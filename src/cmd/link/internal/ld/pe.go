@@ -1479,7 +1479,7 @@ func addpersrc(ctxt *Link) {
 	}
 
 	rsrc := ctxt.loader.Syms[rsrcsym]
-	data := rsrc.P
+	data := ctxt.loader.Data(rsrcsym)
 	size := len(data)
 	h := pefile.addSection(".rsrc", size, size)
 	h.characteristics = IMAGE_SCN_MEM_READ | IMAGE_SCN_MEM_WRITE | IMAGE_SCN_CNT_INITIALIZED_DATA
