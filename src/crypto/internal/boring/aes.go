@@ -168,6 +168,9 @@ func (x *aesCBC) CryptBlocks(dst, src []byte) {
 		}
 		copy(dst, buf)
 		fmt.Println("outlen", outlen)
+		if outlen != C.int(len(src)) {
+			panic("crypto/cipher: CipherUpdate length mismatch")
+		}
 		runtime.KeepAlive(x.ctx)
 	}
 }

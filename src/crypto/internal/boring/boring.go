@@ -17,6 +17,7 @@ import (
 	"crypto/internal/boring/fipstls"
 	"crypto/internal/boring/sig"
 	"errors"
+	"fmt"
 	"math/big"
 	"os"
 	"runtime"
@@ -68,8 +69,16 @@ func enableBoringFIPSMode() {
 }
 
 func fipsModeEnabled() bool {
-	return os.Getenv("GOLANG_FIPS") == "1" ||
-		C._goboringcrypto_FIPS_mode() == fipsOn
+	if os.Getenv("GOLANG_FIPS") == "1" {
+		if C._goboringcrypto_FIPS_mode_set(fipsOn) == fipsOn {
+			return true
+		}
+		fmt.Printf("FIPS_mode() == %d\n", C._goboringcrypto_FIPS_mode())
+		fmt.Println(NewOpenSSLError("boringcrypto: FIPS mode not enabled"))
+		panic("FIPS requested but not enabled")
+		return false
+	}
+	return C._goboringcrypto_FIPS_mode() == fipsOn
 }
 
 var randstub bool

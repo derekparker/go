@@ -179,7 +179,7 @@ func TestDecryptSimple(t *testing.T) {
 	// first call decrypts correctly
 	decrypter.CryptBlocks(decrypted, cipherText[:64])
 	// subsequent call decrypts incorrectly
-	decrypter.CryptBlocks(decrypted, cipherText[64:])
+	decrypter.CryptBlocks(decrypted[64:], cipherText[64:])
 
 	if len(decrypted) != len(plainText) {
 		t.Fail()
