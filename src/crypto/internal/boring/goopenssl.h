@@ -273,6 +273,9 @@ DEFINEFUNC(int, EVP_CipherInit_ex,
 DEFINEFUNC(int, EVP_CipherUpdate,
 		   (EVP_CIPHER_CTX * ctx, unsigned char *out, int *outl, const unsigned char *in, int inl),
 		   (ctx, out, outl, in, inl))
+DEFINEFUNC(int, EVP_CipherFinal,
+		   (EVP_CIPHER_CTX * ctx, unsigned char *out, int *outl),
+		   (ctx, out, outl))
 
 void _goboringcrypto_EVP_AES_ctr128_enc(EVP_CIPHER_CTX *ctx, const uint8_t *in, uint8_t *out, size_t len);
 

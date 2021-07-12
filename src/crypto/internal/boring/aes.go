@@ -15,6 +15,7 @@ import "C"
 import (
 	"crypto/cipher"
 	"errors"
+	"fmt"
 	"runtime"
 	"strconv"
 	"unsafe"
@@ -157,14 +158,17 @@ func (x *aesCBC) CryptBlocks(dst, src []byte) {
 	}
 	if len(src) > 0 {
 		outlen := C.int(0)
+		buf := make([]byte, len(src)+aesBlockSize)
 		if C._goboringcrypto_EVP_CipherUpdate(
 			x.ctx,
-			base(dst), &outlen,
-			base(src), C.int(len(src)),
+			(*C.uint8_t)(unsafe.Pointer(&buf[0])), &outlen,
+			(*C.uint8_t)(unsafe.Pointer(&src[0])), C.int(len(src)),
 		) != 1 {
 			panic("crypto/cipher: CipherUpdate failed")
 		}
-		runtime.KeepAlive(x)
+		copy(dst, buf)
+		fmt.Println("outlen", outlen)
+		runtime.KeepAlive(x.ctx)
 	}
 }
 
@@ -173,6 +177,9 @@ func (x *aesCBC) SetIV(iv []byte) {
 		panic("cipher: incorrect length IV")
 	}
 	copy(x.iv[:], iv)
+	if C.int(1) != C._goboringcrypto_EVP_CipherInit_ex(x.ctx, nil, nil, nil, (*C.uchar)(unsafe.Pointer(&x.iv[0])), -1) {
+		panic("cipher: unable to initialize EVP cipher ctx")
+	}
 }
 
 func (c *aesCipher) NewCBCEncrypter(iv []byte) cipher.BlockMode {
@@ -231,6 +238,8 @@ func (c *aesCipher) NewCBCDecrypter(iv []byte) cipher.BlockMode {
 		cipher = C._goboringcrypto_EVP_aes_192_cbc()
 	case 256:
 		cipher = C._goboringcrypto_EVP_aes_256_cbc()
+	default:
+		panic("crypto/boring: unsupported key length")
 	}
 	if C.int(1) != C._goboringcrypto_EVP_CipherInit_ex(x.ctx, cipher, nil, k, vec, x.mode) {
 		panic("cipher: unable to initialize EVP cipher ctx")
