@@ -457,6 +457,30 @@ func geneq(t *types.Type) *obj.LSym {
 				if last {
 					fn.Body.Append(ir.NewAssignStmt(base.Pos, nr, checkIdx(ir.NewInt(nelem))))
 				}
+			} else if unroll > 1 && nelem%unroll == 0 {
+				unrollIdx := nelem / unroll
+
+				// Generate a for loop.
+				// for i := 0; i < unrollIdx; i += unrollIdx
+				i := typecheck.Temp(types.Types[types.TINT])
+				init := ir.NewAssignStmt(base.Pos, i, ir.NewInt(0))
+				cond := ir.NewBinaryExpr(base.Pos, ir.OLT, i, ir.NewInt(unrollIdx))
+				post := ir.NewAssignOpStmt(base.Pos, ir.OADD, i, ir.NewInt(unrollIdx))
+				loop := ir.NewForStmt(base.Pos, nil, cond, post, nil)
+				loop.PtrInit().Append(init)
+
+				for ii := int64(0); ii < unroll; ii++ {
+					// if check {} else { goto neq }
+					j := ir.NewBinaryExpr(base.Pos, ir.OADD, ir.NewInt(ii), i)
+					nif := ir.NewIfStmt(base.Pos, checkIdx(j), nil, nil)
+					nif.Else.Append(ir.NewBranchStmt(base.Pos, ir.OGOTO, neq))
+					loop.Body.Append(nif)
+				}
+
+				fn.Body.Append(loop)
+				if last {
+					fn.Body.Append(ir.NewAssignStmt(base.Pos, nr, ir.NewBool(true)))
+				}
 			} else {
 				// Generate a for loop.
 				// for i := 0; i < nelem; i++
