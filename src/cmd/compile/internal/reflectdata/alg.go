@@ -425,9 +425,6 @@ func geneq(t *types.Type) *obj.LSym {
 		//     goto neq
 		//   }
 		// }
-		//
-		// TODO(josharian): consider doing some loop unrolling
-		// for larger nelem as well, processing a few elements at a time in a loop.
 		checkAll := func(unroll int64, last bool, eq func(pi, qi ir.Node) ir.Node) {
 			// checkIdx generates a node to check for equality at index i.
 			checkIdx := func(i ir.Node) ir.Node {
@@ -457,7 +454,10 @@ func geneq(t *types.Type) *obj.LSym {
 				if last {
 					fn.Body.Append(ir.NewAssignStmt(base.Pos, nr, checkIdx(ir.NewInt(nelem))))
 				}
-			} else if unroll > 1 && nelem%unroll == 0 {
+			} else if unroll > 1 {
+				// Partially unroll the loop.
+
+				// Get upper bound for partially unrolled loop.
 				unrollIdx := nelem / unroll
 
 				// Generate a for loop.
@@ -476,8 +476,17 @@ func geneq(t *types.Type) *obj.LSym {
 					nif.Else.Append(ir.NewBranchStmt(base.Pos, ir.OGOTO, neq))
 					loop.Body.Append(nif)
 				}
-
 				fn.Body.Append(loop)
+
+				// Get remainder which we will check after the partially unrolled loop.
+				remainder := nelem % unroll
+				for j := (nelem - remainder - 1); j < nelem; j++ {
+					// if check {} else { goto neq }
+					nif := ir.NewIfStmt(base.Pos, checkIdx(ir.NewInt(j)), nil, nil)
+					nif.Else.Append(ir.NewBranchStmt(base.Pos, ir.OGOTO, neq))
+					fn.Body.Append(nif)
+				}
+
 				if last {
 					fn.Body.Append(ir.NewAssignStmt(base.Pos, nr, ir.NewBool(true)))
 				}
