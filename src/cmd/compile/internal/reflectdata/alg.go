@@ -454,7 +454,7 @@ func geneq(t *types.Type) *obj.LSym {
 				if last {
 					fn.Body.Append(ir.NewAssignStmt(base.Pos, nr, checkIdx(ir.NewInt(nelem))))
 				}
-			} else if unroll > 1 {
+			} else if unroll > 1 && nelem > unroll {
 				// Partially unroll the loop.
 
 				// Get upper bound for partially unrolled loop.
