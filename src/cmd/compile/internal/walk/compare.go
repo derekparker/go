@@ -189,7 +189,7 @@ func walkCompare(n *ir.BinaryExpr, init *ir.Nodes) ir.Node {
 	cmpl = safeExpr(cmpl, init)
 	cmpr = safeExpr(cmpr, init)
 	if t.IsStruct() {
-		for _, f := range t.Fields().Slice() {
+		for _, f := range t.FieldSlice() {
 			sym := f.Sym
 			if sym.IsBlank() {
 				continue
