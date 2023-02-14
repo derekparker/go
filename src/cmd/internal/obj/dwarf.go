@@ -80,7 +80,7 @@ func (ctxt *Link) generateDebugLinesSymbol(s, lines *LSym) {
 			wrote = true
 		}
 
-		if line != int64(newLine) || wrote {
+		if line != int64(newLine) || wrote || p.Link == nil {
 			pcdelta := p.Pc - pc
 			lastpc = p.Pc
 			putpclcdelta(ctxt, dctxt, lines, uint64(pcdelta), int64(newLine)-line)
