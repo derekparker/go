@@ -210,14 +210,6 @@ func walkCompare(n *ir.BinaryExpr, init *ir.Nodes) ir.Node {
 		andor = ir.OOROR
 	}
 	var expr ir.Node
-	comp := func(el, er ir.Node) {
-		a := ir.NewBinaryExpr(base.Pos, n.Op(), el, er)
-		if expr == nil {
-			expr = a
-		} else {
-			expr = ir.NewLogicalExpr(base.Pos, andor, expr, a)
-		}
-	}
 	and := func(cond ir.Node) {
 		if expr == nil {
 			expr = cond
@@ -240,60 +232,7 @@ func walkCompare(n *ir.BinaryExpr, init *ir.Nodes) ir.Node {
 			}
 		}
 	} else {
-		step := int64(1)
-		remains := t.NumElem() * t.Elem().Size()
-		combine64bit := unalignedLoad && types.RegSize == 8 && t.Elem().Size() <= 4 && t.Elem().IsInteger()
-		combine32bit := unalignedLoad && t.Elem().Size() <= 2 && t.Elem().IsInteger()
-		combine16bit := unalignedLoad && t.Elem().Size() == 1 && t.Elem().IsInteger()
-		for i := int64(0); remains > 0; {
-			var convType *types.Type
-			switch {
-			case remains >= 8 && combine64bit:
-				convType = types.Types[types.TINT64]
-				step = 8 / t.Elem().Size()
-			case remains >= 4 && combine32bit:
-				convType = types.Types[types.TUINT32]
-				step = 4 / t.Elem().Size()
-			case remains >= 2 && combine16bit:
-				convType = types.Types[types.TUINT16]
-				step = 2 / t.Elem().Size()
-			default:
-				step = 1
-			}
-			if step == 1 {
-				comp(
-					ir.NewIndexExpr(base.Pos, cmpl, ir.NewInt(base.Pos, i)),
-					ir.NewIndexExpr(base.Pos, cmpr, ir.NewInt(base.Pos, i)),
-				)
-				i++
-				remains -= t.Elem().Size()
-			} else {
-				elemType := t.Elem().ToUnsigned()
-				cmplw := ir.Node(ir.NewIndexExpr(base.Pos, cmpl, ir.NewInt(base.Pos, i)))
-				cmplw = typecheck.Conv(cmplw, elemType) // convert to unsigned
-				cmplw = typecheck.Conv(cmplw, convType) // widen
-				cmprw := ir.Node(ir.NewIndexExpr(base.Pos, cmpr, ir.NewInt(base.Pos, i)))
-				cmprw = typecheck.Conv(cmprw, elemType)
-				cmprw = typecheck.Conv(cmprw, convType)
-				// For code like this:  uint32(s[0]) | uint32(s[1])<<8 | uint32(s[2])<<16 ...
-				// ssa will generate a single large load.
-				for offset := int64(1); offset < step; offset++ {
-					lb := ir.Node(ir.NewIndexExpr(base.Pos, cmpl, ir.NewInt(base.Pos, i+offset)))
-					lb = typecheck.Conv(lb, elemType)
-					lb = typecheck.Conv(lb, convType)
-					lb = ir.NewBinaryExpr(base.Pos, ir.OLSH, lb, ir.NewInt(base.Pos, 8*t.Elem().Size()*offset))
-					cmplw = ir.NewBinaryExpr(base.Pos, ir.OOR, cmplw, lb)
-					rb := ir.Node(ir.NewIndexExpr(base.Pos, cmpr, ir.NewInt(base.Pos, i+offset)))
-					rb = typecheck.Conv(rb, elemType)
-					rb = typecheck.Conv(rb, convType)
-					rb = ir.NewBinaryExpr(base.Pos, ir.OLSH, rb, ir.NewInt(base.Pos, 8*t.Elem().Size()*offset))
-					cmprw = ir.NewBinaryExpr(base.Pos, ir.OOR, cmprw, rb)
-				}
-				comp(cmplw, cmprw)
-				i += step
-				remains -= step * t.Elem().Size()
-			}
-		}
+		expr = compare.EqArray(n)
 	}
 	if expr == nil {
 		expr = ir.NewBool(base.Pos, n.Op() == ir.OEQ)
