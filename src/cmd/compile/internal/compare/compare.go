@@ -9,6 +9,7 @@ package compare
 import (
 	"cmd/compile/internal/base"
 	"cmd/compile/internal/ir"
+	"cmd/compile/internal/ssagen"
 	"cmd/compile/internal/typecheck"
 	"cmd/compile/internal/types"
 	"fmt"
@@ -77,6 +78,25 @@ func EqCanPanic(t *types.Type) bool {
 		}
 		return false
 	}
+}
+
+func EqArray(n *ir.BinaryExpr) {
+	var (
+		maxcmpsize    = int64(4)
+		unalignedLoad = ssagen.Arch.LinkArch.CanMergeLoads
+		t             = n.X.Type()
+		inline        = t.NumElem() <= 1 || (types.IsSimple[t.Elem().Kind()] && (t.NumElem() <= 4 || t.Elem().Size()*t.NumElem() <= maxcmpsize))
+	)
+
+	if unalignedLoad {
+		// Keep this low enough to generate less code than a function call.
+		maxcmpsize = 2 * int64(ssagen.Arch.LinkArch.RegSize)
+	}
+
+	if !inline {
+
+	}
+
 }
 
 // EqStructCost returns the cost of an equality comparison of two structs.
