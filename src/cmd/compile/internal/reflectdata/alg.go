@@ -507,7 +507,22 @@ func eqFunc(t *types.Type) *ir.Func {
 				// p[i] == q[i]
 				return ir.NewBinaryExpr(base.Pos, ir.OEQ, pi, qi)
 			})
-		// TODO: pick apart structs, do them piecemeal too
+		case types.TSTRUCT:
+			var expr ir.Node
+			and := func(cond ir.Node) {
+				if expr == nil {
+					expr = cond
+				} else {
+					expr = ir.NewLogicalExpr(base.Pos, ir.OANDAND, expr, cond)
+				}
+			}
+			checkAll(1, true, func(pi, qi ir.Node) ir.Node {
+				conds := compare.EqStruct(t.Elem(), pi, qi)
+				for _, cond := range conds {
+					and(cond)
+				}
+				return expr
+			})
 		default:
 			checkAll(1, true, func(pi, qi ir.Node) ir.Node {
 				// p[i] == q[i]
