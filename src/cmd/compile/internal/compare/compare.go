@@ -79,93 +79,220 @@ func EqCanPanic(t *types.Type) bool {
 	}
 }
 
-func EqArray(n *ir.BinaryExpr) ir.Node {
-	var (
-		t = n.X.Type()
+func EqArray(n *ir.BinaryExpr, t *types.Type, simple bool, fn *ir.Func, neq *types.Sym, np, nq, nr ir.Node) ir.Node {
+	if simple {
+		var (
+			step    = int64(1)
+			remains = t.NumElem() * t.Elem().Size()
 
-		step    = int64(1)
-		remains = t.NumElem() * t.Elem().Size()
+			unalignedLoad = base.Ctxt.Arch.CanMergeLoads
+			combine64bit  = unalignedLoad && types.RegSize == 8 && t.Elem().Size() <= 4 && t.Elem().IsInteger()
+			combine32bit  = unalignedLoad && t.Elem().Size() <= 2 && t.Elem().IsInteger()
+			combine16bit  = unalignedLoad && t.Elem().Size() == 1 && t.Elem().IsInteger()
+		)
 
-		unalignedLoad = base.Ctxt.Arch.CanMergeLoads
-		combine64bit  = unalignedLoad && types.RegSize == 8 && t.Elem().Size() <= 4 && t.Elem().IsInteger()
-		combine32bit  = unalignedLoad && t.Elem().Size() <= 2 && t.Elem().IsInteger()
-		combine16bit  = unalignedLoad && t.Elem().Size() == 1 && t.Elem().IsInteger()
-	)
-
-	andor := ir.OANDAND
-	if n.Op() == ir.ONE {
-		andor = ir.OOROR
-	}
-
-	var expr ir.Node
-	comp := func(el, er ir.Node) {
-		a := ir.NewBinaryExpr(base.Pos, n.Op(), el, er)
-		if expr == nil {
-			expr = a
-		} else {
-			expr = ir.NewLogicalExpr(base.Pos, andor, expr, a)
-		}
-	}
-	cmpl := n.X
-	for cmpl != nil && cmpl.Op() == ir.OCONVNOP {
-		cmpl = cmpl.(*ir.ConvExpr).X
-	}
-	cmpr := n.Y
-	for cmpr != nil && cmpr.Op() == ir.OCONVNOP {
-		cmpr = cmpr.(*ir.ConvExpr).X
-	}
-
-	for i := int64(0); remains > 0; {
-		var convType *types.Type
-		switch {
-		case remains >= 8 && combine64bit:
-			convType = types.Types[types.TINT64]
-			step = 8 / t.Elem().Size()
-		case remains >= 4 && combine32bit:
-			convType = types.Types[types.TUINT32]
-			step = 4 / t.Elem().Size()
-		case remains >= 2 && combine16bit:
-			convType = types.Types[types.TUINT16]
-			step = 2 / t.Elem().Size()
-		default:
-			step = 1
+		andor := ir.OANDAND
+		if n.Op() == ir.ONE {
+			andor = ir.OOROR
 		}
 
-		if step == 1 {
-			comp(
-				ir.NewIndexExpr(base.Pos, cmpl, ir.NewInt(base.Pos, i)),
-				ir.NewIndexExpr(base.Pos, cmpr, ir.NewInt(base.Pos, i)),
-			)
-			i++
-			remains -= t.Elem().Size()
-		} else {
-			elemType := t.Elem().ToUnsigned()
-			cmplw := ir.Node(ir.NewIndexExpr(base.Pos, cmpl, ir.NewInt(base.Pos, i)))
-			cmplw = typecheck.Conv(cmplw, elemType) // convert to unsigned
-			cmplw = typecheck.Conv(cmplw, convType) // widen
-			cmprw := ir.Node(ir.NewIndexExpr(base.Pos, cmpr, ir.NewInt(base.Pos, i)))
-			cmprw = typecheck.Conv(cmprw, elemType)
-			cmprw = typecheck.Conv(cmprw, convType)
-			// For code like this:  uint32(s[0]) | uint32(s[1])<<8 | uint32(s[2])<<16 ...
-			// ssa will generate a single large load.
-			for offset := int64(1); offset < step; offset++ {
-				lb := ir.Node(ir.NewIndexExpr(base.Pos, cmpl, ir.NewInt(base.Pos, i+offset)))
-				lb = typecheck.Conv(lb, elemType)
-				lb = typecheck.Conv(lb, convType)
-				lb = ir.NewBinaryExpr(base.Pos, ir.OLSH, lb, ir.NewInt(base.Pos, 8*t.Elem().Size()*offset))
-				cmplw = ir.NewBinaryExpr(base.Pos, ir.OOR, cmplw, lb)
-				rb := ir.Node(ir.NewIndexExpr(base.Pos, cmpr, ir.NewInt(base.Pos, i+offset)))
-				rb = typecheck.Conv(rb, elemType)
-				rb = typecheck.Conv(rb, convType)
-				rb = ir.NewBinaryExpr(base.Pos, ir.OLSH, rb, ir.NewInt(base.Pos, 8*t.Elem().Size()*offset))
-				cmprw = ir.NewBinaryExpr(base.Pos, ir.OOR, cmprw, rb)
+		var expr ir.Node
+		comp := func(el, er ir.Node) {
+			a := ir.NewBinaryExpr(base.Pos, n.Op(), el, er)
+			if expr == nil {
+				expr = a
+			} else {
+				expr = ir.NewLogicalExpr(base.Pos, andor, expr, a)
 			}
-			comp(cmplw, cmprw)
-			i += step
-			remains -= step * t.Elem().Size()
+		}
+		cmpl := n.X
+		for cmpl != nil && cmpl.Op() == ir.OCONVNOP {
+			cmpl = cmpl.(*ir.ConvExpr).X
+		}
+		cmpr := n.Y
+		for cmpr != nil && cmpr.Op() == ir.OCONVNOP {
+			cmpr = cmpr.(*ir.ConvExpr).X
+		}
+
+		for i := int64(0); remains > 0; {
+			var convType *types.Type
+			switch {
+			case remains >= 8 && combine64bit:
+				convType = types.Types[types.TINT64]
+				step = 8 / t.Elem().Size()
+			case remains >= 4 && combine32bit:
+				convType = types.Types[types.TUINT32]
+				step = 4 / t.Elem().Size()
+			case remains >= 2 && combine16bit:
+				convType = types.Types[types.TUINT16]
+				step = 2 / t.Elem().Size()
+			default:
+				step = 1
+			}
+
+			if step == 1 {
+				comp(
+					ir.NewIndexExpr(base.Pos, cmpl, ir.NewInt(base.Pos, i)),
+					ir.NewIndexExpr(base.Pos, cmpr, ir.NewInt(base.Pos, i)),
+				)
+				i++
+				remains -= t.Elem().Size()
+			} else {
+				elemType := t.Elem().ToUnsigned()
+				cmplw := ir.Node(ir.NewIndexExpr(base.Pos, cmpl, ir.NewInt(base.Pos, i)))
+				cmplw = typecheck.Conv(cmplw, elemType) // convert to unsigned
+				cmplw = typecheck.Conv(cmplw, convType) // widen
+				cmprw := ir.Node(ir.NewIndexExpr(base.Pos, cmpr, ir.NewInt(base.Pos, i)))
+				cmprw = typecheck.Conv(cmprw, elemType)
+				cmprw = typecheck.Conv(cmprw, convType)
+				// For code like this:  uint32(s[0]) | uint32(s[1])<<8 | uint32(s[2])<<16 ...
+				// ssa will generate a single large load.
+				for offset := int64(1); offset < step; offset++ {
+					lb := ir.Node(ir.NewIndexExpr(base.Pos, cmpl, ir.NewInt(base.Pos, i+offset)))
+					lb = typecheck.Conv(lb, elemType)
+					lb = typecheck.Conv(lb, convType)
+					lb = ir.NewBinaryExpr(base.Pos, ir.OLSH, lb, ir.NewInt(base.Pos, 8*t.Elem().Size()*offset))
+					cmplw = ir.NewBinaryExpr(base.Pos, ir.OOR, cmplw, lb)
+					rb := ir.Node(ir.NewIndexExpr(base.Pos, cmpr, ir.NewInt(base.Pos, i+offset)))
+					rb = typecheck.Conv(rb, elemType)
+					rb = typecheck.Conv(rb, convType)
+					rb = ir.NewBinaryExpr(base.Pos, ir.OLSH, rb, ir.NewInt(base.Pos, 8*t.Elem().Size()*offset))
+					cmprw = ir.NewBinaryExpr(base.Pos, ir.OOR, cmprw, rb)
+				}
+				comp(cmplw, cmprw)
+				i += step
+				remains -= step * t.Elem().Size()
+			}
+		}
+		return expr
+	} else {
+		nelem := t.NumElem()
+
+		// checkAll generates code to check the equality of all array elements.
+		// If unroll is greater than nelem, checkAll generates:
+		//
+		// if eq(p[0], q[0]) && eq(p[1], q[1]) && ... {
+		// } else {
+		//   goto neq
+		// }
+		//
+		// And so on.
+		//
+		// Otherwise it generates:
+		//
+		// iterateTo := nelem/unroll*unroll
+		// for i := 0; i < iterateTo; i += unroll {
+		//   if eq(p[i+0], q[i+0]) && eq(p[i+1], q[i+1]) && ... && eq(p[i+unroll-1], q[i+unroll-1]) {
+		//   } else {
+		//     goto neq
+		//   }
+		// }
+		// if eq(p[iterateTo+0], q[iterateTo+0]) && eq(p[iterateTo+1], q[iterateTo+1]) && ... {
+		// } else {
+		//    goto neq
+		// }
+		//
+		checkAll := func(unroll int64, last bool, eq func(pi, qi ir.Node) ir.Node) {
+			// checkIdx generates a node to check for equality at index i.
+			checkIdx := func(i ir.Node) ir.Node {
+				// pi := p[i]
+				pi := ir.NewIndexExpr(base.Pos, np, i)
+				pi.SetBounded(true)
+				pi.SetType(t.Elem())
+				// qi := q[i]
+				qi := ir.NewIndexExpr(base.Pos, nq, i)
+				qi.SetBounded(true)
+				qi.SetType(t.Elem())
+				return eq(pi, qi)
+			}
+
+			iterations := nelem / unroll
+			iterateTo := iterations * unroll
+			// If a loop is iterated only once, there shouldn't be any loop at all.
+			if iterations == 1 {
+				iterateTo = 0
+			}
+
+			if iterateTo > 0 {
+				// Generate an unrolled for loop.
+				// for i := 0; i < nelem/unroll*unroll; i += unroll
+				i := typecheck.Temp(types.Types[types.TINT])
+				init := ir.NewAssignStmt(base.Pos, i, ir.NewInt(base.Pos, 0))
+				cond := ir.NewBinaryExpr(base.Pos, ir.OLT, i, ir.NewInt(base.Pos, iterateTo))
+				loop := ir.NewForStmt(base.Pos, nil, cond, nil, nil, false)
+				loop.PtrInit().Append(init)
+
+				// if eq(p[i+0], q[i+0]) && eq(p[i+1], q[i+1]) && ... && eq(p[i+unroll-1], q[i+unroll-1]) {
+				// } else {
+				//   goto neq
+				// }
+				for j := int64(0); j < unroll; j++ {
+					// if check {} else { goto neq }
+					nif := ir.NewIfStmt(base.Pos, checkIdx(i), nil, nil)
+					nif.Else.Append(ir.NewBranchStmt(base.Pos, ir.OGOTO, neq))
+					loop.Body.Append(nif)
+					post := ir.NewAssignStmt(base.Pos, i, ir.NewBinaryExpr(base.Pos, ir.OADD, i, ir.NewInt(base.Pos, 1)))
+					loop.Body.Append(post)
+				}
+
+				fn.Body.Append(loop)
+
+				if nelem == iterateTo {
+					if last {
+						fn.Body.Append(ir.NewAssignStmt(base.Pos, nr, ir.NewBool(base.Pos, true)))
+					}
+					return
+				}
+			}
+
+			// Generate remaining checks, if nelem is not a multiple of unroll.
+			if last {
+				// Do last comparison in a different manner.
+				nelem--
+			}
+			// if eq(p[iterateTo+0], q[iterateTo+0]) && eq(p[iterateTo+1], q[iterateTo+1]) && ... {
+			// } else {
+			//    goto neq
+			// }
+			for j := iterateTo; j < nelem; j++ {
+				// if check {} else { goto neq }
+				nif := ir.NewIfStmt(base.Pos, checkIdx(ir.NewInt(base.Pos, j)), nil, nil)
+				nif.Else.Append(ir.NewBranchStmt(base.Pos, ir.OGOTO, neq))
+				fn.Body.Append(nif)
+			}
+			if last {
+				fn.Body.Append(ir.NewAssignStmt(base.Pos, nr, checkIdx(ir.NewInt(base.Pos, nelem))))
+			}
+		}
+
+		switch t.Elem().Kind() {
+		case types.TSTRING:
+			// Do two loops. First, check that all the lengths match (cheap).
+			// Second, check that all the contents match (expensive).
+			checkAll(3, false, func(pi, qi ir.Node) ir.Node {
+				// Compare lengths.
+				eqlen, _ := EqString(pi, qi)
+				return eqlen
+			})
+			checkAll(1, true, func(pi, qi ir.Node) ir.Node {
+				// Compare contents.
+				_, eqmem := EqString(pi, qi)
+				return eqmem
+			})
+		case types.TFLOAT32, types.TFLOAT64:
+			checkAll(2, true, func(pi, qi ir.Node) ir.Node {
+				// p[i] == q[i]
+				return ir.NewBinaryExpr(base.Pos, ir.OEQ, pi, qi)
+			})
+		// TODO: pick apart structs, do them piecemeal too
+		default:
+			checkAll(1, true, func(pi, qi ir.Node) ir.Node {
+				// p[i] == q[i]
+				return ir.NewBinaryExpr(base.Pos, ir.OEQ, pi, qi)
+			})
 		}
 	}
-	return expr
+	return nil
 }
 
 // EqStructCost returns the cost of an equality comparison of two structs.

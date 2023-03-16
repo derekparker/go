@@ -232,7 +232,7 @@ func walkCompare(n *ir.BinaryExpr, init *ir.Nodes) ir.Node {
 			}
 		}
 	} else {
-		expr = compare.EqArray(n)
+		expr = compare.EqArray(n, n.X.Type(), true, nil, nil, nil, nil, nil)
 	}
 	if expr == nil {
 		expr = ir.NewBool(base.Pos, n.Op() == ir.OEQ)
