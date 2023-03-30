@@ -4,7 +4,10 @@
 
 package reflectdata_test
 
-import "testing"
+import (
+	"math/rand"
+	"testing"
+)
 
 func BenchmarkEqArrayOfStrings5(b *testing.B) {
 	var a [5]string
@@ -79,6 +82,44 @@ const size = 16
 
 type T1 struct {
 	a [size]byte
+}
+
+const letterBytes = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
+
+func randStringBytes(n int) string {
+	b := make([]byte, n)
+	for i := range b {
+		b[i] = letterBytes[rand.Intn(len(letterBytes))]
+	}
+	return string(b)
+}
+
+func BenchmarkEqArrayOfStructs(b *testing.B) {
+	type T2 struct {
+		a string
+		b int
+	}
+	const size = 1024
+	var (
+		// str1 = randStringBytes(10)
+		// str2 = randStringBytes(10)
+		str1 = "foobar"
+		str2 = "foobaz"
+
+		a [size]T2
+		c [size]T2
+	)
+
+	for i := 0; i < size; i++ {
+		a[i].a = str1
+		c[i].a = str1
+	}
+	c[len(c)-1].a = str2
+
+	b.ResetTimer()
+	for j := 0; j < b.N; j++ {
+		_ = a == c
+	}
 }
 
 func BenchmarkEqStruct(b *testing.B) {
