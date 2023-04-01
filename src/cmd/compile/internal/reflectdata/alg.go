@@ -509,8 +509,8 @@ func eqFunc(t *types.Type) *ir.Func {
 			})
 		case types.TSTRUCT:
 			cost := compare.EqStructCost(t.Elem())
-			if cost <= 8 {
-				checkAll(4, true, func(pi, qi ir.Node) ir.Node {
+			if cost <= 4 {
+				checkAll(2, true, func(pi, qi ir.Node) ir.Node {
 					// p[i] == q[i]
 					return ir.NewBinaryExpr(base.Pos, ir.OEQ, pi, qi)
 				})
