@@ -7,6 +7,7 @@ package ssa
 import (
 	"cmd/compile/internal/ir"
 	"cmd/compile/internal/types"
+	"fmt"
 )
 
 // dse does dead-store elimination on the Function.
@@ -34,9 +35,11 @@ func dse(f *Func) {
 				continue
 			}
 			if v.Type.IsMemory() {
+				fmt.Printf("is memory: %s\n", v)
 				stores = append(stores, v)
 				for _, a := range v.Args {
 					if a.Block == b && a.Type.IsMemory() {
+						fmt.Println("adding to storeUse:", a)
 						storeUse.add(a.ID)
 						if v.Op != OpStore && v.Op != OpZero && v.Op != OpVarDef {
 							// CALL, DUFFCOPY, etc. are both
@@ -46,8 +49,20 @@ func dse(f *Func) {
 					}
 				}
 			} else {
+				fmt.Printf("not memory: %s\n", v)
+				// If we have an OpLocalAddr, perhaps we check if we've already
+				// seen another OpLocalAddr with the same variable, if so maybe
+				// we can alter the memory context so that we don't get erroneous
+				// stores.
+				if v.Op == OpLocalAddr {
+					fmt.Println("is local addr")
+					fmt.Println("aux:", v.Aux)
+					fmt.Printf("--- %t\n", v.Aux)
+				}
 				for _, a := range v.Args {
+					fmt.Println("arg:", a)
 					if a.Block == b && a.Type.IsMemory() {
+						fmt.Println("adding to loadUse:", a)
 						loadUse.add(a.ID)
 					}
 				}
@@ -89,11 +104,13 @@ func dse(f *Func) {
 		}
 		if v.Op == OpStore || v.Op == OpZero {
 			ptr := v.Args[0]
+			// fmt.Printf("%#v\n", ptr)
 			var off int64
 			for ptr.Op == OpOffPtr { // Walk to base pointer
 				off += ptr.AuxInt
 				ptr = ptr.Args[0]
 			}
+			// fmt.Printf("off: %d\n", off)
 			var sz int64
 			if v.Op == OpStore {
 				sz = v.Aux.(*types.Type).Size()
@@ -113,7 +130,6 @@ func dse(f *Func) {
 				}
 				v.Aux = nil
 				v.AuxInt = 0
-				v.Op = OpCopy
 			} else {
 				// Extend shadowed region.
 				shadowed.set(ptr.ID, int32(sr.merge(off, off+sz)))
@@ -146,6 +162,7 @@ type shadowRange int32
 func (sr shadowRange) lo() int64 {
 	return int64(sr & 0xffff)
 }
+
 func (sr shadowRange) hi() int64 {
 	return int64((sr >> 16) & 0xffff)
 }
