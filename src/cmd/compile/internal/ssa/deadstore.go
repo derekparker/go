@@ -130,6 +130,7 @@ func dse(f *Func) {
 				}
 				v.Aux = nil
 				v.AuxInt = 0
+				v.Op = OpCopy
 			} else {
 				// Extend shadowed region.
 				shadowed.set(ptr.ID, int32(sr.merge(off, off+sz)))
