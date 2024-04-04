@@ -157,6 +157,7 @@ func TestDeadStoreSmallStructInit(t *testing.T) {
 		Bloc("exit",
 			Exit("zerostore4")))
 
+	fun.f.Name = "smallstructinit"
 	t.Logf("%s", fun.f.String())
 	CheckFunc(fun.f)
 	cse(fun.f)

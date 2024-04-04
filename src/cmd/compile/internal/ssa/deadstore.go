@@ -34,12 +34,19 @@ func dse(f *Func) {
 				// Ignore phis - they will always be first and can't be eliminated
 				continue
 			}
+			if v.Op == OpLocalAddr {
+				// Eliminate memory dependence of OpLocalAddr
+				// without pointers.
+				if !v.Type.Elem().HasPointers() {
+					v.SetArgs1(v.Args[0])
+				}
+			}
 			if v.Type.IsMemory() {
-				fmt.Printf("is memory: %s\n", v)
+				// fmt.Printf("is memory: %s\n", v)
 				stores = append(stores, v)
 				for _, a := range v.Args {
 					if a.Block == b && a.Type.IsMemory() {
-						fmt.Println("adding to storeUse:", a)
+						// fmt.Println("adding to storeUse:", a)
 						storeUse.add(a.ID)
 						if v.Op != OpStore && v.Op != OpZero && v.Op != OpVarDef {
 							// CALL, DUFFCOPY, etc. are both
@@ -49,18 +56,18 @@ func dse(f *Func) {
 					}
 				}
 			} else {
-				fmt.Printf("not memory: %s\n", v)
+				// fmt.Printf("not memory: %s\n", v)
 				// If we have an OpLocalAddr, perhaps we check if we've already
 				// seen another OpLocalAddr with the same variable, if so maybe
 				// we can alter the memory context so that we don't get erroneous
 				// stores.
 				if v.Op == OpLocalAddr {
-					fmt.Println("is local addr")
-					fmt.Println("aux:", v.Aux)
-					fmt.Printf("--- %t\n", v.Aux)
+					// fmt.Println("is local addr")
+					// fmt.Println("aux:", v.Aux)
+					// fmt.Printf("--- %t\n", v.Aux)
+					// Maybe we can use isSamePtr() here?
 				}
 				for _, a := range v.Args {
-					fmt.Println("arg:", a)
 					if a.Block == b && a.Type.IsMemory() {
 						fmt.Println("adding to loadUse:", a)
 						loadUse.add(a.ID)

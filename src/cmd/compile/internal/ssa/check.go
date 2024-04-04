@@ -259,13 +259,13 @@ func checkFunc(f *Func) {
 			}
 
 			if v.Op == OpLocalAddr {
-				if len(v.Args) != 2 {
+				if len(v.Args) != 2 && len(v.Args) != 1 {
 					f.Fatalf("wrong # of args for OpLocalAddr %s", v.LongString())
 				}
 				if v.Args[0].Op != OpSP {
 					f.Fatalf("bad arg 0 to OpLocalAddr %v", v)
 				}
-				if !v.Args[1].Type.IsMemory() {
+				if len(v.Args) == 2 && !v.Args[1].Type.IsMemory() {
 					f.Fatalf("bad arg 1 to OpLocalAddr %v", v)
 				}
 			}
