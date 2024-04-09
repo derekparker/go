@@ -66,7 +66,6 @@ func dse(f *Func) {
 							}
 						}
 					}
-
 				}
 			}
 			if v.Type.IsMemory() {
