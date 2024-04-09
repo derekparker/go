@@ -29,6 +29,7 @@ func dse(f *Func) {
 		//  storeUse contains stores which are used by a subsequent store.
 		loadUse.clear()
 		storeUse.clear()
+		localAddrs.clear()
 		stores = stores[:0]
 		for i, v := range b.Values {
 			if v.Op == OpPhi {
@@ -38,9 +39,9 @@ func dse(f *Func) {
 			if v.Op == OpLocalAddr {
 				// Eliminate memory dependence of OpLocalAddr
 				// without pointers.
-				if !v.Type.Elem().HasPointers() {
-					v.SetArgs1(v.Args[0])
-				}
+				// if !v.Type.Elem().HasPointers() {
+				// 	v.SetArgs1(v.Args[0])
+				// }
 				findSameLocalAddr := func(vv *Value, localAddrs *sparseSet) int {
 					for _, idx := range localAddrs.contents() {
 						la := b.Values[idx]
@@ -55,6 +56,7 @@ func dse(f *Func) {
 					localAddrs.add(ID(i))
 				} else {
 					la := b.Values[seenLocalAddr]
+					v.SetArgs2(v.Args[0], la.Args[1])
 					for _, vv := range b.Values {
 						for i, arg := range vv.Args {
 							if arg.ID == v.ID {
