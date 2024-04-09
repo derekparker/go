@@ -39694,7 +39694,7 @@ var opcodeTable = [...]opInfo{
 	{
 		name:      "LocalAddr",
 		auxType:   auxSym,
-		argLen:    2,
+		argLen:    -1,
 		symEffect: SymAddr,
 		generic:   true,
 	},

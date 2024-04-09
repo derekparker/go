@@ -7,7 +7,6 @@ package ssa
 import (
 	"cmd/compile/internal/ir"
 	"cmd/compile/internal/types"
-	"fmt"
 )
 
 // dse does dead-store elimination on the Function.
@@ -22,6 +21,8 @@ func dse(f *Func) {
 	defer f.retSparseSet(storeUse)
 	shadowed := f.newSparseMap(f.NumValues())
 	defer f.retSparseMap(shadowed)
+	localAddrs := f.newSparseSet(f.NumValues())
+	defer f.retSparseSet(localAddrs)
 	for _, b := range f.Blocks {
 		// Find all the stores in this block. Categorize their uses:
 		//  loadUse contains stores which are used by a subsequent load.
@@ -29,17 +30,47 @@ func dse(f *Func) {
 		loadUse.clear()
 		storeUse.clear()
 		stores = stores[:0]
-		for _, v := range b.Values {
+		for i, v := range b.Values {
 			if v.Op == OpPhi {
 				// Ignore phis - they will always be first and can't be eliminated
 				continue
 			}
+			if v.Op == OpLocalAddr {
+				// Eliminate memory dependence of OpLocalAddr
+				// without pointers.
+				if !v.Type.Elem().HasPointers() {
+					v.SetArgs1(v.Args[0])
+				}
+				findSameLocalAddr := func(vv *Value, localAddrs *sparseSet) int {
+					for _, idx := range localAddrs.contents() {
+						la := b.Values[idx]
+						if isSamePtr(la, vv) {
+							return int(idx)
+						}
+					}
+					return -1
+				}
+				seenLocalAddr := findSameLocalAddr(v, localAddrs)
+				if localAddrs.size() == 0 || seenLocalAddr == -1 {
+					localAddrs.add(ID(i))
+				} else {
+					la := b.Values[seenLocalAddr]
+					for _, vv := range b.Values {
+						for i, arg := range vv.Args {
+							if arg.ID == v.ID {
+								la.Uses++
+								arg.Uses--
+								vv.Args[i] = la
+							}
+						}
+					}
+
+				}
+			}
 			if v.Type.IsMemory() {
-				fmt.Printf("is memory: %s\n", v)
 				stores = append(stores, v)
 				for _, a := range v.Args {
 					if a.Block == b && a.Type.IsMemory() {
-						fmt.Println("adding to storeUse:", a)
 						storeUse.add(a.ID)
 						if v.Op != OpStore && v.Op != OpZero && v.Op != OpVarDef {
 							// CALL, DUFFCOPY, etc. are both
@@ -49,20 +80,15 @@ func dse(f *Func) {
 					}
 				}
 			} else {
-				fmt.Printf("not memory: %s\n", v)
 				// If we have an OpLocalAddr, perhaps we check if we've already
 				// seen another OpLocalAddr with the same variable, if so maybe
 				// we can alter the memory context so that we don't get erroneous
 				// stores.
 				if v.Op == OpLocalAddr {
-					fmt.Println("is local addr")
-					fmt.Println("aux:", v.Aux)
-					fmt.Printf("--- %t\n", v.Aux)
+					// Maybe we can use isSamePtr() here?
 				}
 				for _, a := range v.Args {
-					fmt.Println("arg:", a)
 					if a.Block == b && a.Type.IsMemory() {
-						fmt.Println("adding to loadUse:", a)
 						loadUse.add(a.ID)
 					}
 				}
@@ -104,19 +130,18 @@ func dse(f *Func) {
 		}
 		if v.Op == OpStore || v.Op == OpZero {
 			ptr := v.Args[0]
-			// fmt.Printf("%#v\n", ptr)
 			var off int64
 			for ptr.Op == OpOffPtr { // Walk to base pointer
 				off += ptr.AuxInt
 				ptr = ptr.Args[0]
 			}
-			// fmt.Printf("off: %d\n", off)
 			var sz int64
 			if v.Op == OpStore {
 				sz = v.Aux.(*types.Type).Size()
 			} else { // OpZero
 				sz = v.AuxInt
 			}
+			// ptr.ID = 4
 			sr := shadowRange(shadowed.get(ptr.ID))
 			if sr.contains(off, off+sz) {
 				// Modify the store/zero into a copy of the memory state,
