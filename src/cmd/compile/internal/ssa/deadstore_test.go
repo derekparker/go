@@ -158,12 +158,10 @@ func TestDeadStoreSmallStructInit(t *testing.T) {
 			Exit("zerostore4")))
 
 	fun.f.Name = "smallstructinit"
-	t.Logf("before::: %s", fun.f.String())
 	CheckFunc(fun.f)
 	cse(fun.f)
 	dse(fun.f)
 	CheckFunc(fun.f)
-	t.Logf("after::: %s", fun.f.String())
 
 	v1 := fun.values["zerostore1"]
 	if v1.Op != OpCopy {

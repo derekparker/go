@@ -27,6 +27,7 @@ func dse(f *Func) {
 		// Find all the stores in this block. Categorize their uses:
 		//  loadUse contains stores which are used by a subsequent load.
 		//  storeUse contains stores which are used by a subsequent store.
+		//  localAddrs contains OpLocalAddr indexes into b.Values for each unique LocalAddr without pointers.
 		loadUse.clear()
 		storeUse.clear()
 		localAddrs.clear()
@@ -46,26 +47,9 @@ func dse(f *Func) {
 				continue
 			}
 			if v.Op == OpLocalAddr && !v.Type.Elem().HasPointers() {
-				// Eliminate memory dependence of OpLocalAddr
-				// without pointers.
-				// if !v.Type.Elem().HasPointers() {
-				// 	v.SetArgs1(v.Args[0])
-				// }
 				seenLocalAddr := findSameLocalAddr(v, localAddrs)
 				if localAddrs.size() == 0 || seenLocalAddr == -1 {
 					localAddrs.add(ID(i))
-					// } else {
-					// 	la := b.Values[seenLocalAddr]
-					// 	v.SetArgs2(v.Args[0], la.Args[1])
-					// 	for _, vv := range b.Values {
-					// 		for i, arg := range vv.Args {
-					// 			if arg.ID == v.ID {
-					// 				la.Uses++
-					// 				arg.Uses--
-					// 				vv.Args[i] = la
-					// 			}
-					// 		}
-					// 	}
 				}
 			}
 			if v.Type.IsMemory() {
@@ -87,11 +71,9 @@ func dse(f *Func) {
 				// stores.
 				skipLocalAddr := false
 				if v.Op == OpLocalAddr {
-					// Maybe we can use isSamePtr() here?
 					idx := findSameLocalAddr(v, localAddrs)
 					skipLocalAddr = !v.Type.Elem().HasPointers() && idx >= 0
 				}
-				// fmt.Println("v:", v, "skipLocalAddr:", skipLocalAddr)
 				for _, a := range v.Args {
 					if a.Block == b && a.Type.IsMemory() && !skipLocalAddr {
 						loadUse.add(a.ID)
@@ -131,10 +113,8 @@ func dse(f *Func) {
 		if loadUse.contains(v.ID) {
 			// Someone might be reading this memory state.
 			// Clear all shadowed addresses.
-			// fmt.Println("clearing shadow for:", v)
 			shadowed.clear()
 		}
-		// fmt.Println("past shadow clearing")
 		if v.Op == OpStore || v.Op == OpZero {
 			ptr := v.Args[0]
 			var off int64
@@ -154,9 +134,7 @@ func dse(f *Func) {
 				ptr = b.Values[idx]
 			}
 			sr := shadowRange(shadowed.get(ptr.ID))
-			// fmt.Println("sr", sr)
 			if sr.contains(off, off+sz) {
-				// fmt.Println("contains ---")
 				// Modify the store/zero into a copy of the memory state,
 				// effectively eliding the store operation.
 				if v.Op == OpStore {
@@ -170,7 +148,6 @@ func dse(f *Func) {
 				v.AuxInt = 0
 				v.Op = OpCopy
 			} else {
-				// fmt.Println("extending shadowed region")
 				// Extend shadowed region.
 				shadowed.set(ptr.ID, int32(sr.merge(off, off+sz)))
 			}
