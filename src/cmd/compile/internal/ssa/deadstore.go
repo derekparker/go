@@ -31,41 +31,41 @@ func dse(f *Func) {
 		storeUse.clear()
 		localAddrs.clear()
 		stores = stores[:0]
+		findSameLocalAddr := func(vv *Value, localAddrs *sparseSet) int {
+			for _, idx := range localAddrs.contents() {
+				la := b.Values[idx]
+				if isSamePtr(la, vv) {
+					return int(idx)
+				}
+			}
+			return -1
+		}
 		for i, v := range b.Values {
 			if v.Op == OpPhi {
 				// Ignore phis - they will always be first and can't be eliminated
 				continue
 			}
-			if v.Op == OpLocalAddr {
+			if v.Op == OpLocalAddr && !v.Type.Elem().HasPointers() {
 				// Eliminate memory dependence of OpLocalAddr
 				// without pointers.
 				// if !v.Type.Elem().HasPointers() {
 				// 	v.SetArgs1(v.Args[0])
 				// }
-				findSameLocalAddr := func(vv *Value, localAddrs *sparseSet) int {
-					for _, idx := range localAddrs.contents() {
-						la := b.Values[idx]
-						if isSamePtr(la, vv) {
-							return int(idx)
-						}
-					}
-					return -1
-				}
 				seenLocalAddr := findSameLocalAddr(v, localAddrs)
 				if localAddrs.size() == 0 || seenLocalAddr == -1 {
 					localAddrs.add(ID(i))
-				} else {
-					la := b.Values[seenLocalAddr]
-					v.SetArgs2(v.Args[0], la.Args[1])
-					for _, vv := range b.Values {
-						for i, arg := range vv.Args {
-							if arg.ID == v.ID {
-								la.Uses++
-								arg.Uses--
-								vv.Args[i] = la
-							}
-						}
-					}
+					// } else {
+					// 	la := b.Values[seenLocalAddr]
+					// 	v.SetArgs2(v.Args[0], la.Args[1])
+					// 	for _, vv := range b.Values {
+					// 		for i, arg := range vv.Args {
+					// 			if arg.ID == v.ID {
+					// 				la.Uses++
+					// 				arg.Uses--
+					// 				vv.Args[i] = la
+					// 			}
+					// 		}
+					// 	}
 				}
 			}
 			if v.Type.IsMemory() {
@@ -88,8 +88,10 @@ func dse(f *Func) {
 				if v.Op == OpLocalAddr {
 					// Maybe we can use isSamePtr() here?
 				}
+				skipLocalAddr := v.Op == OpLocalAddr && !v.Type.Elem().HasPointers()
+				// fmt.Println("v:", v, "skipLocalAddr:", skipLocalAddr)
 				for _, a := range v.Args {
-					if a.Block == b && a.Type.IsMemory() {
+					if a.Block == b && a.Type.IsMemory() && !skipLocalAddr {
 						loadUse.add(a.ID)
 					}
 				}
@@ -127,8 +129,10 @@ func dse(f *Func) {
 		if loadUse.contains(v.ID) {
 			// Someone might be reading this memory state.
 			// Clear all shadowed addresses.
+			// fmt.Println("clearing shadow for:", v)
 			shadowed.clear()
 		}
+		// fmt.Println("past shadow clearing")
 		if v.Op == OpStore || v.Op == OpZero {
 			ptr := v.Args[0]
 			var off int64
@@ -143,8 +147,14 @@ func dse(f *Func) {
 				sz = v.AuxInt
 			}
 			// ptr.ID = 4
+			idx := findSameLocalAddr(ptr, localAddrs)
+			if idx != -1 {
+				ptr = b.Values[idx]
+			}
 			sr := shadowRange(shadowed.get(ptr.ID))
+			// fmt.Println("sr", sr)
 			if sr.contains(off, off+sz) {
+				// fmt.Println("contains ---")
 				// Modify the store/zero into a copy of the memory state,
 				// effectively eliding the store operation.
 				if v.Op == OpStore {
@@ -158,6 +168,7 @@ func dse(f *Func) {
 				v.AuxInt = 0
 				v.Op = OpCopy
 			} else {
+				// fmt.Println("extending shadowed region")
 				// Extend shadowed region.
 				shadowed.set(ptr.ID, int32(sr.merge(off, off+sz)))
 			}
