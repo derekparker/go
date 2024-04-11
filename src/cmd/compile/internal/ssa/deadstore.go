@@ -85,10 +85,12 @@ func dse(f *Func) {
 				// seen another OpLocalAddr with the same variable, if so maybe
 				// we can alter the memory context so that we don't get erroneous
 				// stores.
+				skipLocalAddr := false
 				if v.Op == OpLocalAddr {
 					// Maybe we can use isSamePtr() here?
+					idx := findSameLocalAddr(v, localAddrs)
+					skipLocalAddr = !v.Type.Elem().HasPointers() && idx >= 0
 				}
-				skipLocalAddr := v.Op == OpLocalAddr && !v.Type.Elem().HasPointers()
 				// fmt.Println("v:", v, "skipLocalAddr:", skipLocalAddr)
 				for _, a := range v.Args {
 					if a.Block == b && a.Type.IsMemory() && !skipLocalAddr {
