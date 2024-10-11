@@ -236,15 +236,26 @@ func (priv *PrivateKey) Validate() error {
 	}
 
 	// Check that Πprimes == n.
-	modulus := new(big.Int).Set(bigOne)
+	im, err := bigmod.NewModulusFromBig(priv.N)
+	if err != nil {
+		return err
+	}
+	modulus, err := bigmod.NewNat().SetBytes(bigOne.Bytes(), im)
+	if err != nil {
+		return err
+	}
 	for _, prime := range priv.Primes {
 		// Any primes ≤ 1 will cause divide-by-zero panics later.
 		if prime.Cmp(bigOne) <= 0 {
 			return errors.New("crypto/rsa: invalid prime value")
 		}
-		modulus.Mul(modulus, prime)
+		pp, err := bigmod.NewNat().SetBytes(prime.Bytes(), im)
+		if err != nil {
+			return err
+		}
+		modulus.Mul(pp, im)
 	}
-	if modulus.Cmp(priv.N) != 0 {
+	if modulus.Equal(im.Nat()) != 0 {
 		return errors.New("crypto/rsa: invalid modulus")
 	}
 
