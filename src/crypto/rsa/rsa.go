@@ -32,6 +32,7 @@ import (
 	"crypto/internal/randutil"
 	"crypto/rand"
 	"crypto/subtle"
+	"encoding/binary"
 	"errors"
 	"hash"
 	"io"
@@ -236,15 +237,34 @@ func (priv *PrivateKey) Validate() error {
 	}
 
 	// Check that Πprimes == n.
-	modulus := new(big.Int).Set(bigOne)
+	im, err := bigmod.NewModulusFromBig(priv.N)
+	if err != nil {
+		return err
+	}
+	bigOneNat, err := bigmod.NewNat().SetBytes(bigOne.Bytes(), im)
+	if err != nil {
+		return err
+	}
+	modulus, err := bigmod.NewNat().SetBytes(bigOne.Bytes(), im)
+	if err != nil {
+		return err
+	}
 	for _, prime := range priv.Primes {
 		// Any primes ≤ 1 will cause divide-by-zero panics later.
-		if prime.Cmp(bigOne) <= 0 {
+		nprime, err := bigmod.NewNat().SetBytes(prime.Bytes(), im)
+		if err != nil {
+			return err
+		}
+		if d, _ := nprime.Cmp(bigOneNat); d <= 0 {
 			return errors.New("crypto/rsa: invalid prime value")
 		}
-		modulus.Mul(modulus, prime)
+		pp, err := bigmod.NewNat().SetBytes(prime.Bytes(), im)
+		if err != nil {
+			return err
+		}
+		modulus.Mul(pp, im)
 	}
-	if modulus.Cmp(priv.N) != 0 {
+	if modulus.Equal(im.Nat()) != 0 {
 		return errors.New("crypto/rsa: invalid modulus")
 	}
 
@@ -253,14 +273,46 @@ func (priv *PrivateKey) Validate() error {
 	// inverse. Therefore e is coprime to lcm(p-1,q-1,r-1,...) =
 	// exponent(ℤ/nℤ). It also implies that a^de ≡ a mod p as a^(p-1) ≡ 1
 	// mod p. Thus a^de ≡ a mod n for all a coprime to n, as required.
-	congruence := new(big.Int)
-	de := new(big.Int).SetInt64(int64(priv.E))
-	de.Mul(de, priv.D)
-	for _, prime := range priv.Primes {
-		pminus1 := new(big.Int).Sub(prime, bigOne)
-		congruence.Mod(de, pminus1)
-		if congruence.Cmp(bigOne) != 0 {
-			return errors.New("crypto/rsa: invalid exponents")
+	{
+		congruence := new(big.Int)
+		de := new(big.Int).SetInt64(int64(priv.E))
+		de.Mul(de, priv.D)
+		for _, prime := range priv.Primes {
+			pminus1 := new(big.Int).Sub(prime, bigOne)
+			congruence.Mod(de, pminus1)
+			if congruence.Cmp(bigOne) != 0 {
+				return errors.New("crypto/rsa: invalid exponents")
+			}
+		}
+	}
+	{
+		// congruence := new(big.Int)
+		congruence, err := bigmod.NewNat().SetBytes([]byte{0}, im)
+		if err != nil {
+			return err
+		}
+		// de := new(big.Int).SetInt64(int64(priv.E))
+		buf := make([]byte, 64)
+		binary.BigEndian.PutUint64(buf, uint64(priv.E))
+		de, err := bigmod.NewNat().SetBytes(buf, im)
+		if err != nil {
+			return err
+		}
+		d, err := bigmod.NewNat().SetBytes(priv.D.Bytes(), im)
+		if err != nil {
+			return err
+		}
+		de.Mul(d, im)
+		for _, prime := range priv.Primes {
+			pminus1 := new(big.Int).Sub(prime, bigOne)
+			pminus1mod, err := bigmod.NewModulusFromBig(pminus1)
+			if err != nil {
+				return err
+			}
+			congruence.Mod(de, pminus1mod)
+			if r, _ := congruence.Cmp(bigOneNat); r != 0 {
+				return errors.New("crypto/rsa: invalid exponents")
+			}
 		}
 	}
 	return nil
