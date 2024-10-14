@@ -478,3 +478,20 @@ func TestNewModFromBigZero(t *testing.T) {
 		t.Errorf("NewModulusFromBig(2) got %q, want %q", err, expected)
 	}
 }
+
+func TestNatCmp(t *testing.T) {
+	testcases := [][3]int64{
+		{33, 22, 1},
+		{33, 33, 0},
+		{22, 33, -1},
+	}
+	for _, tc := range testcases {
+		a := new(big.Int).SetInt64(tc[0])
+		b := new(big.Int).SetInt64(tc[1])
+		na := natFromBytes(a.Bytes())
+		nb := natFromBytes(b.Bytes())
+		if res, _ := na.Cmp(nb); res != int(tc[2]) {
+			t.Errorf("expected %d got %d for (%d).cmp(%d)", tc[2], res, tc[0], tc[1])
+		}
+	}
+}

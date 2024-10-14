@@ -226,6 +226,16 @@ func (x *Nat) IsZero() choice {
 //
 // Both operands must have the same announced length.
 func (x *Nat) cmpGeq(y *Nat) choice {
+	_, c := x.Cmp(y)
+	// If there was a carry, then subtracting y underflowed, so
+	// x is not greater than or equal to y.
+	return not(choice(c))
+}
+
+func (x *Nat) Cmp(y *Nat) (int, uint) {
+	if x.Equal(y) == yes {
+		return 0, 0
+	}
 	// Eliminate bounds checks in the loop.
 	size := len(x.limbs)
 	xLimbs := x.limbs[:size]
@@ -235,9 +245,11 @@ func (x *Nat) cmpGeq(y *Nat) choice {
 	for i := 0; i < size; i++ {
 		_, c = bits.Sub(xLimbs[i], yLimbs[i], c)
 	}
-	// If there was a carry, then subtracting y underflowed, so
-	// x is not greater than or equal to y.
-	return not(choice(c))
+	res := 1
+	if c > 0 {
+		res = -1
+	}
+	return res, c
 }
 
 // assign sets x <- y if on == 1, and does nothing otherwise.

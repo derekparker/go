@@ -240,13 +240,21 @@ func (priv *PrivateKey) Validate() error {
 	if err != nil {
 		return err
 	}
+	bigOneNat, err := bigmod.NewNat().SetBytes(bigOne.Bytes(), im)
+	if err != nil {
+		return err
+	}
 	modulus, err := bigmod.NewNat().SetBytes(bigOne.Bytes(), im)
 	if err != nil {
 		return err
 	}
 	for _, prime := range priv.Primes {
 		// Any primes ≤ 1 will cause divide-by-zero panics later.
-		if prime.Cmp(bigOne) <= 0 {
+		nprime, err := bigmod.NewNat().SetBytes(prime.Bytes(), im)
+		if err != nil {
+			return err
+		}
+		if d, _ := nprime.Cmp(bigOneNat); d <= 0 {
 			return errors.New("crypto/rsa: invalid prime value")
 		}
 		pp, err := bigmod.NewNat().SetBytes(prime.Bytes(), im)
@@ -264,14 +272,28 @@ func (priv *PrivateKey) Validate() error {
 	// inverse. Therefore e is coprime to lcm(p-1,q-1,r-1,...) =
 	// exponent(ℤ/nℤ). It also implies that a^de ≡ a mod p as a^(p-1) ≡ 1
 	// mod p. Thus a^de ≡ a mod n for all a coprime to n, as required.
-	congruence := new(big.Int)
-	de := new(big.Int).SetInt64(int64(priv.E))
-	de.Mul(de, priv.D)
-	for _, prime := range priv.Primes {
-		pminus1 := new(big.Int).Sub(prime, bigOne)
-		congruence.Mod(de, pminus1)
-		if congruence.Cmp(bigOne) != 0 {
-			return errors.New("crypto/rsa: invalid exponents")
+	{
+		congruence := new(big.Int)
+		de := new(big.Int).SetInt64(int64(priv.E))
+		de.Mul(de, priv.D)
+		for _, prime := range priv.Primes {
+			pminus1 := new(big.Int).Sub(prime, bigOne)
+			congruence.Mod(de, pminus1)
+			if congruence.Cmp(bigOne) != 0 {
+				return errors.New("crypto/rsa: invalid exponents")
+			}
+		}
+	}
+	{
+		congruence := new(big.Int)
+		de := new(big.Int).SetInt64(int64(priv.E))
+		de.Mul(de, priv.D)
+		for _, prime := range priv.Primes {
+			pminus1 := new(big.Int).Sub(prime, bigOne)
+			congruence.Mod(de, pminus1)
+			if congruence.Cmp(bigOne) != 0 {
+				return errors.New("crypto/rsa: invalid exponents")
+			}
 		}
 	}
 	return nil
