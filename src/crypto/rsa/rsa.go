@@ -32,6 +32,7 @@ import (
 	"crypto/internal/randutil"
 	"crypto/rand"
 	"crypto/subtle"
+	"encoding/binary"
 	"errors"
 	"hash"
 	"io"
@@ -285,13 +286,31 @@ func (priv *PrivateKey) Validate() error {
 		}
 	}
 	{
-		congruence := new(big.Int)
-		de := new(big.Int).SetInt64(int64(priv.E))
-		de.Mul(de, priv.D)
+		// congruence := new(big.Int)
+		congruence, err := bigmod.NewNat().SetBytes([]byte{0}, im)
+		if err != nil {
+			return err
+		}
+		// de := new(big.Int).SetInt64(int64(priv.E))
+		buf := make([]byte, 64)
+		binary.BigEndian.PutUint64(buf, uint64(priv.E))
+		de, err := bigmod.NewNat().SetBytes(buf, im)
+		if err != nil {
+			return err
+		}
+		d, err := bigmod.NewNat().SetBytes(priv.D.Bytes(), im)
+		if err != nil {
+			return err
+		}
+		de.Mul(d, im)
 		for _, prime := range priv.Primes {
 			pminus1 := new(big.Int).Sub(prime, bigOne)
-			congruence.Mod(de, pminus1)
-			if congruence.Cmp(bigOne) != 0 {
+			pminus1mod, err := bigmod.NewModulusFromBig(pminus1)
+			if err != nil {
+				return err
+			}
+			congruence.Mod(de, pminus1mod)
+			if r, _ := congruence.Cmp(bigOneNat); r != 0 {
 				return errors.New("crypto/rsa: invalid exponents")
 			}
 		}
