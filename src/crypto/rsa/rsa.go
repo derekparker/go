@@ -237,91 +237,58 @@ func (priv *PrivateKey) Validate() error {
 	}
 
 	// Check that Πprimes == n.
-	im, err := bigmod.NewModulusFromBig(priv.N)
+	N, err := bigmod.NewModulusFromBig(priv.N)
 	if err != nil {
 		return err
 	}
-	bigOneNat, err := bigmod.NewNat().SetBytes(bigOne.Bytes(), im)
+	bigOneNat, err := bigmod.NewNat().SetBytes(bigOne.Bytes(), N)
 	if err != nil {
 		return err
 	}
-	modulus, err := bigmod.NewNat().SetBytes(bigOne.Bytes(), im)
+	modulus, err := bigmod.NewNat().SetBytes(bigOne.Bytes(), N)
 	if err != nil {
 		return err
 	}
 	for _, prime := range priv.Primes {
 		// Any primes ≤ 1 will cause divide-by-zero panics later.
-		nprime, err := bigmod.NewNat().SetBytes(prime.Bytes(), im)
+		nprime, err := bigmod.NewNat().SetBytes(prime.Bytes(), N)
 		if err != nil {
 			return err
 		}
 		if d, _ := nprime.Cmp(bigOneNat); d <= 0 {
 			return errors.New("crypto/rsa: invalid prime value")
 		}
-		pp, err := bigmod.NewNat().SetBytes(prime.Bytes(), im)
+		pp, err := bigmod.NewNat().SetBytes(prime.Bytes(), N)
 		if err != nil {
 			return err
 		}
-		modulus.Mul(pp, im)
+		modulus.Mul(pp, N)
 	}
-	if modulus.Equal(im.Nat()) != 0 {
+	if modulus.Equal(N.Nat()) != 0 {
 		return errors.New("crypto/rsa: invalid modulus")
 	}
 
-	// Check that de ≡ 1 mod p-1, for each prime.
-	// This implies that e is coprime to each p-1 as e has a multiplicative
-	// inverse. Therefore e is coprime to lcm(p-1,q-1,r-1,...) =
-	// exponent(ℤ/nℤ). It also implies that a^de ≡ a mod p as a^(p-1) ≡ 1
-	// mod p. Thus a^de ≡ a mod n for all a coprime to n, as required.
-	{
-		congruence := new(big.Int)
-		de := new(big.Int).SetInt64(int64(priv.E))
-		de.Mul(de, priv.D)
-		for _, prime := range priv.Primes {
-			pminus1 := new(big.Int).Sub(prime, bigOne)
-			congruence.Mod(de, pminus1)
-			if congruence.Cmp(bigOne) != 0 {
-				return errors.New("crypto/rsa: invalid exponents")
-			}
-		}
+	// NIST SP 800-56B REV.2 6.4.1.1 3.a
+	// Key-pair consistency verifying that m = (m^e)^d mod n for some integer m satisfying 1 < m < (n − 1).
+	m := bigmod.NewNat().Set(N.Nat())
+	y, err := bigmod.NewNat().SetBytes([]byte{2}, N)
+	if err != nil {
+		return err
 	}
-	{
-		// congruence := new(big.Int)
-		one, err := bigmod.NewNat().SetBytes([]byte{1}, im)
-		if err != nil {
-			return errors.New("crypto/rsa: unexpected error")
-		}
-		congruence, err := bigmod.NewNat().SetBytes([]byte{0}, im)
-		if err != nil {
-			return err
-		}
-		// de := new(big.Int).SetInt64(int64(priv.E))
-		buf := make([]byte, 64)
-		binary.BigEndian.PutUint64(buf, uint64(priv.E))
-		de, err := bigmod.NewNat().SetBytes(buf, im)
-		if err != nil {
-			return err
-		}
-		d, err := bigmod.NewNat().SetBytes(priv.D.Bytes(), im)
-		if err != nil {
-			return err
-		}
-		de.Mul(d, im)
-		for _, prime := range priv.Primes {
-			pminus1, err := bigmod.NewNat().SetBytes(prime.Bytes(), im)
-			if err != nil {
-				return err
-			}
-			pminus1 = pminus1.Sub(one, im)
-			pminus1mod, err := bigmod.NewModulusFromBig(new(big.Int).SetBytes(pminus1.Bytes(im)))
-			if err != nil {
-				return err
-			}
-			congruence.Mod(de, pminus1mod)
-			if r, _ := congruence.Cmp(bigOneNat); r != 0 {
-				return errors.New("crypto/rsa: invalid exponents")
-			}
-		}
+	m.Sub(y, N)
+	if res, _ := m.Cmp(bigOneNat); res < 1 {
+		return errors.New("crypto/rsa: key-pair consistency check failed")
+	}
+	if res, _ := m.Cmp(N.Nat()); res > 0 {
+		return errors.New("crypto/rsa: key-pair consistency check failed")
+	}
+	buf := make([]byte, 8)
+	binary.BigEndian.PutUint64(buf, uint64(priv.PublicKey.E))
+	mm := bigmod.NewNat().Exp(m, buf, N)
+	mm = bigmod.NewNat().Exp(mm, priv.D.Bytes(), N)
+	mm = bigmod.NewNat().Mod(mm, N)
+	if mm.Equal(m) != 1 {
+		return errors.New("crypto/rsa: final key-pair consistency check failed")
 	}
 	return nil
 }

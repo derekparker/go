@@ -25,8 +25,10 @@ type choice uint
 
 func not(c choice) choice { return 1 ^ c }
 
-const yes = choice(1)
-const no = choice(0)
+const (
+	yes = choice(1)
+	no  = choice(0)
+)
 
 // ctMask is all 1s if on is yes, and all 0s otherwise.
 func ctMask(on choice) uint { return -uint(on) }
@@ -53,8 +55,10 @@ type Nat struct {
 // preallocTarget is the size in bits of the numbers used to implement the most
 // common and most performant RSA key size. It's also enough to cover some of
 // the operations of key sizes up to 4096.
-const preallocTarget = 2048
-const preallocLimbs = (preallocTarget + _W - 1) / _W
+const (
+	preallocTarget = 2048
+	preallocLimbs  = (preallocTarget + _W - 1) / _W
+)
 
 // NewNat returns a new nat with a size of zero, just like new(Nat), but with
 // the preallocated capacity to hold a number of up to preallocTarget bits.
@@ -92,8 +96,8 @@ func (x *Nat) reset(n int) *Nat {
 	return x
 }
 
-// set assigns x = y, optionally resizing x to the appropriate size.
-func (x *Nat) set(y *Nat) *Nat {
+// Set assigns x = y, optionally resizing x to the appropriate size.
+func (x *Nat) Set(y *Nat) *Nat {
 	x.reset(len(y.limbs))
 	copy(x.limbs, y.limbs)
 	return x
@@ -520,7 +524,7 @@ func (out *Nat) resetFor(m *Modulus) *Nat {
 //
 // x and m operands must have the same announced length.
 func (x *Nat) maybeSubtractModulus(always choice, m *Modulus) {
-	t := NewNat().set(x)
+	t := NewNat().Set(x)
 	underflow := t.sub(m.nat)
 	// We keep the result if x - m didn't underflow (meaning x >= m)
 	// or if always was set.
@@ -535,7 +539,7 @@ func (x *Nat) maybeSubtractModulus(always choice, m *Modulus) {
 func (x *Nat) Sub(y *Nat, m *Modulus) *Nat {
 	underflow := x.sub(y)
 	// If the subtraction underflowed, add m.
-	t := NewNat().set(x)
+	t := NewNat().Set(x)
 	t.add(m.nat)
 	x.assign(choice(underflow), t)
 	return x
@@ -726,7 +730,7 @@ func addMulVVW(z, x []uint, y uint) (carry uint) {
 func (x *Nat) Mul(y *Nat, m *Modulus) *Nat {
 	// A Montgomery multiplication by a value out of the Montgomery domain
 	// takes the result out of Montgomery representation.
-	xR := NewNat().set(x).montgomeryRepresentation(m) // xR = x * R mod m
+	xR := NewNat().Set(x).montgomeryRepresentation(m) // xR = x * R mod m
 	return x.montgomeryMul(xR, y, m)                  // x = xR * y / R mod m
 }
 
@@ -746,7 +750,7 @@ func (out *Nat) Exp(x *Nat, e []byte, m *Modulus) *Nat {
 		NewNat(), NewNat(), NewNat(), NewNat(), NewNat(),
 		NewNat(), NewNat(), NewNat(), NewNat(), NewNat(),
 	}
-	table[0].set(x).montgomeryRepresentation(m)
+	table[0].Set(x).montgomeryRepresentation(m)
 	for i := 1; i < len(table); i++ {
 		table[i].montgomeryMul(table[i-1], table[0], m)
 	}
@@ -787,8 +791,8 @@ func (out *Nat) ExpShortVarTime(x *Nat, e uint, m *Modulus) *Nat {
 	// For short exponents, precomputing a table and using a window like in Exp
 	// doesn't pay off. Instead, we do a simple conditional square-and-multiply
 	// chain, skipping the initial run of zeroes.
-	xR := NewNat().set(x).montgomeryRepresentation(m)
-	out.set(xR)
+	xR := NewNat().Set(x).montgomeryRepresentation(m)
+	out.Set(xR)
 	for i := bits.UintSize - bitLen(e) + 1; i < bits.UintSize; i++ {
 		out.montgomeryMul(out, out, m)
 		if k := (e >> (bits.UintSize - i - 1)) & 1; k != 0 {
