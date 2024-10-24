@@ -287,6 +287,10 @@ func (priv *PrivateKey) Validate() error {
 	}
 	{
 		// congruence := new(big.Int)
+		one, err := bigmod.NewNat().SetBytes([]byte{1}, im)
+		if err != nil {
+			return errors.New("crypto/rsa: unexpected error")
+		}
 		congruence, err := bigmod.NewNat().SetBytes([]byte{0}, im)
 		if err != nil {
 			return err
@@ -304,8 +308,12 @@ func (priv *PrivateKey) Validate() error {
 		}
 		de.Mul(d, im)
 		for _, prime := range priv.Primes {
-			pminus1 := new(big.Int).Sub(prime, bigOne)
-			pminus1mod, err := bigmod.NewModulusFromBig(pminus1)
+			pminus1, err := bigmod.NewNat().SetBytes(prime.Bytes(), im)
+			if err != nil {
+				return err
+			}
+			pminus1 = pminus1.Sub(one, im)
+			pminus1mod, err := bigmod.NewModulusFromBig(new(big.Int).SetBytes(pminus1.Bytes(im)))
 			if err != nil {
 				return err
 			}
@@ -683,8 +691,10 @@ func (priv *PrivateKey) Precompute() {
 	}
 }
 
-const withCheck = true
-const noCheck = false
+const (
+	withCheck = true
+	noCheck   = false
+)
 
 // decrypt performs an RSA decryption of ciphertext into out. If check is true,
 // m^e is calculated and compared with ciphertext, in order to defend against
