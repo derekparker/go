@@ -288,7 +288,28 @@ func (priv *PrivateKey) Validate() error {
 	mm = bigmod.NewNat().Exp(mm, priv.D.Bytes(), N)
 	mm = bigmod.NewNat().Mod(mm, N)
 	if mm.Equal(m) != 1 {
-		return errors.New("crypto/rsa: final key-pair consistency check failed")
+		return errors.New("crypto/rsa: key-pair consistency check failed")
+	}
+
+	// 6.4.1.2.1 rsakpv1-crt
+	// TODO: not working yet.
+	{
+		p1 := priv.Primes[0]
+		p2 := priv.Primes[1]
+		z := new(big.Int).Mul(p1, p2)
+		if z.Cmp(priv.N) != 0 {
+			return errors.New("crypto/rsa: BIG INT invalid RSA key pair")
+		}
+	}
+	p1, err := bigmod.NewNat().SetBytes(priv.Primes[0].Bytes(), N)
+	p2, err := bigmod.NewNat().SetBytes(priv.Primes[1].Bytes(), N)
+	oneMod, err := bigmod.NewModulusFromBig(new(big.Int).SetBytes([]byte{1}))
+	if err != nil {
+		return err
+	}
+	p1.Mul(p2, oneMod)
+	if p1.Equal(N.Nat()) != 1 {
+		return errors.New("crypto/rsa: invalid RSA key pair")
 	}
 	return nil
 }
