@@ -291,25 +291,31 @@ func (priv *PrivateKey) Validate() error {
 		return errors.New("crypto/rsa: key-pair consistency check failed")
 	}
 
-	// 6.4.1.2.1 rsakpv1-crt
-	// TODO: not working yet.
-	{
-		p1 := priv.Primes[0]
-		p2 := priv.Primes[1]
-		z := new(big.Int).Mul(p1, p2)
-		if z.Cmp(priv.N) != 0 {
+	if len(priv.Primes) > 2 {
+		// Check that de ≡ 1 mod p-1, for each prime.
+		// This implies that e is coprime to each p-1 as e has a multiplicative
+		// inverse. Therefore e is coprime to lcm(p-1,q-1,r-1,...) =
+		// exponent(ℤ/nℤ). It also implies that a^de ≡ a mod p as a^(p-1) ≡ 1
+		// mod p. Thus a^de ≡ a mod n for all a coprime to n, as required.
+		congruence := new(big.Int)
+		de := new(big.Int).SetInt64(int64(priv.E))
+		de.Mul(de, priv.D)
+		for _, prime := range priv.Primes {
+			pminus1 := new(big.Int).Sub(prime, bigOne)
+			congruence.Mod(de, pminus1)
+			if congruence.Cmp(bigOne) != 0 {
+				return errors.New("crypto/rsa: invalid exponents")
+			}
+		}
+	} else {
+		// 6.4.1.2.1 rsakpv1-crt
+		// TODO: port to not using math/big
+		p := priv.Primes[0]
+		q := priv.Primes[1]
+		product := new(big.Int).Mul(p, q)
+		if product.Cmp(priv.N) != 0 {
 			return errors.New("crypto/rsa: BIG INT invalid RSA key pair")
 		}
-	}
-	p1, err := bigmod.NewNat().SetBytes(priv.Primes[0].Bytes(), N)
-	p2, err := bigmod.NewNat().SetBytes(priv.Primes[1].Bytes(), N)
-	oneMod, err := bigmod.NewModulusFromBig(new(big.Int).SetBytes([]byte{1}))
-	if err != nil {
-		return err
-	}
-	p1.Mul(p2, oneMod)
-	if p1.Equal(N.Nat()) != 1 {
-		return errors.New("crypto/rsa: invalid RSA key pair")
 	}
 	return nil
 }
