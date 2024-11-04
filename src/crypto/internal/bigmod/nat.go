@@ -723,15 +723,30 @@ func addMulVVW(z, x []uint, y uint) (carry uint) {
 	return carry
 }
 
-// Mul calculates x = x * y mod m.
+// MulMod calculates x = x * y mod m.
 //
 // The length of both operands must be the same as the modulus. Both operands
 // must already be reduced modulo m.
-func (x *Nat) Mul(y *Nat, m *Modulus) *Nat {
+func (x *Nat) MulMod(y *Nat, m *Modulus) *Nat {
 	// A Montgomery multiplication by a value out of the Montgomery domain
 	// takes the result out of Montgomery representation.
 	xR := NewNat().Set(x).montgomeryRepresentation(m) // xR = x * R mod m
 	return x.montgomeryMul(xR, y, m)                  // x = xR * y / R mod m
+}
+
+// Mul calculates z = x * y.
+//
+// All inputs should be the same length and already reduced modulo m.
+// z will be resized to the size of m and overwritten.
+func (z *Nat) Mul(x *Nat, y *Nat, m *Modulus) *Nat {
+	n := len(m.nat.limbs)
+	zLimbs := z.resetFor(m).limbs
+	xLimbs := x.limbs
+	yLimbs := y.limbs
+	for i := 0; i < n; i++ {
+		addMulVVW(zLimbs[i:], xLimbs, yLimbs[i])
+	}
+	return z
 }
 
 // Exp calculates out = x^e mod m.

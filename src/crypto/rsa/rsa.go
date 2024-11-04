@@ -262,7 +262,7 @@ func (priv *PrivateKey) Validate() error {
 		if err != nil {
 			return err
 		}
-		modulus.Mul(pp, N)
+		modulus.MulMod(pp, N)
 	}
 	if modulus.Equal(N.Nat()) != 0 {
 		return errors.New("crypto/rsa: invalid modulus")
@@ -310,10 +310,18 @@ func (priv *PrivateKey) Validate() error {
 	} else {
 		// 6.4.1.2.1 rsakpv1-crt
 		// TODO: port to not using math/big
-		p := priv.Primes[0]
-		q := priv.Primes[1]
-		product := new(big.Int).Mul(p, q)
-		if product.Cmp(priv.N) != 0 {
+		pBytes := priv.Primes[0].Bytes()
+		qBytes := priv.Primes[1].Bytes()
+		p, err := bigmod.NewNat().SetBytes(pBytes, N)
+		if err != nil {
+			return err
+		}
+		q, err := bigmod.NewNat().SetBytes(qBytes, N)
+		if err != nil {
+			return err
+		}
+		product := bigmod.NewNat().Mul(p, q, N)
+		if r, _ := product.Cmp(N.Nat()); r != 0 {
 			return errors.New("crypto/rsa: BIG INT invalid RSA key pair")
 		}
 	}
@@ -733,9 +741,9 @@ func decrypt(priv *PrivateKey, ciphertext []byte, check bool) ([]byte, error) {
 		// m = m - m2 mod p
 		m.Sub(t0.Mod(m2, P), P)
 		// m = m * Qinv mod p
-		m.Mul(Qinv, P)
+		m.MulMod(Qinv, P)
 		// m = m * q mod N
-		m.ExpandFor(N).Mul(t0.Mod(Q.Nat(), N), N)
+		m.ExpandFor(N).MulMod(t0.Mod(Q.Nat(), N), N)
 		// m = m + m2 mod N
 		m.Add(m2.ExpandFor(N), N)
 	}

@@ -327,9 +327,9 @@ func signNISTEC[Point nistPoint[Point]](c *nistCurve[Point], priv *PrivateKey, c
 	if err != nil {
 		return nil, err
 	}
-	s.Mul(r, c.N)
+	s.MulMod(r, c.N)
 	s.Add(e, c.N)
-	s.Mul(kInv, c.N)
+	s.MulMod(kInv, c.N)
 
 	// Again, the chance of this happening is cryptographically negligible.
 	if s.IsZero() == 1 {
@@ -528,12 +528,12 @@ func verifyNISTEC[Point nistPoint[Point]](c *nistCurve[Point], pub *PublicKey, h
 	inverse(c, w, s)
 
 	// p₁ = [e * s⁻¹]G
-	p1, err := c.newPoint().ScalarBaseMult(e.Mul(w, c.N).Bytes(c.N))
+	p1, err := c.newPoint().ScalarBaseMult(e.MulMod(w, c.N).Bytes(c.N))
 	if err != nil {
 		return false
 	}
 	// p₂ = [r * s⁻¹]Q
-	p2, err := Q.ScalarMult(Q, w.Mul(r, c.N).Bytes(c.N))
+	p2, err := Q.ScalarMult(Q, w.MulMod(r, c.N).Bytes(c.N))
 	if err != nil {
 		return false
 	}
@@ -613,8 +613,10 @@ func (curve *nistCurve[Point]) pointToAffine(p Point) (x, y *big.Int, err error)
 	return x, y, nil
 }
 
-var p224Once sync.Once
-var _p224 *nistCurve[*nistec.P224Point]
+var (
+	p224Once sync.Once
+	_p224    *nistCurve[*nistec.P224Point]
+)
 
 func p224() *nistCurve[*nistec.P224Point] {
 	p224Once.Do(func() {
@@ -626,8 +628,10 @@ func p224() *nistCurve[*nistec.P224Point] {
 	return _p224
 }
 
-var p256Once sync.Once
-var _p256 *nistCurve[*nistec.P256Point]
+var (
+	p256Once sync.Once
+	_p256    *nistCurve[*nistec.P256Point]
+)
 
 func p256() *nistCurve[*nistec.P256Point] {
 	p256Once.Do(func() {
@@ -639,8 +643,10 @@ func p256() *nistCurve[*nistec.P256Point] {
 	return _p256
 }
 
-var p384Once sync.Once
-var _p384 *nistCurve[*nistec.P384Point]
+var (
+	p384Once sync.Once
+	_p384    *nistCurve[*nistec.P384Point]
+)
 
 func p384() *nistCurve[*nistec.P384Point] {
 	p384Once.Do(func() {
@@ -652,8 +658,10 @@ func p384() *nistCurve[*nistec.P384Point] {
 	return _p384
 }
 
-var p521Once sync.Once
-var _p521 *nistCurve[*nistec.P521Point]
+var (
+	p521Once sync.Once
+	_p521    *nistCurve[*nistec.P521Point]
+)
 
 func p521() *nistCurve[*nistec.P521Point] {
 	p521Once.Do(func() {
