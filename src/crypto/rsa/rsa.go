@@ -309,7 +309,6 @@ func (priv *PrivateKey) Validate() error {
 		}
 	} else {
 		// 6.4.1.2.1 rsakpv1-crt
-		// TODO: port to not using math/big
 		pBytes := priv.Primes[0].Bytes()
 		qBytes := priv.Primes[1].Bytes()
 		p, err := bigmod.NewNat().SetBytes(pBytes, N)
