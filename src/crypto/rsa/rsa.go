@@ -308,7 +308,7 @@ func (priv *PrivateKey) Validate() error {
 			}
 		}
 	} else {
-		// 6.4.1.2.1 rsakpv1-crt
+		// 6.4.1.2.1.D rsakpv1-crt
 		pBytes := priv.Primes[0].Bytes()
 		qBytes := priv.Primes[1].Bytes()
 		p, err := bigmod.NewNat().SetBytes(pBytes, N)
