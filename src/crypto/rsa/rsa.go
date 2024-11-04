@@ -321,7 +321,7 @@ func (priv *PrivateKey) Validate() error {
 		}
 		product := bigmod.NewNat().Mul(p, q, N)
 		if r, _ := product.Cmp(N.Nat()); r != 0 {
-			return errors.New("crypto/rsa: BIG INT invalid RSA key pair")
+			return errors.New("crypto/rsa: invalid RSA key pair")
 		}
 	}
 	return nil
