@@ -275,7 +275,7 @@ func (priv *PrivateKey) Validate() error {
 	if err != nil {
 		return err
 	}
-	m.Sub(y, N)
+	m.SubMod(y, N)
 	if res, _ := m.Cmp(bigOneNat); res < 1 {
 		return errors.New("crypto/rsa: key-pair consistency check failed")
 	}
@@ -309,6 +309,8 @@ func (priv *PrivateKey) Validate() error {
 		}
 	} else {
 		// 6.4.1.2.1.D rsakpv1-crt
+		//
+		// (npub == p × q)
 		pBytes := priv.Primes[0].Bytes()
 		qBytes := priv.Primes[1].Bytes()
 		p, err := bigmod.NewNat().SetBytes(pBytes, N)
@@ -321,6 +323,78 @@ func (priv *PrivateKey) Validate() error {
 		}
 		product := bigmod.NewNat().Mul(p, q, N)
 		if r, _ := product.Cmp(N.Nat()); r != 0 {
+			return errors.New("crypto/rsa: invalid RSA key pair")
+		}
+
+		// 6.4.1.2.1.F rsakpv1-crt
+		priv.Precompute()
+
+		// Step a: 1 < dP < (p – 1).
+		pminus1 := bigmod.NewNat().Set(p)
+		pminus1.Sub(bigOneNat)
+		pminus1big := new(big.Int).SetBytes(pminus1.Bytes(N))
+		pminus1mod, err := bigmod.NewModulusFromBig(pminus1big)
+		dP, err := bigmod.NewNat().SetBytes(priv.Precomputed.Dp.Bytes(), N)
+		if err != nil {
+			return err
+		}
+		// dP := bigmod.NewNat().Mod(d, pminus1mod)
+		res1, _ := bigOneNat.Cmp(dP)
+		res2, _ := dP.Cmp(pminus1)
+		if res1 != -1 || res2 != -1 {
+			return errors.New("crypto/rsa: (step A) invalid RSA key pair")
+		}
+
+		// Step b: 1 < dQ < (q – 1).
+		dQ, err := bigmod.NewNat().SetBytes(priv.Precomputed.Dq.Bytes(), N)
+		if err != nil {
+			return err
+		}
+		qminus1 := bigmod.NewNat().Set(q)
+		qminus1.Sub(bigOneNat)
+		qminus1big := new(big.Int).SetBytes(qminus1.Bytes(N))
+		qminus1mod, err := bigmod.NewModulusFromBig(qminus1big)
+		res1, _ = bigOneNat.Cmp(dQ)
+		res2, _ = dQ.Cmp(qminus1)
+		if res1 != -1 || res2 != -1 {
+			return errors.New("crypto/rsa: invalid RSA key pair")
+		}
+		// Step c: 1 < qInv < p.
+		qInv, err := bigmod.NewNat().SetBytes(priv.Precomputed.Qinv.Bytes(), N)
+		if err != nil {
+			return err
+		}
+		res1, _ = bigOneNat.Cmp(qInv)
+		res2, _ = qInv.Cmp(p)
+		if res1 != -1 || res2 != -1 {
+			return errors.New("crypto/rsa: invalid RSA key pair")
+		}
+		// Step d: 1 = (dP × epub) mod (p – 1).
+		buf := make([]byte, 8)
+		binary.BigEndian.PutUint64(buf, uint64(priv.PublicKey.E))
+		epub, err := bigmod.NewNat().SetBytes(buf, N)
+		if err != nil {
+			return err
+		}
+		if bigmod.NewNat().Mod(
+			bigmod.NewNat().Mul(dP, epub, N),
+			pminus1mod).Equal(bigOneNat) != 1 {
+			return errors.New("crypto/rsa: invalid RSA key pair")
+		}
+		// Step e: 1 = (dQ × epub) mod (q – 1).
+		if bigmod.NewNat().Mod(
+			bigmod.NewNat().Mul(dQ, epub, N),
+			qminus1mod).Equal(bigOneNat) != 1 {
+			return errors.New("crypto/rsa: invalid RSA key pair")
+		}
+		// Step f: 1 = (qInv × q) mod p.
+		pmod, err := bigmod.NewModulusFromBig(priv.Primes[0])
+		if err != nil {
+			return err
+		}
+		if bigmod.NewNat().Mod(
+			bigmod.NewNat().Mul(qInv, q, N),
+			pmod).Equal(bigOneNat) != 1 {
 			return errors.New("crypto/rsa: invalid RSA key pair")
 		}
 	}
@@ -738,7 +812,7 @@ func decrypt(priv *PrivateKey, ciphertext []byte, check bool) ([]byte, error) {
 		// m2 = c ^ Dq mod q
 		m2 := bigmod.NewNat().Exp(t0.Mod(c, Q), priv.Precomputed.Dq.Bytes(), Q)
 		// m = m - m2 mod p
-		m.Sub(t0.Mod(m2, P), P)
+		m.SubMod(t0.Mod(m2, P), P)
 		// m = m * Qinv mod p
 		m.MulMod(Qinv, P)
 		// m = m * q mod N

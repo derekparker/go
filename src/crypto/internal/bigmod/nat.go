@@ -290,7 +290,7 @@ func (x *Nat) add(y *Nat) (c uint) {
 // sub computes x -= y. It returns the borrow of the subtraction.
 //
 // Both operands must have the same announced length.
-func (x *Nat) sub(y *Nat) (c uint) {
+func (x *Nat) Sub(y *Nat) (c uint) {
 	// Eliminate bounds checks in the loop.
 	size := len(x.limbs)
 	xLimbs := x.limbs[:size]
@@ -317,6 +317,7 @@ type Modulus struct {
 	leading int  // number of leading zeros in the modulus
 	m0inv   uint // -nat.limbs[0]⁻¹ mod _W
 	rr      *Nat // R*R for montgomeryRepresentation
+	even    bool
 }
 
 // rr returns R*R with R = 2^(_W * n) and n = len(m.nat.limbs).
@@ -390,16 +391,18 @@ func minusInverseModW(x uint) uint {
 // The Int must be odd. The number of significant bits (and nothing else) is
 // leaked through timing side-channels.
 func NewModulusFromBig(n *big.Int) (*Modulus, error) {
-	if b := n.Bits(); len(b) == 0 {
+	b := n.Bits()
+	if len(b) == 0 {
 		return nil, errors.New("modulus must be >= 0")
-	} else if b[0]&1 != 1 {
-		return nil, errors.New("modulus must be odd")
 	}
 	m := &Modulus{}
+	m.even = b[0]&1 != 1
 	m.nat = NewNat().setBig(n)
 	m.leading = _W - bitLen(m.nat.limbs[len(m.nat.limbs)-1])
-	m.m0inv = minusInverseModW(m.nat.limbs[0])
-	m.rr = rr(m)
+	if !m.even {
+		m.m0inv = minusInverseModW(m.nat.limbs[0])
+		m.rr = rr(m)
+	}
 	return m, nil
 }
 
@@ -525,7 +528,7 @@ func (out *Nat) resetFor(m *Modulus) *Nat {
 // x and m operands must have the same announced length.
 func (x *Nat) maybeSubtractModulus(always choice, m *Modulus) {
 	t := NewNat().Set(x)
-	underflow := t.sub(m.nat)
+	underflow := t.Sub(m.nat)
 	// We keep the result if x - m didn't underflow (meaning x >= m)
 	// or if always was set.
 	keep := not(choice(underflow)) | choice(always)
@@ -536,8 +539,8 @@ func (x *Nat) maybeSubtractModulus(always choice, m *Modulus) {
 //
 // The length of both operands must be the same as the modulus. Both operands
 // must already be reduced modulo m.
-func (x *Nat) Sub(y *Nat, m *Modulus) *Nat {
-	underflow := x.sub(y)
+func (x *Nat) SubMod(y *Nat, m *Modulus) *Nat {
+	underflow := x.Sub(y)
 	// If the subtraction underflowed, add m.
 	t := NewNat().Set(x)
 	t.add(m.nat)
@@ -587,6 +590,9 @@ func (x *Nat) montgomeryReduction(m *Modulus) *Nat {
 // All inputs should be the same length and already reduced modulo m.
 // x will be resized to the size of m and overwritten.
 func (x *Nat) montgomeryMul(a *Nat, b *Nat, m *Modulus) *Nat {
+	if m.even {
+		panic("crypto/rsa: montgomery multiplication on even modulus")
+	}
 	n := len(m.nat.limbs)
 	mLimbs := m.nat.limbs[:n]
 	aLimbs := a.limbs[:n]
