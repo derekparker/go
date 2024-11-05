@@ -391,7 +391,179 @@ func (priv *PrivateKey) Validate() error {
 // returned key does not depend deterministically on the bytes read from rand,
 // and may change between calls and/or between versions.
 func GenerateKey(random io.Reader, bits int) (*PrivateKey, error) {
-	return GenerateMultiPrimeKey(random, 2, bits)
+	//return GenerateMultiPrimeKey(random, 2, bits)
+	if bits < 2048 {
+		return nil, errors.New("crypto/rsa: bit size too small")
+	}
+
+	priv := new(PrivateKey)
+	priv.E = 65537
+	// p and q
+	primes := make([]*big.Int, 2)
+	priv.Primes = primes
+
+	if priv.rsa_fips186_5_generate_prime_factors(bits) != nil {
+		return nil, errors.New("crypto/rsa: could not generate prime factors p,q")
+
+	}
+	n := new(big.Int).Set(bigOne)
+	totient := new(big.Int).Set(bigOne)
+	pminus1 := new(big.Int)
+	for _, prime := range primes {
+		n.Mul(n, prime)
+		pminus1.Sub(prime, bigOne)
+		totient.Mul(totient, pminus1)
+	}
+	priv.D = new(big.Int)
+	e := big.NewInt(int64(priv.E))
+	ok := priv.D.ModInverse(e, totient)
+
+	if ok != nil {
+		priv.N = n
+	} else {
+		return nil, errors.New("crypto/rsa: modulus error with public key exponent")
+	}
+	priv.Precompute()
+	return priv, nil
+}
+
+func diffcheck(p *big.Int, q *big.Int, bits int) bool {
+	if (bits >> 1) <= 356 {
+		panic("crypto/rsa: not enough bit length")
+
+	}
+	// 1/sqrt(2) * 2^256
+	base, ok := new(big.Int).SetString("0xB504F333F9DE6484597D89B3754ABE9F1D6F60BA893BA84CED17AC8583339916", 16)
+	if !ok {
+		panic("crypto/rsa: Overflow of static constant sqrt2inv")
+	}
+	limit := new(big.Int).Lsh(base, (uint)(bits>>1)-356)
+	z := p.Sub(p, q)
+	z = z.Abs(z)
+	if z.Cmp(limit) <= 0 {
+		return true
+	} else {
+		return false
+	}
+}
+
+func rsa_fips186_5_aux_prime_MR_rounds(bits int) int {
+	if bits >= 4096 {
+		return 44
+	}
+	if bits >= 3072 {
+		return 41
+	}
+	if bits >= 2048 {
+		return 38
+	}
+	return 0
+}
+
+func (priv *PrivateKey) rsa_fips186_5_generate_prime_factors(bits int) error {
+
+	// ---------------------
+	rounds := rsa_fips186_5_aux_prime_MR_rounds(bits)
+	bytes := ((bits >> 1) + 7) >> 3
+	E := new(big.Int).SetInt64(int64(priv.E))
+
+	bigOne := new(big.Int).SetInt64(1)
+	// 1/sqrt(2) * 2^256
+	base, ok := new(big.Int).SetString("0xB504F333F9DE6484597D89B3754ABE9F1D6F60BA893BA84CED17AC8583339916", 16)
+	if !ok {
+		panic("crypto/rsa: Overflow of static constant sqrt2inv")
+	}
+	if (bits >> 1) < 257 {
+		panic("crypto/rsa: Number of bits too small")
+	}
+	sqrtinv := new(big.Int).Lsh(base, (uint)((bits>>1)-257))
+
+	// Generate p
+	pbuf := make([]byte, bytes)
+	if _, err := rand.Read(pbuf); err != nil {
+		panic("crypto/rsa: RNG failure")
+	}
+	pbuf[bytes-1] |= 1
+	//	bign := new(big.Int).SetBytes(pbuf)
+	p := new(big.Int).SetBytes(pbuf)
+	//p := NewNat().setBig(bign)
+
+	i := 0
+	// check if p < 1/sqrt(2)*(2^(bits/2)-1)
+	for {
+		for p.Cmp(sqrtinv) < 0 {
+			if _, err := rand.Read(pbuf); err != nil {
+				panic("RNG failure")
+			}
+			pbuf[bytes-1] |= 1
+			//		bign = new(big.Int).SetBytes(pbuf)
+			p = new(big.Int).SetBytes(pbuf)
+			//		p = NewNat().setBig(bign)
+		}
+		diff := new(big.Int).Sub(p, bigOne)
+		ret := new(big.Int).GCD(nil, nil, diff, E)
+		if ret.Cmp(bigOne) != 0 {
+			ret := p.ProbablyPrime(rounds)
+			if ret != true {
+				priv.Primes[0] = nil
+				priv.Primes[1] = nil
+				return errors.New("crypto/rsa: could not find prime factor")
+			} else {
+				break
+			}
+		}
+		i++
+		if i >= 5*bits {
+			priv.Primes[0] = nil
+			priv.Primes[1] = nil
+			return errors.New("crypto/rsa: number of tries to find prime factor exceeded limit")
+		}
+	}
+
+	// Generate q
+	i = 0
+	pbuf = make([]byte, bytes)
+	if _, err := rand.Read(pbuf); err != nil {
+		panic("RNG failure")
+	}
+	pbuf[bytes-1] |= 1
+	//bign := new(big.Int).SetBytes(pbuf)
+	q := new(big.Int).SetBytes(pbuf)
+	//q := NewNat().setBig(bign)
+
+	// check if q < 1/sqrt(2)*(2^(bits/2)-1)
+	for {
+		for q.Cmp(sqrtinv) < 0 || !diffcheck(p, q, bits) {
+			if _, err := rand.Read(pbuf); err != nil {
+				panic("RNG failure")
+			}
+			pbuf[bytes-1] |= 1
+			//		bign = new(big.Int).SetBytes(pbuf)
+			q = new(big.Int).SetBytes(pbuf)
+			//		q = NewNat().setBig(bign)
+		}
+		diff := new(big.Int).Sub(q, bigOne)
+		ret := new(big.Int).GCD(nil, nil, diff, E)
+		if ret.Cmp(bigOne) != 0 {
+			ret := q.ProbablyPrime(rounds)
+			if ret != true {
+				priv.Primes[0] = nil
+				priv.Primes[1] = nil
+				return errors.New("crypto/rsa: could not find prime factor")
+			} else {
+				break
+			}
+		}
+		i++
+		if i >= 10*bits {
+			priv.Primes[0] = nil
+			priv.Primes[1] = nil
+			return errors.New("crypto/rsa: number of tries to find prime factor exceeded limit")
+		}
+	}
+	priv.Primes[0] = p
+	priv.Primes[1] = q
+	return nil
 }
 
 // GenerateMultiPrimeKey generates a multi-prime RSA keypair of the given bit
