@@ -433,9 +433,9 @@ func diffcheck(p *big.Int, q *big.Int, bits int) bool {
 
 	}
 	// 1/sqrt(2) * 2^256
-	base, ok := new(big.Int).SetString("0xB504F333F9DE6484597D89B3754ABE9F1D6F60BA893BA84CED17AC8583339916", 16)
+	base, ok := new(big.Int).SetString("0xB504F333F9DE6484597D89B3754ABE9F1D6F60BA893BA84CED17AC8583339916", 0)
 	if !ok {
-		panic("crypto/rsa: Overflow of static constant sqrt2inv")
+		panic("crypto/rsa: 319 Overflow of static constant sqrt2inv")
 	}
 	limit := new(big.Int).Lsh(base, (uint)(bits>>1)-356)
 	z := p.Sub(p, q)
@@ -469,9 +469,9 @@ func (priv *PrivateKey) rsa_fips186_5_generate_prime_factors(bits int) error {
 
 	bigOne := new(big.Int).SetInt64(1)
 	// 1/sqrt(2) * 2^256
-	base, ok := new(big.Int).SetString("0xB504F333F9DE6484597D89B3754ABE9F1D6F60BA893BA84CED17AC8583339916", 16)
+	base, ok := new(big.Int).SetString("0xB504F333F9DE6484597D89B3754ABE9F1D6F60BA893BA84CED17AC8583339916", 0)
 	if !ok {
-		panic("crypto/rsa: Overflow of static constant sqrt2inv")
+		panic("crypto/rsa: 355 Overflow of static constant sqrt2inv")
 	}
 	if (bits >> 1) < 257 {
 		panic("crypto/rsa: Number of bits too small")
