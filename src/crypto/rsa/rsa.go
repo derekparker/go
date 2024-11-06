@@ -34,6 +34,7 @@ import (
 	"crypto/subtle"
 	"encoding/binary"
 	"errors"
+	"fmt"
 	"hash"
 	"io"
 	"math"
@@ -423,6 +424,9 @@ func GenerateKey(random io.Reader, bits int) (*PrivateKey, error) {
 	} else {
 		return nil, errors.New("crypto/rsa: modulus error with public key exponent")
 	}
+	priv.PublicKey.N = n
+	priv.PublicKey.E = priv.E
+	priv.Precomputed = PrecomputedValues{Dp: nil, Dq: nil, Qinv: nil, CRTValues: make([]CRTValue, 0), n: nil, p: nil, q: nil}
 	priv.Precompute()
 	return priv, nil
 }
@@ -478,30 +482,36 @@ func (priv *PrivateKey) rsa_fips186_5_generate_prime_factors(bits int) error {
 	}
 	sqrtinv := new(big.Int).Lsh(base, (uint)((bits>>1)-257))
 
-	// Generate p
-	pbuf := make([]byte, bytes)
-	if _, err := rand.Read(pbuf); err != nil {
-		panic("crypto/rsa: RNG failure")
-	}
-	pbuf[bytes-1] |= 1
-	//	bign := new(big.Int).SetBytes(pbuf)
-	p := new(big.Int).SetBytes(pbuf)
-	//p := NewNat().setBig(bign)
-
 	i := 0
-	// check if p < 1/sqrt(2)*(2^(bits/2)-1)
+	pbuf := make([]byte, bytes)
+	var p, q *big.Int
 	for {
+		// Generate p
+		if _, err := rand.Read(pbuf); err != nil {
+			panic("crypto/rsa: RNG failure")
+		}
+		pbuf[bytes-1] |= 1
+		fmt.Printf("pbuf %s\n", pbuf)
+		//	bign := new(big.Int).SetBytes(pbuf)
+		p = new(big.Int).SetBytes(pbuf)
+		fmt.Printf("p set successfully\n")
+		//p := NewNat().setBig(bign)
+
+		// check if p < 1/sqrt(2)*(2^(bits/2)-1)
 		for p.Cmp(sqrtinv) < 0 {
 			if _, err := rand.Read(pbuf); err != nil {
+				fmt.Printf("rng failure\n")
 				panic("RNG failure")
 			}
 			pbuf[bytes-1] |= 1
+			fmt.Printf("pbuf %s\n", pbuf)
 			//		bign = new(big.Int).SetBytes(pbuf)
 			p = new(big.Int).SetBytes(pbuf)
 			//		p = NewNat().setBig(bign)
 		}
 		diff := new(big.Int).Sub(p, bigOne)
 		ret := new(big.Int).GCD(nil, nil, diff, E)
+		fmt.Printf("diff, ret computed\n")
 		if ret.Cmp(bigOne) != 0 {
 			ret := p.ProbablyPrime(rounds)
 			if ret != true {
@@ -509,6 +519,7 @@ func (priv *PrivateKey) rsa_fips186_5_generate_prime_factors(bits int) error {
 				priv.Primes[1] = nil
 				return errors.New("crypto/rsa: could not find prime factor")
 			} else {
+				fmt.Printf("p is probably prime\n")
 				break
 			}
 		}
@@ -516,23 +527,24 @@ func (priv *PrivateKey) rsa_fips186_5_generate_prime_factors(bits int) error {
 		if i >= 5*bits {
 			priv.Primes[0] = nil
 			priv.Primes[1] = nil
+			fmt.Printf("number of tries exceeded to find p\n")
 			return errors.New("crypto/rsa: number of tries to find prime factor exceeded limit")
 		}
 	}
+	fmt.Printf("p generated successfully\n")
 
 	// Generate q
 	i = 0
-	pbuf = make([]byte, bytes)
-	if _, err := rand.Read(pbuf); err != nil {
-		panic("RNG failure")
-	}
-	pbuf[bytes-1] |= 1
-	//bign := new(big.Int).SetBytes(pbuf)
-	q := new(big.Int).SetBytes(pbuf)
-	//q := NewNat().setBig(bign)
-
-	// check if q < 1/sqrt(2)*(2^(bits/2)-1)
 	for {
+		if _, err := rand.Read(pbuf); err != nil {
+			panic("RNG failure")
+		}
+		pbuf[bytes-1] |= 1
+		//bign := new(big.Int).SetBytes(pbuf)
+		q = new(big.Int).SetBytes(pbuf)
+		//q := NewNat().setBig(bign)
+
+		// check if q < 1/sqrt(2)*(2^(bits/2)-1)
 		for q.Cmp(sqrtinv) < 0 || !diffcheck(p, q, bits) {
 			if _, err := rand.Read(pbuf); err != nil {
 				panic("RNG failure")
@@ -558,6 +570,7 @@ func (priv *PrivateKey) rsa_fips186_5_generate_prime_factors(bits int) error {
 		if i >= 10*bits {
 			priv.Primes[0] = nil
 			priv.Primes[1] = nil
+			fmt.Printf("number of tries exceeded to find q\n")
 			return errors.New("crypto/rsa: number of tries to find prime factor exceeded limit")
 		}
 	}
