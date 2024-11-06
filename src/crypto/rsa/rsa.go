@@ -471,7 +471,6 @@ func (priv *PrivateKey) rsa_fips186_5_generate_prime_factors(bits int) error {
 	bytes := ((bits >> 1) + 7) >> 3
 	E := new(big.Int).SetInt64(int64(priv.E))
 
-	bigOne := new(big.Int).SetInt64(1)
 	// 1/sqrt(2) * 2^256
 	base, ok := new(big.Int).SetString("0xB504F333F9DE6484597D89B3754ABE9F1D6F60BA893BA84CED17AC8583339916", 0)
 	if !ok {
@@ -491,7 +490,7 @@ func (priv *PrivateKey) rsa_fips186_5_generate_prime_factors(bits int) error {
 			panic("crypto/rsa: RNG failure")
 		}
 		pbuf[bytes-1] |= 1
-		fmt.Printf("pbuf %s\n", pbuf)
+		fmt.Printf("pbuf %x..%x\n", pbuf[0], pbuf[bytes-1])
 		//	bign := new(big.Int).SetBytes(pbuf)
 		p = new(big.Int).SetBytes(pbuf)
 		fmt.Printf("p set successfully\n")
@@ -504,7 +503,7 @@ func (priv *PrivateKey) rsa_fips186_5_generate_prime_factors(bits int) error {
 				panic("RNG failure")
 			}
 			pbuf[bytes-1] |= 1
-			fmt.Printf("pbuf %s\n", pbuf)
+			fmt.Printf("pbuf %x..%x\n", pbuf[0], pbuf[bytes-1])
 			//		bign = new(big.Int).SetBytes(pbuf)
 			p = new(big.Int).SetBytes(pbuf)
 			//		p = NewNat().setBig(bign)
@@ -512,15 +511,25 @@ func (priv *PrivateKey) rsa_fips186_5_generate_prime_factors(bits int) error {
 		diff := new(big.Int).Sub(p, bigOne)
 		ret := new(big.Int).GCD(nil, nil, diff, E)
 		fmt.Printf("diff, ret computed\n")
-		if ret.Cmp(bigOne) != 0 {
+		/*
+				ans := ret.Bytes()
+				for m:=0;m<len(ans);m++ {
+					fmt.Printf("%x",ans[m])
+				}
+					fmt.Printf("\n")
+		                fmt.Printf("bigone\n")
+		                ans1 := bigOne.Bytes()
+		                for m:=0;m<len(ans1);m++ {
+		                        fmt.Printf("%x",ans1[m])
+		                }
+		                        fmt.Printf(" comparison %d\n",ret.Cmp(bigOne))
+		*/
+		if ret.Cmp(bigOne) == 0 {
 			ret := p.ProbablyPrime(rounds)
-			if ret != true {
-				priv.Primes[0] = nil
-				priv.Primes[1] = nil
-				return errors.New("crypto/rsa: could not find prime factor")
-			} else {
+			fmt.Printf("check for probably prime returned %t", ret)
+			if ret == true {
 				fmt.Printf("p is probably prime\n")
-				break
+				goto genq
 			}
 		}
 		i++
@@ -532,7 +541,7 @@ func (priv *PrivateKey) rsa_fips186_5_generate_prime_factors(bits int) error {
 		}
 	}
 	fmt.Printf("p generated successfully\n")
-
+genq:
 	// Generate q
 	i = 0
 	for {
@@ -556,7 +565,7 @@ func (priv *PrivateKey) rsa_fips186_5_generate_prime_factors(bits int) error {
 		}
 		diff := new(big.Int).Sub(q, bigOne)
 		ret := new(big.Int).GCD(nil, nil, diff, E)
-		if ret.Cmp(bigOne) != 0 {
+		if ret.Cmp(bigOne) == 0 {
 			ret := q.ProbablyPrime(rounds)
 			if ret != true {
 				priv.Primes[0] = nil
