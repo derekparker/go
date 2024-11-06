@@ -241,7 +241,8 @@ func TestPSS513(t *testing.T) {
 	// See Issue 42741, and separately, RFC 8017: "Note that the octet length of
 	// EM will be one less than k if modBits - 1 is divisible by 8 and equal to
 	// k otherwise, where k is the length in octets of the RSA modulus n."
-	key, err := GenerateKey(rand.Reader, 513)
+	//key, err := GenerateKey(rand.Reader, 513)
+	key, err := GenerateKey(rand.Reader, 3072)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -284,7 +285,8 @@ func fromHex(hexStr string) []byte {
 }
 
 func TestInvalidPSSSaltLength(t *testing.T) {
-	key, err := GenerateKey(rand.Reader, 245)
+	//key, err := GenerateKey(rand.Reader, 245)
+	key, err := GenerateKey(rand.Reader, 2192)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -309,7 +311,8 @@ func TestInvalidPSSSaltLength(t *testing.T) {
 }
 
 func TestHashOverride(t *testing.T) {
-	key, err := GenerateKey(rand.Reader, 1024)
+	//key, err := GenerateKey(rand.Reader, 1024)
+	key, err := GenerateKey(rand.Reader, 3072)
 	if err != nil {
 		t.Fatal(err)
 	}

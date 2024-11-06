@@ -432,17 +432,9 @@ func GenerateKey(random io.Reader, bits int) (*PrivateKey, error) {
 }
 
 func diffcheck(p *big.Int, q *big.Int, bits int) bool {
-	if (bits >> 1) <= 356 {
-		panic("crypto/rsa: not enough bit length")
-
-	}
-	// 1/sqrt(2) * 2^256
-	base, ok := new(big.Int).SetString("0xB504F333F9DE6484597D89B3754ABE9F1D6F60BA893BA84CED17AC8583339916", 0)
-	if !ok {
-		panic("crypto/rsa: 319 Overflow of static constant sqrt2inv")
-	}
-	limit := new(big.Int).Lsh(base, (uint)(bits>>1)-356)
-	z := p.Sub(p, q)
+	// 2^(nlen/2)-100
+	limit := new(big.Int).Lsh(bigOne, (uint)(bits>>1)-99)
+	z := new(big.Int).Sub(p, q)
 	z = z.Abs(z)
 	if z.Cmp(limit) <= 0 {
 		return true
@@ -490,10 +482,10 @@ func (priv *PrivateKey) rsa_fips186_5_generate_prime_factors(bits int) error {
 			panic("crypto/rsa: RNG failure")
 		}
 		pbuf[bytes-1] |= 1
-		fmt.Printf("pbuf %x..%x\n", pbuf[0], pbuf[bytes-1])
+		//fmt.Printf("pbuf %x..%x\n", pbuf[0], pbuf[bytes-1])
 		//	bign := new(big.Int).SetBytes(pbuf)
 		p = new(big.Int).SetBytes(pbuf)
-		fmt.Printf("p set successfully\n")
+		//fmt.Printf("p set successfully\n")
 		//p := NewNat().setBig(bign)
 
 		// check if p < 1/sqrt(2)*(2^(bits/2)-1)
@@ -503,14 +495,14 @@ func (priv *PrivateKey) rsa_fips186_5_generate_prime_factors(bits int) error {
 				panic("RNG failure")
 			}
 			pbuf[bytes-1] |= 1
-			fmt.Printf("pbuf %x..%x\n", pbuf[0], pbuf[bytes-1])
+		//	fmt.Printf("pbuf %x..%x\n", pbuf[0], pbuf[bytes-1])
 			//		bign = new(big.Int).SetBytes(pbuf)
 			p = new(big.Int).SetBytes(pbuf)
 			//		p = NewNat().setBig(bign)
 		}
 		diff := new(big.Int).Sub(p, bigOne)
 		ret := new(big.Int).GCD(nil, nil, diff, E)
-		fmt.Printf("diff, ret computed\n")
+		//fmt.Printf("diff, ret computed\n")
 		/*
 				ans := ret.Bytes()
 				for m:=0;m<len(ans);m++ {
@@ -526,9 +518,9 @@ func (priv *PrivateKey) rsa_fips186_5_generate_prime_factors(bits int) error {
 		*/
 		if ret.Cmp(bigOne) == 0 {
 			ret := p.ProbablyPrime(rounds)
-			fmt.Printf("check for probably prime returned %t", ret)
+		//	fmt.Printf("check for probably prime returned %t", ret)
 			if ret == true {
-				fmt.Printf("p is probably prime\n")
+		//		fmt.Printf("p is probably prime\n")
 				goto genq
 			}
 		}
@@ -540,25 +532,27 @@ func (priv *PrivateKey) rsa_fips186_5_generate_prime_factors(bits int) error {
 			return errors.New("crypto/rsa: number of tries to find prime factor exceeded limit")
 		}
 	}
-	fmt.Printf("p generated successfully\n")
 genq:
 	// Generate q
+	fmt.Printf("p generated successfully\n")
 	i = 0
 	for {
 		if _, err := rand.Read(pbuf); err != nil {
 			panic("RNG failure")
 		}
 		pbuf[bytes-1] |= 1
+		//fmt.Printf("pbuf %x..%x\n", pbuf[0], pbuf[bytes-1])
 		//bign := new(big.Int).SetBytes(pbuf)
 		q = new(big.Int).SetBytes(pbuf)
 		//q := NewNat().setBig(bign)
 
 		// check if q < 1/sqrt(2)*(2^(bits/2)-1)
-		for q.Cmp(sqrtinv) < 0 || !diffcheck(p, q, bits) {
+		for q.Cmp(sqrtinv) < 0 || diffcheck(p, q, bits) {
 			if _, err := rand.Read(pbuf); err != nil {
 				panic("RNG failure")
 			}
 			pbuf[bytes-1] |= 1
+		//fmt.Printf("pbuf %x..%x\n", pbuf[0], pbuf[bytes-1])
 			//		bign = new(big.Int).SetBytes(pbuf)
 			q = new(big.Int).SetBytes(pbuf)
 			//		q = NewNat().setBig(bign)
@@ -567,11 +561,9 @@ genq:
 		ret := new(big.Int).GCD(nil, nil, diff, E)
 		if ret.Cmp(bigOne) == 0 {
 			ret := q.ProbablyPrime(rounds)
-			if ret != true {
-				priv.Primes[0] = nil
-				priv.Primes[1] = nil
-				return errors.New("crypto/rsa: could not find prime factor")
-			} else {
+		//	fmt.Printf("check for probably prime returned %t", ret)
+			if ret == true {
+			fmt.Printf("q is probably prime\n")
 				break
 			}
 		}
