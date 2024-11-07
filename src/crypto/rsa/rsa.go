@@ -428,6 +428,10 @@ func GenerateKey(random io.Reader, bits int) (*PrivateKey, error) {
 	priv.PublicKey.E = priv.E
 	priv.Precomputed = PrecomputedValues{Dp: nil, Dq: nil, Qinv: nil, CRTValues: make([]CRTValue, 0), n: nil, p: nil, q: nil}
 	priv.Precompute()
+	fmt.Printf("P len %d Q Len %d\n", priv.Primes[0].BitLen(), priv.Primes[1].BitLen())
+	pbytes:=priv.Primes[0].Bytes()
+	qbytes:=priv.Primes[1].Bytes()
+	fmt.Printf("P bytes %x..%x Q bytes %x .. %x\n", pbytes[0], pbytes[1], qbytes[0], qbytes[1])
 	return priv, nil
 }
 
@@ -461,6 +465,7 @@ func (priv *PrivateKey) rsa_fips186_5_generate_prime_factors(bits int) error {
 	// ---------------------
 	rounds := rsa_fips186_5_aux_prime_MR_rounds(bits)
 	bytes := ((bits >> 1) + 7) >> 3
+
 	E := new(big.Int).SetInt64(int64(priv.E))
 
 	// 1/sqrt(2) * 2^256
@@ -482,6 +487,9 @@ func (priv *PrivateKey) rsa_fips186_5_generate_prime_factors(bits int) error {
 			panic("crypto/rsa: RNG failure")
 		}
 		pbuf[bytes-1] |= 1
+		////////////////////
+			pbuf[0]|=0xe0
+			pbuf[1]|=0xa0
 		//fmt.Printf("pbuf %x..%x\n", pbuf[0], pbuf[bytes-1])
 		//	bign := new(big.Int).SetBytes(pbuf)
 		p = new(big.Int).SetBytes(pbuf)
@@ -495,6 +503,10 @@ func (priv *PrivateKey) rsa_fips186_5_generate_prime_factors(bits int) error {
 				panic("RNG failure")
 			}
 			pbuf[bytes-1] |= 1
+			////////////////////
+			pbuf[0]|=0xe0
+			pbuf[1]|=0xa0
+
 		//	fmt.Printf("pbuf %x..%x\n", pbuf[0], pbuf[bytes-1])
 			//		bign = new(big.Int).SetBytes(pbuf)
 			p = new(big.Int).SetBytes(pbuf)
@@ -541,6 +553,10 @@ genq:
 			panic("RNG failure")
 		}
 		pbuf[bytes-1] |= 1
+		////////////////////
+                        pbuf[0]|=0xe0
+                        pbuf[1]|=0x80
+
 		//fmt.Printf("pbuf %x..%x\n", pbuf[0], pbuf[bytes-1])
 		//bign := new(big.Int).SetBytes(pbuf)
 		q = new(big.Int).SetBytes(pbuf)
@@ -552,6 +568,10 @@ genq:
 				panic("RNG failure")
 			}
 			pbuf[bytes-1] |= 1
+			////////////////////
+                        pbuf[0]|=0xe0
+                        pbuf[1]|=0x80
+
 		//fmt.Printf("pbuf %x..%x\n", pbuf[0], pbuf[bytes-1])
 			//		bign = new(big.Int).SetBytes(pbuf)
 			q = new(big.Int).SetBytes(pbuf)

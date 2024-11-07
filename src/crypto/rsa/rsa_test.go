@@ -166,10 +166,14 @@ func TestEverything(t *testing.T) {
 		min = max
 	}
 	if *allFlag {
-		max = 2048
+		//max = 2048
+		max = 8192
 	}
 	for size := min; size <= max; size++ {
 		size := size
+		if size < 2048 {
+			continue
+		}
 		t.Run(fmt.Sprintf("%d", size), func(t *testing.T) {
 			t.Parallel()
 			priv, err := GenerateKey(rand.Reader, size)
