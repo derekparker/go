@@ -428,10 +428,6 @@ func GenerateKey(random io.Reader, bits int) (*PrivateKey, error) {
 	priv.PublicKey.E = priv.E
 	priv.Precomputed = PrecomputedValues{Dp: nil, Dq: nil, Qinv: nil, CRTValues: make([]CRTValue, 0), n: nil, p: nil, q: nil}
 	priv.Precompute()
-	fmt.Printf("P len %d Q Len %d\n", priv.Primes[0].BitLen(), priv.Primes[1].BitLen())
-	pbytes:=priv.Primes[0].Bytes()
-	qbytes:=priv.Primes[1].Bytes()
-	fmt.Printf("P bytes %x..%x Q bytes %x .. %x\n", pbytes[0], pbytes[1], qbytes[0], qbytes[1])
 	return priv, nil
 }
 
@@ -462,7 +458,6 @@ func rsa_fips186_5_aux_prime_MR_rounds(bits int) int {
 
 func (priv *PrivateKey) rsa_fips186_5_generate_prime_factors(bits int) error {
 
-	// ---------------------
 	rounds := rsa_fips186_5_aux_prime_MR_rounds(bits)
 	bytes := ((bits >> 1) + 7) >> 3
 
@@ -487,14 +482,9 @@ func (priv *PrivateKey) rsa_fips186_5_generate_prime_factors(bits int) error {
 			panic("crypto/rsa: RNG failure")
 		}
 		pbuf[bytes-1] |= 1
-		////////////////////
-			pbuf[0]|=0xe0
-			pbuf[1]|=0xa0
-		//fmt.Printf("pbuf %x..%x\n", pbuf[0], pbuf[bytes-1])
-		//	bign := new(big.Int).SetBytes(pbuf)
+		pbuf[0] |= 0xe0
+		pbuf[1] |= 0xa0
 		p = new(big.Int).SetBytes(pbuf)
-		//fmt.Printf("p set successfully\n")
-		//p := NewNat().setBig(bign)
 
 		// check if p < 1/sqrt(2)*(2^(bits/2)-1)
 		for p.Cmp(sqrtinv) < 0 {
@@ -503,36 +493,16 @@ func (priv *PrivateKey) rsa_fips186_5_generate_prime_factors(bits int) error {
 				panic("RNG failure")
 			}
 			pbuf[bytes-1] |= 1
-			////////////////////
-			pbuf[0]|=0xe0
-			pbuf[1]|=0xa0
+			pbuf[0] |= 0xe0
+			pbuf[1] |= 0xa0
 
-		//	fmt.Printf("pbuf %x..%x\n", pbuf[0], pbuf[bytes-1])
-			//		bign = new(big.Int).SetBytes(pbuf)
 			p = new(big.Int).SetBytes(pbuf)
-			//		p = NewNat().setBig(bign)
 		}
 		diff := new(big.Int).Sub(p, bigOne)
 		ret := new(big.Int).GCD(nil, nil, diff, E)
-		//fmt.Printf("diff, ret computed\n")
-		/*
-				ans := ret.Bytes()
-				for m:=0;m<len(ans);m++ {
-					fmt.Printf("%x",ans[m])
-				}
-					fmt.Printf("\n")
-		                fmt.Printf("bigone\n")
-		                ans1 := bigOne.Bytes()
-		                for m:=0;m<len(ans1);m++ {
-		                        fmt.Printf("%x",ans1[m])
-		                }
-		                        fmt.Printf(" comparison %d\n",ret.Cmp(bigOne))
-		*/
 		if ret.Cmp(bigOne) == 0 {
 			ret := p.ProbablyPrime(rounds)
-		//	fmt.Printf("check for probably prime returned %t", ret)
 			if ret == true {
-		//		fmt.Printf("p is probably prime\n")
 				goto genq
 			}
 		}
@@ -546,21 +516,16 @@ func (priv *PrivateKey) rsa_fips186_5_generate_prime_factors(bits int) error {
 	}
 genq:
 	// Generate q
-	fmt.Printf("p generated successfully\n")
 	i = 0
 	for {
 		if _, err := rand.Read(pbuf); err != nil {
 			panic("RNG failure")
 		}
 		pbuf[bytes-1] |= 1
-		////////////////////
-                        pbuf[0]|=0xe0
-                        pbuf[1]|=0x80
+		pbuf[0] |= 0xe0
+		pbuf[1] |= 0x80
 
-		//fmt.Printf("pbuf %x..%x\n", pbuf[0], pbuf[bytes-1])
-		//bign := new(big.Int).SetBytes(pbuf)
 		q = new(big.Int).SetBytes(pbuf)
-		//q := NewNat().setBig(bign)
 
 		// check if q < 1/sqrt(2)*(2^(bits/2)-1)
 		for q.Cmp(sqrtinv) < 0 || diffcheck(p, q, bits) {
@@ -568,22 +533,16 @@ genq:
 				panic("RNG failure")
 			}
 			pbuf[bytes-1] |= 1
-			////////////////////
-                        pbuf[0]|=0xe0
-                        pbuf[1]|=0x80
+			pbuf[0] |= 0xe0
+			pbuf[1] |= 0x80
 
-		//fmt.Printf("pbuf %x..%x\n", pbuf[0], pbuf[bytes-1])
-			//		bign = new(big.Int).SetBytes(pbuf)
 			q = new(big.Int).SetBytes(pbuf)
-			//		q = NewNat().setBig(bign)
 		}
 		diff := new(big.Int).Sub(q, bigOne)
 		ret := new(big.Int).GCD(nil, nil, diff, E)
 		if ret.Cmp(bigOne) == 0 {
 			ret := q.ProbablyPrime(rounds)
-		//	fmt.Printf("check for probably prime returned %t", ret)
 			if ret == true {
-			fmt.Printf("q is probably prime\n")
 				break
 			}
 		}
