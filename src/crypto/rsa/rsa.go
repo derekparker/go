@@ -392,9 +392,9 @@ func (priv *PrivateKey) Validate() error {
 // returned key does not depend deterministically on the bytes read from rand,
 // and may change between calls and/or between versions.
 func GenerateKey(random io.Reader, bits int) (*PrivateKey, error) {
-	//return GenerateMultiPrimeKey(random, 2, bits)
 	if bits < 2048 {
-		return nil, errors.New("crypto/rsa: bit size too small")
+		// Fall back to old implementation for smaller keys.
+		return GenerateMultiPrimeKey(random, 2, bits)
 	}
 
 	priv := new(PrivateKey)
@@ -405,7 +405,6 @@ func GenerateKey(random io.Reader, bits int) (*PrivateKey, error) {
 
 	if priv.rsaFipsGeneratePrimeFactors(bits) != nil {
 		return nil, errors.New("crypto/rsa: could not generate prime factors p,q")
-
 	}
 	n := new(big.Int).Set(bigOne)
 	totient := new(big.Int).Set(bigOne)
@@ -424,8 +423,7 @@ func GenerateKey(random io.Reader, bits int) (*PrivateKey, error) {
 	} else {
 		return nil, errors.New("crypto/rsa: modulus error with public key exponent")
 	}
-	priv.PublicKey.N = n
-	priv.PublicKey.E = priv.E
+	priv.N = n
 	priv.Precomputed = PrecomputedValues{Dp: nil, Dq: nil, Qinv: nil, CRTValues: make([]CRTValue, 0), n: nil, p: nil, q: nil}
 	priv.Precompute()
 	return priv, nil
@@ -457,7 +455,6 @@ func rsaFipsAuxPrimeMRRounds(bits int) int {
 }
 
 func (priv *PrivateKey) rsaFipsGeneratePrimeFactors(bits int) error {
-
 	rounds := rsaFipsAuxPrimeMRRounds(bits)
 	bytes := ((bits >> 1) + 7) >> 3
 
@@ -466,10 +463,10 @@ func (priv *PrivateKey) rsaFipsGeneratePrimeFactors(bits int) error {
 	// 1/sqrt(2) * 2^256
 	base, ok := new(big.Int).SetString("0xB504F333F9DE6484597D89B3754ABE9F1D6F60BA893BA84CED17AC8583339916", 0)
 	if !ok {
-		panic("crypto/rsa: 355 Overflow of static constant sqrt2inv")
+		panic("crypto/rsa: overflow of static constant sqrt2inv")
 	}
 	if (bits >> 1) < 257 {
-		panic("crypto/rsa: Number of bits too small")
+		return errors.New("crypto/rsa: Number of bits too small")
 	}
 	sqrtinv := new(big.Int).Lsh(base, (uint)((bits>>1)-257))
 
@@ -489,8 +486,7 @@ func (priv *PrivateKey) rsaFipsGeneratePrimeFactors(bits int) error {
 		// check if p < 1/sqrt(2)*(2^(bits/2)-1)
 		for p.Cmp(sqrtinv) < 0 {
 			if _, err := rand.Read(pbuf); err != nil {
-				fmt.Printf("rng failure\n")
-				panic("RNG failure")
+				return fmt.Errorf("crypto/rsa: error reading from random number generator: %s", err)
 			}
 			pbuf[bytes-1] |= 1
 			pbuf[0] |= 0xe0
@@ -501,8 +497,8 @@ func (priv *PrivateKey) rsaFipsGeneratePrimeFactors(bits int) error {
 		diff := new(big.Int).Sub(p, bigOne)
 		ret := new(big.Int).GCD(nil, nil, diff, E)
 		if ret.Cmp(bigOne) == 0 {
-			ret := p.ProbablyPrime(rounds)
-			if ret == true {
+			isPrime := p.ProbablyPrime(rounds)
+			if isPrime {
 				goto genq
 			}
 		}
@@ -510,7 +506,6 @@ func (priv *PrivateKey) rsaFipsGeneratePrimeFactors(bits int) error {
 		if i >= 5*bits {
 			priv.Primes[0] = nil
 			priv.Primes[1] = nil
-			fmt.Printf("number of tries exceeded to find p\n")
 			return errors.New("crypto/rsa: number of tries to find prime factor exceeded limit")
 		}
 	}
@@ -519,7 +514,7 @@ genq:
 	i = 0
 	for {
 		if _, err := rand.Read(pbuf); err != nil {
-			panic("RNG failure")
+			return fmt.Errorf("crypto/rsa: error reading from random number generator: %s", err)
 		}
 		pbuf[bytes-1] |= 1
 		pbuf[0] |= 0xe0
@@ -530,7 +525,7 @@ genq:
 		// check if q < 1/sqrt(2)*(2^(bits/2)-1)
 		for q.Cmp(sqrtinv) < 0 || diffCheck(p, q, bits) {
 			if _, err := rand.Read(pbuf); err != nil {
-				panic("RNG failure")
+				return fmt.Errorf("crypto/rsa: error reading from random number generator: %s", err)
 			}
 			pbuf[bytes-1] |= 1
 			pbuf[0] |= 0xe0
@@ -541,8 +536,8 @@ genq:
 		diff := new(big.Int).Sub(q, bigOne)
 		ret := new(big.Int).GCD(nil, nil, diff, E)
 		if ret.Cmp(bigOne) == 0 {
-			ret := q.ProbablyPrime(rounds)
-			if ret == true {
+			isPrime := q.ProbablyPrime(rounds)
+			if isPrime {
 				break
 			}
 		}
@@ -550,7 +545,6 @@ genq:
 		if i >= 10*bits {
 			priv.Primes[0] = nil
 			priv.Primes[1] = nil
-			fmt.Printf("number of tries exceeded to find q\n")
 			return errors.New("crypto/rsa: number of tries to find prime factor exceeded limit")
 		}
 	}
