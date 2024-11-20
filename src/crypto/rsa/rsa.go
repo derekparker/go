@@ -403,7 +403,7 @@ func GenerateKey(random io.Reader, bits int) (*PrivateKey, error) {
 	primes := make([]*big.Int, 2)
 	priv.Primes = primes
 
-	if priv.rsa_fips186_5_generate_prime_factors(bits) != nil {
+	if priv.rsaFipsGeneratePrimeFactors(bits) != nil {
 		return nil, errors.New("crypto/rsa: could not generate prime factors p,q")
 
 	}
@@ -431,7 +431,7 @@ func GenerateKey(random io.Reader, bits int) (*PrivateKey, error) {
 	return priv, nil
 }
 
-func diffcheck(p *big.Int, q *big.Int, bits int) bool {
+func diffCheck(p *big.Int, q *big.Int, bits int) bool {
 	// 2^(nlen/2)-100
 	limit := new(big.Int).Lsh(bigOne, (uint)(bits>>1)-99)
 	z := new(big.Int).Sub(p, q)
@@ -443,7 +443,7 @@ func diffcheck(p *big.Int, q *big.Int, bits int) bool {
 	}
 }
 
-func rsa_fips186_5_aux_prime_MR_rounds(bits int) int {
+func rsaFipsAuxPrimeMRRounds(bits int) int {
 	if bits >= 4096 {
 		return 44
 	}
@@ -456,9 +456,9 @@ func rsa_fips186_5_aux_prime_MR_rounds(bits int) int {
 	return 0
 }
 
-func (priv *PrivateKey) rsa_fips186_5_generate_prime_factors(bits int) error {
+func (priv *PrivateKey) rsaFipsGeneratePrimeFactors(bits int) error {
 
-	rounds := rsa_fips186_5_aux_prime_MR_rounds(bits)
+	rounds := rsaFipsAuxPrimeMRRounds(bits)
 	bytes := ((bits >> 1) + 7) >> 3
 
 	E := new(big.Int).SetInt64(int64(priv.E))
@@ -528,7 +528,7 @@ genq:
 		q = new(big.Int).SetBytes(pbuf)
 
 		// check if q < 1/sqrt(2)*(2^(bits/2)-1)
-		for q.Cmp(sqrtinv) < 0 || diffcheck(p, q, bits) {
+		for q.Cmp(sqrtinv) < 0 || diffCheck(p, q, bits) {
 			if _, err := rand.Read(pbuf); err != nil {
 				panic("RNG failure")
 			}
