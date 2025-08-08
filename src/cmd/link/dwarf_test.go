@@ -266,9 +266,6 @@ func TestDWARFiOS(t *testing.T) {
 // pertaining to these limitations. There are other missing location lists which must be fixed
 // particularly in functions where `linkname` is involved.
 func TestDWARFLocationList(t *testing.T) {
-	if runtime.GOOS != "linux" {
-		t.Skip("skipping test on non-linux OS")
-	}
 	testenv.MustHaveCGO(t)
 	testenv.MustHaveGoBuild(t)
 
@@ -316,8 +313,7 @@ func TestDWARFLocationList(t *testing.T) {
 		// Look for the net.sendFile subprogram
 		if entry.Tag == dwarf.TagSubprogram {
 			fnName, ok := entry.Val(dwarf.AttrName).(string)
-			if !ok || fnName != "net.sendFile" {
-				reader.SkipChildren()
+			if !ok {
 				continue
 			}
 
