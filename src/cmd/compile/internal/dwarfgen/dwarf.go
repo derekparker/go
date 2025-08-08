@@ -273,11 +273,18 @@ func createDwarfVars(fnsym *obj.LSym, complexOK bool, fn *ir.Func, apDecls []*ir
 			DictIndex:     n.DictIndex,
 			ClosureOffset: closureOffset(n, closureVars),
 		}
-		if n.Esc() == ir.EscHeap {
+		debug, ok := fn.DebugInfo.(*ssa.FuncDebug)
+		if ok && isReturnValue && n.IsOutputParamInRegisters() {
+			// Create register based location list
+			list := createRegisterOnlyLocationList(n.Registers, debug.EntryID)
+			dvar.PutLocationList = func(listSym, startPC dwarf.Sym) {
+				debug.PutLocationList(list, base.Ctxt, listSym.(*obj.LSym), startPC.(*obj.LSym))
+			}
+		}
+		if ok && n.Esc() == ir.EscHeap {
 			if n.Heapaddr == nil {
 				base.Fatalf("invalid heap allocated var without Heapaddr")
 			}
-			debug := fn.DebugInfo.(*ssa.FuncDebug)
 			list := createHeapDerefLocationList(n, debug.EntryID)
 			dvar.PutLocationList = func(listSym, startPC dwarf.Sym) {
 				debug.PutLocationList(list, base.Ctxt, listSym.(*obj.LSym), startPC.(*obj.LSym))
@@ -292,6 +299,33 @@ func createDwarfVars(fnsym *obj.LSym, complexOK bool, fn *ir.Func, apDecls []*ir
 	sortDeclsAndVars(fn, decls, vars)
 
 	return decls, vars
+}
+
+// CreateRegisterOnlyLocationList creates a minimal location list that specifies
+// a value is in a register from function entry onwards.
+// This follows the same pattern as createHeapDerefLocationList.
+func createRegisterOnlyLocationList(regs []uint8, entryID ssa.ID) []byte {
+	ctxt := base.Ctxt
+
+	var list []byte
+	var sizeIdx int
+	list, sizeIdx = ssa.SetupLocList(base.Ctxt, entryID, list, ssa.BlockStart.ID, ssa.FuncEnd.ID)
+
+	// The actual location expression
+	for _, reg := range regs {
+		if reg < 32 {
+			list = append(list, dwarf.DW_OP_reg0+byte(reg))
+		} else {
+			list = append(list, dwarf.DW_OP_regx)
+			list = dwarf.AppendUleb128(list, uint64(reg))
+		}
+	}
+
+	// Update the size
+	locSize := len(list) - sizeIdx - 2
+	ctxt.Arch.ByteOrder.PutUint16(list[sizeIdx:], uint16(locSize))
+
+	return list
 }
 
 // sortDeclsAndVars sorts the decl and dwarf var lists according to

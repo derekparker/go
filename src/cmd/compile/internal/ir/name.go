@@ -57,7 +57,8 @@ type Name struct {
 	// The function, method, or closure in which local variable or param is declared.
 	Curfn *Func
 
-	Heapaddr *Name // temp holding heap address of param
+	Heapaddr  *Name // temp holding heap address of param
+	Registers []uint8
 
 	// Outer points to the immediately enclosing function's copy of this
 	// closure variable. If not a closure variable, then Outer is nil.

@@ -13,6 +13,7 @@ import (
 	"fmt"
 	"math"
 	"sync"
+	"unsafe"
 )
 
 //......................................................................
@@ -430,6 +431,7 @@ func (config *ABIConfig) updateOffset(result *ABIParamResultInfo, f *types.Field
 			fname := f.Nname.(*ir.Name)
 			fname.SetIsOutputParamInRegisters(true)
 			fname.SetFrameOffset(0)
+			fname.Registers = *(*[]uint8)(unsafe.Pointer(&a.Registers))
 		}
 	}
 }
