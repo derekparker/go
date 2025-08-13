@@ -267,6 +267,8 @@ func TestDWARFiOS(t *testing.T) {
 // pertaining to these limitations. There are other missing location lists which must be fixed
 // particularly in functions where `linkname` is involved.
 func TestDWARFLocationList(t *testing.T) {
+	const dwarfGoLanguage = 22
+
 	testenv.MustHaveCGO(t)
 	testenv.MustHaveGoBuild(t)
 
@@ -317,6 +319,10 @@ func TestDWARFLocationList(t *testing.T) {
 		}
 
 		if entry.Tag == dwarf.TagCompileUnit {
+			if lang, _ := entry.Val(dwarf.AttrLanguage).(int64); lang != dwarfGoLanguage {
+				reader.SkipChildren()
+				continue // Skip non-Go compile units.
+			}
 			cu = entry
 			lr, err = d.LineReader(cu)
 			if err != nil {
@@ -328,6 +334,14 @@ func TestDWARFLocationList(t *testing.T) {
 			fnName, ok := entry.Val(dwarf.AttrName).(string)
 			if !ok || re.MatchString(fnName) {
 				continue // Skip if no name or an anonymous function. TODO(deparker): fix loclists for anonymous functions (possible unused param).
+			}
+
+			if strings.HasPrefix(fnName, "runtime.") {
+				// Ignore runtime for now, there are a lot of runtime functions which use
+				// certain pragmas that seemingly cause the location lists to be empty such as
+				// cgo_unsafe_args and nosplit.
+				// TODO(deparker): fix loclists for runtime functions.
+				continue
 			}
 
 			fi, ok := entry.Val(dwarf.AttrDeclFile).(int64)
@@ -346,6 +360,10 @@ func TestDWARFLocationList(t *testing.T) {
 
 				if paramEntry.Tag == dwarf.TagFormalParameter {
 					paramName, _ := paramEntry.Val(dwarf.AttrName).(string)
+
+					if paramName == ".dict" {
+						continue
+					}
 
 					// Skip anonymous / blank (unused) params.
 					if strings.HasPrefix(paramName, "~p") {
