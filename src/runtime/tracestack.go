@@ -75,7 +75,10 @@ func traceStack(skip int, gp *g, tab *traceStackTable) uint64 {
 		// motivation is to take advantage of a potentially registered cgo
 		// symbolizer.
 		pcBuf[0] = logicalStackSentinel
-		if getg() == gp {
+		if getg() == gp || gp == nil {
+			// When gp == nil (getg().m.curg == nil), we are on the system stack
+			// with no user goroutine; take a traceback of the current (g0) stack.
+			// See go.dev/issue/68093 and go.dev/cl/593835.
 			nstk += callers(skip+1, pcBuf[1:])
 		} else if gp != nil {
 			nstk += gcallers(gp, skip, pcBuf[1:])
@@ -83,7 +86,8 @@ func traceStack(skip int, gp *g, tab *traceStackTable) uint64 {
 	} else {
 		// Fast path: Unwind using frame pointers.
 		pcBuf[0] = uintptr(skip)
-		if getg() == gp {
+		if getg() == gp || gp == nil {
+			// See comment in the slow path above.
 			nstk += fpTracebackPCs(unsafe.Pointer(getfp()), pcBuf[1:])
 		} else if gp != nil {
 			// Three cases:
@@ -129,7 +133,7 @@ func traceStack(skip int, gp *g, tab *traceStackTable) uint64 {
 	if nstk > 0 {
 		nstk-- // skip runtime.goexit
 	}
-	if nstk > 0 && gp.goid == 1 {
+	if nstk > 0 && gp != nil && gp.goid == 1 {
 		nstk-- // skip runtime.main
 	}
 	id := tab.put(pcBuf[:nstk])

@@ -513,6 +513,70 @@ func TestTraceStacks(t *testing.T) {
 	})
 }
 
+func TestTraceG0Stacks(t *testing.T) {
+	// Verify stacks are recorded for events emitted on g0 with curg == nil
+	// (go.dev/issue/68093 / go.dev/cl/593835).
+	testTraceProg(t, "g0-stacks.go", func(t *testing.T, tb, _ []byte, _ string) {
+		stackHas := func(stk trace.Stack, wantFn string) bool {
+			if stk == trace.NoStack {
+				return false
+			}
+			for f := range stk.Frames() {
+				if f.Func == wantFn {
+					return true
+				}
+			}
+			return false
+		}
+
+		var (
+			seenAfterFuncCreate bool
+			seenTimerUnblock    bool
+		)
+		r, err := trace.NewReader(bytes.NewReader(tb))
+		if err != nil {
+			t.Fatal(err)
+		}
+		for {
+			ev, err := r.ReadEvent()
+			if err == io.EOF {
+				break
+			}
+			if err != nil {
+				t.Fatal(err)
+			}
+			if ev.Kind() != trace.EventStateTransition {
+				continue
+			}
+			st := ev.StateTransition()
+			if st.Resource.Kind != trace.ResourceGoroutine {
+				continue
+			}
+			old, new := st.Goroutine()
+			switch {
+			case old == trace.GoNotExist && (new == trace.GoRunnable || new == trace.GoWaiting):
+				// AfterFunc's GoCreate runs from the timer callback on g0.
+				// Event.Stack is the creator stack; Transition stack is start PC.
+				if stackHas(ev.Stack(), "time.goFunc") {
+					seenAfterFuncCreate = true
+				}
+			case old == trace.GoWaiting && new == trace.GoRunnable:
+				// Timer/Ticker channel send runs time.sendTime on g0 and unparks
+				// the waiter; the GoUnblock stack should name sendTime.
+				if stackHas(ev.Stack(), "time.sendTime") {
+					seenTimerUnblock = true
+				}
+			}
+		}
+		if !seenAfterFuncCreate {
+			t.Error("no GoCreate stack containing time.goFunc (AfterFunc on g0); see go.dev/issue/68093")
+		}
+		if !seenTimerUnblock {
+			t.Error("no GoUnblock stack containing time.sendTime (timer channel wake on g0)")
+		}
+	})
+}
+
 func TestTraceStress(t *testing.T) {
 	switch runtime.GOOS {
 	case "js", "wasip1":
