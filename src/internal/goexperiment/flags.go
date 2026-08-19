@@ -127,4 +127,8 @@ type Flags struct {
 	// from interleaved key/elem slots (KVKVKVKV) to split key and elem
 	// arrays (KKKKVVVV).
 	MapSplitGroup bool
+
+	// Numa enables NUMA topology discovery and (later) memory policy.
+	// Linux-only; other platforms no-op. Off by default.
+	Numa bool
 }
