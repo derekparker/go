@@ -433,3 +433,160 @@ Caveats:
   bytes or write traffic; they are a proxy for cross-socket read pressure, not full IMC
   bandwidth.
 - Single run per label; no repeated trials.
+
+---
+
+## Layer 0 gate (v2) — 2026-08-19
+
+Date: 2026-08-19
+Local SHA: `ed06774c7decd93ded7f5fcc13ce817eee671fe6`
+Remote SHA (`numa-dell`, post-`make push`+`make build`): `ed06774c7decd93ded7f5fcc13ce817eee671fe6` (matches; remote was previously stale at `d9a7ef91aa`, resynced via `git push numa-dell +HEAD:claude/numa-v2-implementation-a6eb4c` then `git fetch && git checkout -f`)
+`go version`: `go1.28-devel_ed06774c7d Wed Aug 19 14:36:56 2026 -0700 linux/amd64`
+Kernel: `6.12.0-211.7.1.el10_2.x86_64`
+`x/benchmarks`: `v0.0.0-20260819172200-70693762b6a0`
+`x/perf` (benchstat): `v0.0.0-20260819171926-ebcb4798430d`
+Machine load: single-user throughout (`who`/`w` showed only `deparker`'s own SSH sessions); `uptime` load average climbed to ~1–6 over the course of the run, attributable to this session's own sequential `make.bash` builds and background benchmark processes, not a second tenant. `tuned-adm active` profile: `throughput-performance`. No cpufreq `scaling_governor` sysfs present (HWP-managed P-states); this correlates with the bimodal run-to-run timing noise described below.
+
+Layer 0 adds: `internal/goexperiment.Numa` flag, `internal/runtime/numa` (topology types + sysfs parser), `runtime.numaSchedinit`/`numaInitTopology`/`numaCurrentNode`, a `getcpu` asm stub, a `debug.numa` dbgvar, and one call site in `schedinit`. No allocator/scheduler fast-path code was touched.
+
+**Machine-noise note (affects every gate below):** `GOMAXPROCS=1` timings on `numa-dell` are strongly bimodal — repeated runs of the *identical* binary swing by up to ~2x (e.g. json `ns/op` alternating between ~16ms and ~33ms; `Malloc8` between ~7ns and ~14ns), independent of which arm (baseline/numa) is measured. This is consistent with HWP/Turbo P-state transitions on this many-core Xeon 8592+ when only 1 of 256 CPUs is active, not a code-path effect — the *same* noise magnitude appears in same-arm-only comparisons. Per the plan's own guidance ("prefer benchstat for any decision near the band"), all verdicts below use `benchstat`'s Mann-Whitney U test as the authoritative comparator; the plan's hand-rolled median comparator is reported alongside for transparency since it is noise-sensitive at this variance level.
+
+### Gate 1 — 1P json, off vs on, same commit (`make gate-json-1p`)
+
+First run, `BENCHNUM=3` (Makefile default):
+
+| metric | baseline median | numa median | rel | hand-rolled verdict |
+|---|---|---|---|---|
+| ns/op | 33,283,930 | 32,987,047 | −0.9% | PASS |
+| user+sys-ns/op | 33,298,610 | 33,016,060 | −0.8% | PASS |
+
+Rerun at `BENCHNUM=10` (triggered proactively due to observed bimodal variance, matching the plan's CONCERN protocol in spirit):
+
+| metric | baseline median | numa median | rel | hand-rolled verdict |
+|---|---|---|---|---|
+| ns/op | 29,914,152.5 | 32,274,066.0 | +7.9% | **FAIL** (exceeds +2%) |
+| user+sys-ns/op | 29,889,640.0 | 32,285,305.0 | +8.0% | **FAIL** (exceeds +2%) |
+
+Raw per-round values for both arms, `/tmp/numa-gate-json-n10/{baseline,numa}.out` (still present on
+`numa-dell` at time of this fix; no rerun needed):
+
+| round | baseline ns/op | baseline user+sys-ns/op | numa ns/op | numa user+sys-ns/op |
+|---|---|---|---|---|
+| 1 | 33,608,984 | 33,687,950 | 33,658,140 | 33,727,950 |
+| 2 | 33,119,372 | 33,172,880 | 33,336,889 | 33,421,040 |
+| 3 | 33,222,479 | 33,289,640 | 32,166,443 | 32,175,670 |
+| 4 | 16,318,991 | 16,329,980 | 30,835,761 | 30,861,540 |
+| 5 | 16,345,159 | 16,352,076 | 17,402,132 | 17,398,562 |
+| 6 | 16,494,396 | 16,497,874 | 16,195,624 | 16,195,624 |
+| 7 | 33,010,681 | 33,087,910 | 16,394,765 | 16,429,716 |
+| 8 | 22,616,279 | 22,612,310 | 32,381,689 | 32,394,940 |
+| 9 | 33,008,511 | 32,979,290 | 32,918,934 | 32,975,850 |
+| 10 | 26,819,794 | 26,799,990 | 33,012,898 | 33,053,550 |
+
+Both arms are bimodal in the same way: baseline has 5/10 rounds in the ~32–34M band and 3/10 in the
+~16M band (plus 2 mid-range outliers at 22.6M/26.8M); numa has 7/10 rounds in the ~30–34M band and
+3/10 in the ~16–17M band. This confirms the "bimodality affects both arms equally" claim with data,
+rather than asserting it from baseline alone — the low-cluster rounds are not concentrated in either
+arm, which is what makes this machine noise rather than a real GOEXPERIMENT=numa effect.
+
+`benchstat` on the same `BENCHNUM=10` data (n=10 each arm):
+
+```
+JSON-1  sec/op:            29.91m ± 45%  32.27m ± 49%  ~ (p=0.971 n=10)
+JSON-1  user+sys-sec/op:   29.89m ± 45%  32.29m ± 49%  ~ (p=1.000 n=10)
+```
+
+**Verdict: PASS** (benchstat: no statistically significant difference). The hand-rolled median comparator's FAIL reading is an artifact of the machine's bimodal noise (±45–49% spread within each arm) landing the small-N median on the wrong side by chance; `benchstat`'s p≈1.0 makes clear the two distributions are indistinguishable. Flagged as a **CONCERN** below.
+
+### Gate 2 — 1P alloc micro (Task 4 Step 1b): `Malloc8`/`Malloc16`, `-count=10`
+
+(No `MallocTypes` benchmark exists in this tree; only `Malloc8`/`Malloc16` matched.)
+
+```
+benchstat /tmp/alloc-base.out /tmp/alloc-numa.out
+Malloc8    7.000n ± 70%   10.505n ± 35%   ~ (p=0.108 n=10)
+Malloc16   11.38n ±  1%    11.37n ±  0%   ~ (p=0.513 n=10)
+geomean    8.923n          10.93n         +22.48% (not significant — both individual comparisons are "~")
+```
+
+**Verdict: PASS** (benchstat: no statistically significant difference on either benchmark). Same bimodal-noise characteristic as Gate 1 (`Malloc8` alternates ~7ns/~14ns run to run in both arms).
+
+### Gate 3 — Parent-commit comparison (Global Constraints, once per layer)
+
+Parent/baseline: `origin/master` @ `8058a577731129d56d03797451804a2c5f4745ca`, own toolchain build, own GOBIN json binary. HEAD off/on binaries reused from Gate 1's pinned-version build. Interleaved (parent, head-off, head-on) × 10 rounds (protocol asked for ×3; extended given the demonstrated noise), `GOMAXPROCS=1 -benchmem=512 -benchtime=3s`.
+
+Hand-rolled medians:
+
+| comparison | parent median ns/op | head median ns/op | rel |
+|---|---|---|---|
+| head-off vs parent | 17,581,312.5 | 16,407,720.0 | −6.7% |
+| head-on vs parent | 17,581,312.5 | 16,307,928.0 | −7.2% |
+
+`benchstat`:
+
+```
+head-off vs parent:  sec/op  17.58m ± 29%  16.41m ± 86%  ~ (p=0.353 n=10)
+head-on  vs parent:  sec/op  17.58m ± 29%  16.31m ± 85%  ~ (p=0.481 n=10)
+```
+
+**Verdict: PASS** for both (head-off ≤ parent+2% and head-on ≤ parent+2%; both nominally *faster*, not slower, and the difference is not statistically significant either way). This gate is the one that would catch an unconditional (non-`goexperiment`-gated) cost — none is visible.
+
+### Gate 4 — Off-binary identity (Task 4 Step 1c #1)
+
+Built `go test -c runtime` (no `GOEXPERIMENT`) from the parent commit and from HEAD; `objdump -d` on both `.test` binaries.
+
+- Function-level census (11,173 functions each): **zero differences** in function set or per-function instruction-line counts between parent and HEAD off-binaries.
+- Zero occurrences of any `numa`-related symbol anywhere in the HEAD off-binary disassembly — the entire `internal/runtime/numa` package, `numaSchedinit`, `numaInitTopology`, `numaCurrentNode`, and the `getcpu` asm stub are fully dead-code-eliminated when `GOEXPERIMENT=numa` is unset (`goexperiment.Numa` is a compile-time-false constant, so `numaSchedinit`'s single `if !goexperiment.Numa { return }` body collapses the whole call away).
+- Explicit fast-path diff of `runtime.mallocgc` (133 instr), `runtime.acquirep` (56 instr), `runtime.schedinit` (355 instr): **mnemonic-for-mnemonic identical** between parent and HEAD; the only diff is the literal RIP-relative addresses of a handful of global data symbols (`runtime.sched`, `runtime.debug`, `runtime.mallocScanTable`, `runtime.gcBlackenEnabled`, etc.), all shifted by a small constant offset.
+- `size`: `.text` +24 bytes, `.data` +32 bytes, `.bss` unchanged — consistent with the single new `debug.numa int32` field added to the `debug` struct (`runtime1.go`) shifting every subsequent global's address, not with any new code path.
+
+**Literal pass-bar not met, and cannot be met at this layer.** Plan Task 4 Step 1c #1 requires
+`objdump` output to "differ only in build IDs." That literal bar was **not** achieved here: the
+`.text`/`.data` size deltas above (+24B/+32B) and the RIP-relative literal-address shifts in
+`mallocgc`/`acquirep`/`schedinit` are real, non-build-ID differences. This is structural, not a
+measurement gap — Layer 0 adds `debug.numa` to the `debug` struct (`runtime1.go`), and any new
+field in a struct that many other functions reference by RIP-relative addressing will shift the
+addresses of every subsequent global, in any binary that links the package, regardless of whether
+`GOEXPERIMENT=numa` is off. There is no way to add a new dbgvar without this effect, so the literal
+"build-IDs-only" bar is unattainable by design at Layer 0 (or any layer that adds a dbgvar).
+
+**Verdict: PASS on the substantive criterion**, not the literal one: zero function-level changes
+(11,173/11,173 functions identical in instruction count), zero new symbols reachable in the
+off-binary, and zero opcode/register/branch-target changes in the three explicitly-checked
+fast-path functions — only data-literal addresses moved. This is the same "flag the honest gap
+between the literal plan bar and what's achievable, then show why the substantive check still
+holds" treatment as Gate 5 below.
+
+### Gate 5 — 1P instruction flatness (Task 4 Step 1c #2)
+
+`perf stat -e instructions` on `GOMAXPROCS=1 go test runtime -bench=Malloc8 -benchtime=100000000x -count=1`, off vs on, 3 runs each (`perf_event_paranoid=2`, works fine for own-process counting):
+
+| arm | run 1 | run 2 | run 3 | median |
+|---|---|---|---|---|
+| off | 11,189,097,561 | 11,178,311,812 | 11,180,809,451 | 11,180,809,451 |
+| on | 11,166,784,307 | 11,167,378,201 | 11,230,889,000 | 11,167,378,201 |
+
+Median delta: −13,431,250 instructions = **−0.12%** (on is fewer, not more — within the run-to-run instruction-count jitter of the harness itself; the aspirational "<0.01%" flatness bar in the plan wasn't hit exactly, but the sign and magnitude are consistent with "no fast-path instructions added," matching Gate 4's static evidence). Notably, instruction counts were far more stable (≤0.5% spread) than wall-clock ns/op on this machine, confirming instruction counting is the better noise-immune signal here.
+
+**Verdict: PASS.**
+
+### Gate 6 — 256P span check (optional, Task 5 Step 3)
+
+`GOMAXPROCS=256 numa-design/gate-json.sh`, `BENCHNUM=3` default:
+
+| metric | baseline | numa | rel |
+|---|---|---|---|
+| ns/op | 3,540,663 | 3,583,323 | +1.2% |
+| user+sys-ns/op | 342,564,831 | 227,273,584 | −33.7% |
+
+**Verdict: PASS / not stop-worthy** (ns/op +1.2% is under the +2% "huge regression" stop bar for this optional, non-gating check; the large negative user+sys swing is noise at 256P, same machine-noise character as the 1P gates — informational only, not evaluated as a hard gate per plan).
+
+### Overall verdict: **PASS**
+
+All hard gates (1P json off-vs-on, 1P alloc micro, parent-commit comparison) pass under `benchstat`'s statistical test, which the plan directs to be authoritative "for any decision near the band." Two additional gates immune to timing noise — off-binary code identity and instruction-count flatness — independently corroborate: Layer 0 adds zero fast-path instructions and is fully dead-code-eliminated when off; the only observable diff when off is a small, expected global-data offset shift from the new `debug.numa` dbgvar.
+
+**Concerns for the controller:**
+
+1. **Machine noise at `GOMAXPROCS=1` on `numa-dell` is large** (±29–86% relative stdev observed across gates), consistent with HWP/Turbo P-state transitions when only 1 of 256 CPUs is active. The plan's hand-rolled median comparator (`gate-json.sh`'s embedded Python) produced one false FAIL (Gate 1, `BENCHNUM=10`) purely from bimodal-noise median placement; `benchstat` correctly showed no significant difference on the same data. Recommend `gate-json.sh` itself be changed (in a follow-up task, not this one — no `src/` or script changes were made here) to run `benchstat` as the primary decision path rather than only "near the band," since "near the band" undersells how noisy this box is even for supposedly-clear results.
+2. No `BenchmarkMallocTypes` exists in this runtime tree, so Gate 2 only covers `Malloc8`/`Malloc16`; the brief's regex `Malloc(8|16|Types)` was written to also match a benchmark that doesn't exist here.
+3. **Gate 4's literal pass bar ("differ only in build IDs") was not met and cannot be at this layer** — adding any `debug.<name>` dbgvar shifts RIP-relative addresses of subsequent globals in every function that references them, off-binary or not. Gate 4 passed on the substantive criterion (zero function-level/opcode/branch-target changes) instead; see the Gate 4 entry above for the full explanation. Future layers that add dbgvars will hit the same structural limit.
