@@ -1582,6 +1582,13 @@ func (h *mheap) grow(npage uintptr) (uintptr, bool) {
 				// as released since we'll be able to start using it after updating
 				// the page allocator and releasing the lock at any time.
 				sysMap(unsafe.Pointer(h.curArena.base), size, &gcController.heapReleased, "heap")
+				if goexperiment.Numa {
+					// mmap(MAP_FIXED) inside sysMap reset any VMA
+					// policy this range had; re-bind it. See
+					// numaBindArena for the init-order guard that
+					// makes this a no-op before numaSchedinit runs.
+					numaBindArena(unsafe.Pointer(h.curArena.base), size)
+				}
 				// Update stats.
 				stats := memstats.heapStats.acquire()
 				atomic.Xaddint64(&stats.released, int64(size))
@@ -1623,6 +1630,10 @@ func (h *mheap) grow(npage uintptr) (uintptr, bool) {
 	// size which is always > physPageSize, so its safe to
 	// just add directly to heapReleased.
 	sysMap(unsafe.Pointer(v), nBase-v, &gcController.heapReleased, "heap")
+	if goexperiment.Numa {
+		// See the comment on the other numaBindArena call above.
+		numaBindArena(unsafe.Pointer(v), nBase-v)
+	}
 
 	// The memory just allocated counts as both released
 	// and idle, even though it's not yet backed by spans.

@@ -6,8 +6,85 @@ package runtime
 
 import (
 	"internal/goexperiment"
+	"internal/runtime/atomic"
 	"internal/runtime/numa"
+	"internal/runtime/syscall/linux"
+	"unsafe"
 )
+
+// Layer 1 mempolicy constants. See numaSetProcessBindAll and numaBindArena.
+//
+// numaMaxNode is the maxnode argument passed to get_mempolicy,
+// set_mempolicy, and mbind, on every architecture: a fixed 65. It is
+// NEVER derived from numaNodemaskBits (which is 32 on 32-bit platforms:
+// 386, arm, mips, mipsle) and never derived from numa.MaxNodes (64).
+//
+// The kernel's get_nodes()/copy_nodes_to_user() decrements maxnode and
+// then sizes its destination write as BITS_TO_LONGS(maxnode-1) kernel
+// ulongs; for maxnode=65 that's BITS_TO_LONGS(64), which is 8 bytes
+// regardless of the calling process's own word size (2 32-bit ulongs or
+// 1 64-bit ulong -- both 8 bytes). Passing maxnode=numaNodemaskBits+1
+// (33, not 65) on a 32-bit arch would still make the kernel round its
+// copy up to that same 8-byte length while our destination was a single
+// 4-byte uintptr: a 4-byte out-of-bounds kernel write. numaNodemask below
+// sizes the actual destination buffer to match this 8-byte requirement on
+// every arch (numaNodemaskWords native-uintptr words: 1 on 64-bit, 2 on
+// 32-bit).
+const numaMaxNode = 65
+
+const (
+	_MPOL_BIND           = 2
+	_MPOL_F_MEMS_ALLOWED = 4      // get_mempolicy flag: return the kernel's allowed-node mask
+	_MPOL_MODE_FLAGS     = 0xc000 // MPOL_F_STATIC_NODES | MPOL_F_RELATIVE_NODES: optional flag bits get_mempolicy may OR into its returned mode
+
+	numaNodemaskBits = 8 * unsafe.Sizeof(uintptr(0))
+	// numaNodemaskWords is the number of native uintptr words needed to
+	// hold a numaMaxNode(65)-bit-capable nodemask, as required above: 1
+	// word on 64-bit platforms, 2 on 32-bit.
+	numaNodemaskWords = 64 / numaNodemaskBits
+)
+
+// numaNodemask is the on-the-wire nodemask buffer for get_mempolicy,
+// set_mempolicy, and mbind. word[0] holds node ids [0, numaNodemaskBits);
+// on 32-bit platforms only, word[1] holds node ids [numaNodemaskBits,
+// 64). Word order matches the kernel's ulong-array indexing (low bits
+// first), so this is correct independent of byte endianness.
+type numaNodemask [numaNodemaskWords]uintptr
+
+// numaNodemaskPopcount returns the number of set bits across all words of
+// *m.
+func numaNodemaskPopcount(m *numaNodemask) int {
+	n := 0
+	for _, w := range m {
+		for w != 0 {
+			w &= w - 1
+			n++
+		}
+	}
+	return n
+}
+
+// numaAllowedNodemask is the BIND-all nodemask published by
+// numaSetProcessBindAll, consumed by numaBindArena's nosplit fast path:
+// bit 1<<id is set for each allowed NUMA node id in [0, numaNodemaskBits)
+// -- all 64 representable ids on 64-bit platforms, but only ids 0-31 on
+// 32-bit platforms (386, arm, mips, mipsle). This is a deliberate
+// narrowing on 32-bit platforms only: the task-wide policy set by
+// set_mempolicy in numaSetProcessBindAll always covers the full 64-id
+// range via the (up to) 2-word numaNodemask buffer, but this single-word
+// atomic cannot. A 32-bit host with more than 32 NUMA nodes is not a
+// configuration Layer 1 targets; such a host still gets correct
+// task-policy behavior, just without the (redundant, in that case) arena
+// VMA policy for node ids >= 32.
+//
+// Zero until numaSetProcessBindAll both computes a mask with at least 2
+// bits set (see the single-node and fallback-footgun guards there) and
+// successfully calls set_mempolicy. numaBindArena relies on this as an
+// init-order guard (mheap.grow can run before numaSchedinit) and it also
+// means a failed or skipped set_mempolicy never gets published: every
+// mheap.grow would otherwise pay a guaranteed-failing (or wrongly-scoped)
+// mbind forever.
+var numaAllowedNodemask atomic.Uintptr
 
 // numaTopology is the machine's NUMA topology, discovered by
 // numaInitTopology during schedinit. It is only populated when
@@ -37,6 +114,7 @@ func numaSchedinit() {
 		return
 	}
 	numaInitTopology()
+	numaSetProcessBindAll()
 	if debug.numa > 0 {
 		println("numa: nodes", numaTopology.NumNodes, "allowed", numaTopology.NumAllowedNodes)
 	}
@@ -77,4 +155,104 @@ func numaCurrentNode() int32 {
 		return -1
 	}
 	return int32(node)
+}
+
+// numaSetProcessBindAll sets this process's task memory policy to
+// MPOL_BIND over every NUMA node it is currently allowed to allocate
+// from, and publishes the resulting mask in numaAllowedNodemask for
+// numaBindArena to consume.
+//
+// It is called once from numaSchedinit, after numaInitTopology. Layer 1
+// only: BIND-all, never MPOL_PREFERRED, and no STW toggle.
+//
+// Global constraint: on a single-node host (or when topology discovery
+// only ever found one node), runtime behavior must be identical to stock
+// Go. numaSetProcessBindAll returns immediately in that case, before any
+// syscall, leaving numaAllowedNodemask at zero so numaBindArena stays a
+// no-op too.
+//
+// The allowed-node mask is read from the kernel itself
+// (get_mempolicy(MPOL_F_MEMS_ALLOWED)) rather than derived from
+// numaTopology: this automatically respects cpusets (e.g. a container's
+// cpuset.mems) with no parsing, and includes CPU-less memory nodes. If
+// the get_mempolicy call fails, numaTopology's allowed-node list is used
+// as a fallback -- but if topology discovery itself failed,
+// numaInitTopology already installed a synthesized single-node topology,
+// and the rebuilt mask would be exactly {node0}; BIND-ing a genuinely
+// multi-node host down to one node would be actively harmful, not merely
+// unhelpful. So regardless of which path produced it: if the final mask
+// has fewer than 2 bits set, set_mempolicy is never called and
+// numaAllowedNodemask is left unpublished. set_mempolicy's own result is
+// checked too -- a failing set_mempolicy also leaves numaAllowedNodemask
+// unpublished, so numaBindArena never spends a syscall on a policy the
+// kernel rejected.
+func numaSetProcessBindAll() {
+	if numaTopology.NumNodes < 2 {
+		return
+	}
+
+	var mask numaNodemask
+	_, _, errno := linux.Syscall6(linux.SYS_GET_MEMPOLICY, 0, uintptr(unsafe.Pointer(&mask[0])), numaMaxNode, 0, uintptr(_MPOL_F_MEMS_ALLOWED), 0)
+	if errno != 0 {
+		mask = numaNodemask{}
+		for i := int32(0); i < numaTopology.NumAllowedNodes; i++ {
+			id := numaTopology.AllowedNode(i)
+			if id < 0 || uintptr(id) >= 64 {
+				continue
+			}
+			mask[uintptr(id)/numaNodemaskBits] |= 1 << (uintptr(id) % numaNodemaskBits)
+		}
+	}
+
+	if numaNodemaskPopcount(&mask) < 2 {
+		return
+	}
+
+	if _, _, errno := linux.Syscall6(linux.SYS_SET_MEMPOLICY, uintptr(_MPOL_BIND), uintptr(unsafe.Pointer(&mask[0])), numaMaxNode, 0, 0, 0); errno != 0 {
+		return
+	}
+	numaAllowedNodemask.Store(mask[0])
+}
+
+// numaBindArena sets MPOL_BIND, over the same allowed-node mask
+// numaSetProcessBindAll computed, as the VMA policy for the heap arena
+// range [addr, addr+size). Layer 1 only: no MPOL_PREFERRED, no getcpu,
+// no span bookkeeping.
+//
+// numaBindArena is called from mheap.grow, with h.lock held, immediately
+// after each sysMap of newly-backed heap memory (mmap with MAP_FIXED
+// resets any VMA policy the range previously had). It must stay
+// nosplit-safe and add nothing slower than the single mbind syscall under
+// that lock: no allocation, no lock acquisition, no additional syscalls.
+//
+// Init-order guard: mheap.grow runs before numaSchedinit (goargs/goenvs
+// allocate heap memory before finishDebugVarsSetup, which precedes
+// numaSchedinit, in schedinit). Until numaSetProcessBindAll publishes a
+// non-empty numaAllowedNodemask, numaBindArena no-ops rather than issuing
+// an mbind with an empty mask (which the kernel would silently reject
+// with EINVAL). Those early-grown ranges carry no VMA policy of their
+// own; they are balancer-exempt only via the task-wide policy set by
+// numaSetProcessBindAll, which is why that call is load-bearing and not
+// just a belt-and-suspenders duplicate of the arena mbind.
+//
+// numaBindArena does not catch up already-mapped ranges once the mask
+// becomes available: see task-6-report.md for that scope decision.
+//
+// mbind errors are ignored: this is deliberate (see design), not a
+// silently-swallowed bug.
+//
+// Scavenger interaction: VMA policies survive sysUnused (MADV_FREE /
+// MADV_DONTNEED); pages that refault after being scavenged are re-placed
+// under the surviving policy, so scavenged-and-reused ranges need no
+// re-mbind here.
+//
+//go:nosplit
+func numaBindArena(addr unsafe.Pointer, size uintptr) {
+	w0 := numaAllowedNodemask.Load()
+	if w0 == 0 {
+		return
+	}
+	var mask numaNodemask
+	mask[0] = w0
+	linux.Syscall6(linux.SYS_MBIND, uintptr(addr), size, uintptr(_MPOL_BIND), uintptr(unsafe.Pointer(&mask[0])), numaMaxNode, 0)
 }

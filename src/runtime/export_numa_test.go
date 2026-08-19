@@ -34,8 +34,19 @@ func NumaCurrentNodeForTest() int32 { return numaCurrentNode() }
 // NumaTaskMemPolicyModeForTest returns this process's current task memory
 // policy mode via get_mempolicy(2) (mode only, no MPOL_F_MEMS_ALLOWED, no
 // nodemask), for TestNUMABindAllTaskPolicy to check against MPOL_BIND (2).
+//
+// The raw mode word can have MPOL_F_STATIC_NODES/MPOL_F_RELATIVE_NODES
+// OR'd in by the kernel; those are masked out here so callers only ever
+// see one of the MPOL_* mode values. Returns -1 if the get_mempolicy
+// syscall itself fails, distinguishing a syscall error from a genuine
+// MPOL_DEFAULT (mode 0) result -- the latter is the expected value on a
+// single-node host, where numaSetProcessBindAll must never have called
+// set_mempolicy at all.
 func NumaTaskMemPolicyModeForTest() int32 {
 	var mode int32
-	linux.Syscall6(linux.SYS_GET_MEMPOLICY, uintptr(unsafe.Pointer(&mode)), 0, 0, 0, 0, 0)
-	return mode
+	_, _, errno := linux.Syscall6(linux.SYS_GET_MEMPOLICY, uintptr(unsafe.Pointer(&mode)), 0, 0, 0, 0, 0)
+	if errno != 0 {
+		return -1
+	}
+	return mode &^ _MPOL_MODE_FLAGS
 }
