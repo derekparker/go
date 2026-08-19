@@ -18,6 +18,9 @@ const (
 	SYS_PREAD64       = 17
 	SYS_READ          = 0
 	SYS_UNAME         = 63
+	SYS_MBIND         = 237
+	SYS_GET_MEMPOLICY = 239
+	SYS_SET_MEMPOLICY = 238
 
 	EFD_NONBLOCK = 0x800
 

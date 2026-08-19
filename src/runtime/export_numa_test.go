@@ -21,7 +21,21 @@
 
 package runtime
 
+import (
+	"internal/runtime/syscall/linux"
+	"unsafe"
+)
+
 func NumaNumNodes() int32           { return numaTopology.NumNodes }
 func NumaNumAllowedNodes() int32    { return numaTopology.NumAllowedNodes }
 func NumaNodeOfCPU(cpu int) int32   { return numaTopology.NodeOfCPU(cpu) }
 func NumaCurrentNodeForTest() int32 { return numaCurrentNode() }
+
+// NumaTaskMemPolicyModeForTest returns this process's current task memory
+// policy mode via get_mempolicy(2) (mode only, no MPOL_F_MEMS_ALLOWED, no
+// nodemask), for TestNUMABindAllTaskPolicy to check against MPOL_BIND (2).
+func NumaTaskMemPolicyModeForTest() int32 {
+	var mode int32
+	linux.Syscall6(linux.SYS_GET_MEMPOLICY, uintptr(unsafe.Pointer(&mode)), 0, 0, 0, 0, 0)
+	return mode
+}

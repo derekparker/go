@@ -43,3 +43,13 @@ func TestNUMAGetcpu(t *testing.T) {
 		t.Fatal("getcpu failed")
 	}
 }
+
+func TestNUMABindAllTaskPolicy(t *testing.T) {
+	if runtime.NumaNumAllowedNodes() <= 1 {
+		t.Skip("not multi-node")
+	}
+	mode := runtime.NumaTaskMemPolicyModeForTest()
+	if mode != 2 { // MPOL_BIND
+		t.Fatalf("mempolicy mode=%d want BIND(2)", mode)
+	}
+}
