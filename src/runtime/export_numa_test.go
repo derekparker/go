@@ -83,3 +83,22 @@ func NumaSetThreadAffinitySelfForTest() bool {
 	}
 	return numaSetThreadAffinity(0, &buf)
 }
+
+// NumaHasSetAffinityForTest reports whether this platform implements
+// numaSetThreadAffinity (see numaHasSetAffinity in numa_linux_affinity.go
+// / numa_linux_affinity_other.go).
+func NumaHasSetAffinityForTest() bool { return numaHasSetAffinity }
+
+// NumaIsNodeCPUCountForTest reports whether n equals some node's CPU count.
+func NumaIsNodeCPUCountForTest(n int) bool {
+	for i := int32(0); i < numaTopology.NumNodes; i++ {
+		if int(numaTopology.Nodes[i].NumCPUs) == n {
+			return true
+		}
+	}
+	return false
+}
+
+// NumaConfinedForTest reports whether fill-one-socket-first confinement is
+// currently active for this process (see numaConfined in numa_linux.go).
+func NumaConfinedForTest() bool { return numaConfined.Load() }

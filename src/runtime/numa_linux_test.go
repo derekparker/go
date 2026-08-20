@@ -7,9 +7,15 @@
 package runtime_test
 
 import (
+	"fmt"
+	"internal/testenv"
+	"os"
 	"runtime"
+	"strings"
 	"testing"
 )
+
+// mempolicy modes (numa_linux.go): 1 = MPOL_PREFERRED, 2 = MPOL_BIND.
 
 func TestNUMATopologyDiscovery(t *testing.T) {
 	n := runtime.NumaNumNodes()
@@ -48,6 +54,9 @@ func TestNUMABindAllTaskPolicy(t *testing.T) {
 	if runtime.NumaNumAllowedNodes() <= 1 {
 		t.Skip("not multi-node")
 	}
+	if runtime.NumaConfinedForTest() {
+		t.Skip("process is socket-confined; BIND-all not in effect by design")
+	}
 	mode := runtime.NumaTaskMemPolicyModeForTest()
 	if mode != 2 { // MPOL_BIND
 		t.Fatalf("mempolicy mode=%d want BIND(2)", mode)
@@ -77,4 +86,70 @@ func TestNUMASetThreadAffinitySelf(t *testing.T) {
 	if !runtime.NumaSetThreadAffinitySelfForTest() {
 		t.Fatal("sched_setaffinity(self, current mask) failed")
 	}
+}
+
+func TestNUMAFillOneSocketConfined(t *testing.T) {
+	if runtime.NumaNumAllowedNodes() <= 1 {
+		t.Skip("not multi-node")
+	}
+	if !runtime.NumaHasSetAffinityForTest() {
+		t.Skip("no sched_setaffinity plumbing on this arch")
+	}
+	// GOMAXPROCS=1 <= every node's CPU count: the subprocess must confine.
+	// NOTE: testprog is built by buildTestProg with the inherited
+	// environment; run via `make test-numa` so GOEXPERIMENT=numa applies
+	// to the subprocess build too.
+	got := runTestProg(t, "testprog", "NUMAPlacementInfo", "GOMAXPROCS=1")
+	aff, mode := parsePlacement(t, got, "info")
+	if mode != 1 {
+		t.Fatalf("confined process mode=%d want MPOL_PREFERRED(1); output %q", mode, got)
+	}
+	if !runtime.NumaIsNodeCPUCountForTest(aff) {
+		t.Fatalf("confined affinity popcount %d matches no node's CPU count; output %q", aff, got)
+	}
+}
+
+func TestNUMAConfineSkipsNarrowedAffinity(t *testing.T) {
+	if runtime.NumaNumAllowedNodes() <= 1 {
+		t.Skip("not multi-node")
+	}
+	testenv.MustHaveExecPath(t, "taskset")
+	// Operator placement wins: under taskset, confinement never engages
+	// and the narrowed 2-CPU mask is left untouched. Layer-1 BIND-all is
+	// affinity-independent and still applies, so the task policy is
+	// MPOL_BIND (mode=2).
+	exe, err := buildTestProg(t, "testprog")
+	if err != nil {
+		t.Fatal(err)
+	}
+	cmd := testenv.Command(t, "taskset", "-c", "0,1", exe, "NUMAPlacementInfo")
+	cmd.Env = append(os.Environ(), "GOMAXPROCS=1")
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("%v: %s", err, out)
+	}
+	aff, mode := parsePlacement(t, string(out), "info")
+	if aff != 2 {
+		t.Fatalf("affinity=%d, want the operator's 2 CPUs untouched", aff)
+	}
+	if mode != 2 {
+		t.Fatalf("mode=%d want MPOL_BIND(2) (Layer 1 BIND-all)", mode)
+	}
+}
+
+func parsePlacement(t *testing.T, out, label string) (aff int, mode int) {
+	t.Helper()
+	for _, line := range strings.Split(out, "\n") {
+		if strings.HasPrefix(line, label+" ") {
+			if strings.Contains(line, "ERR") || strings.Contains(line, "SKIP") {
+				t.Fatalf("probe failed: %q", line)
+			}
+			if _, err := fmt.Sscanf(line, label+" affinity=%d mode=%d", &aff, &mode); err != nil {
+				t.Fatalf("bad probe line %q: %v", line, err)
+			}
+			return aff, mode
+		}
+	}
+	t.Fatalf("no %q line in output %q", label, out)
+	return 0, 0
 }
