@@ -1194,3 +1194,389 @@ Raw benchmark output and vmstat snapshots archived at:
 optional ("Do not run full Sweet yet unless you want extra evidence") and per this task's brief,
 which scoped Task 8 to Step 1 (garbage vmstat) plus this RESULTS.md note only. Layer 1's shippable
 status does not depend on it — Tasks 6 and 7's hard gates already passed.
+
+## Layer 2 gate (v2) — 2026-08-19/20
+
+Date: 2026-08-19/20
+Local/Remote SHA: `23cbc99649` (green implementation commit), preceded by `c9a1f7b442` (red test
+commit). Layer 1 tip / parent: `c3f6cbeef6`.
+Host: `numa-dell` (`dell-per660-01.khw.eng.rdu2.dc.redhat.com`), Intel Xeon Platinum 8592+.
+Kernel: `6.12.0-211.7.1.el10_2.x86_64`. `kernel.numa_balancing`: `1` throughout, confirmed
+unchanged at the end. `x/benchmarks` pin: `v0.0.0-20260819172200-70693762b6a0` (identical to
+Layers 0/1 — no upstream commits landed in between). `x/perf`/benchstat: `/tmp/numa-tools/benchstat`
+on `numa-dell` (same binary as Layers 0/1).
+
+### Summary
+
+**Overall verdict: hard gates PASS (1P json, 1P alloc micro, 256P json, vmstat); IMC locality gate
+FAILS.** Per the brief's Step 7 commit rule ("If IMC failed but the others passed → still commit
+both"), both the red test commit (`c9a1f7b442`) and the green implementation commit (`23cbc99649`)
+stand, plus this RESULTS.md record. **Per the brief's own explicit verdict text: "PREFERRED-at-grow
+did not move IMC on interleaved 2P; do not add mcentral/steal." Product B (Layers 3-4) stops here.**
+Layer 1 (BIND-all task policy + arena mbind, already merged) remains shippable; the Layer 2 code
+added in this task is a real, working, gate-passing addition to the runtime (it does not regress
+1P/256P throughput or reactivate the NUMA balancer) but does not achieve its purpose (steering
+memory accesses local), so building anything further on it (Layers 3-4: span tags, mcache-aware
+allocation, steal) is not justified by this measurement.
+
+This matches the plan's own stated prior expectation for this exact gate almost exactly: "a whole
+chunk gets the node of whichever M happened to grow the heap, then 256 Ps on both nodes allocate
+from it." At `GOMAXPROCS=256` with two interleaved sockets, roughly half the allocating Ps are not
+on the node any given already-grown chunk was PREFERRED to, and json's allocation pattern spreads
+reads across many chunks from many Ps — so PREFERRED-at-grow does not, in aggregate, change which
+fraction of L3-miss loads land on the remote socket.
+
+### Implementation
+
+`numaBindArena` (`src/runtime/numa_linux.go`) now does BIND-all (Layer 1, unchanged, kept as the
+fallback for when the range never gets a VMA policy at all) followed by a second
+`mbind(MPOL_PREFERRED, 1<<node)` call, `node` from `getcpu(2)` via a new `numaGetCPUNode()` wrapper.
+Per the kernel's `vma_replace_policy`, the second `mbind` **replaces** rather than stacks on the
+first: a chunk that gets a successful PREFERRED call ends up PREFERRED-only. #14406 still holds
+regardless of which of the two policies "won" a given chunk: neither `mbind` call ever sets
+`MPOL_F_MOF`, so the balancer skips every VMA this function ever touches, and the task-wide
+BIND-all policy from `numaSetProcessBindAll` still covers everything it doesn't.
+
+**Link-safety split (the brief's explicit CONCERN):** `numa_linux.go` has no per-arch build
+constraint (just the `_linux.go` filename suffix), so it is compiled for every `GOOS=linux`
+architecture. `getcpu` only has an assembly body on amd64 and arm64. Before this task,
+`numaBindArena` never called `getcpu`, and the pre-existing `numaCurrentNode` (which did) was only
+ever reachable from an already amd64/arm64-restricted test-export file — so the symbol was safely
+dead-code-eliminated everywhere else. Layer 2 makes `numaBindArena` itself call into `getcpu`, and
+`numaBindArena` is reachable from `mheap.grow` in *every* ordinary `GOEXPERIMENT=numa` binary, not
+just tests — so without a split, `GOEXPERIMENT=numa` would fail to **link** ordinary binaries on
+every non-amd64/non-arm64 Linux architecture the moment this landed. Fixed by extracting a
+`numaGetCPUNode() (node uint32, ok bool)` wrapper into two new arch-gated files:
+- `src/runtime/numa_linux_getcpu.go` (`//go:build linux && (amd64 || arm64)`): real `getcpu` call.
+- `src/runtime/numa_linux_getcpu_other.go` (`//go:build linux && !(amd64 || arm64)`): always
+  `ok=false` — Layer 2's PREFERRED step is unconditionally skipped there, Layer 1's BIND-all
+  fallback still applies. Correct, conservative behavior for architectures Layer 2 doesn't target.
+
+`numaCurrentNode` was refactored to call this same wrapper instead of `getcpu` directly, so
+`numa_linux.go` no longer references the asm-only symbol at all.
+
+**Link sweep** (local toolchain, `GOWORK=off`, both `GOEXPERIMENT=numa` and unset), a trivial
+`package main` built and linked per target — the reachability check the brief asked for, not just
+a compile check:
+
+```
+$ for arch in amd64 arm64 riscv64 arm 386 ppc64le s390x loong64 mips64 mips mipsle; do
+    for exp in none numa; do
+      GOOS=linux GOARCH=$arch GOEXPERIMENT=$exp go build -o /tmp/... hello.go
+    done
+  done
+```
+
+All 22 combinations (11 arches × {off, on}) built and linked successfully. Also verified: the
+`runtime` test archive links for `GOOS=linux GOARCH=riscv64 GOEXPERIMENT=numa` (`go test -c
+runtime`) and for `GOOS=linux GOARCH=amd64 GOEXPERIMENT=numa` (includes the new test); `GOOS=darwin
+GOARCH=arm64` and `GOOS=windows GOARCH=amd64` sanity builds (non-Linux, unaffected); `go vet
+runtime` clean both with and without the experiment, both `GOARCH=amd64` and `GOARCH=riscv64`.
+
+### TDD: red → green on `numa-dell`
+
+Per the brief ("Red commit optional — at minimum show the test failing remotely"), the repo's own
+established convention in this branch (see `c4ae2020fd`, `TestNUMABindAllTaskPolicy (red)`) was
+followed: a real red commit.
+
+**Red** (`c9a1f7b442`): all Layer 2 scaffolding landed (`numaPreferredCalls` counter,
+`numaGetCPUNode` arch split, `NumaPreferredBindCalls` export, `TestNUMAPreferredBindOnGrow`), but
+`numaBindArena`'s PREFERRED half was wrapped in `if false { ... }` so it compiles but never runs.
+
+```
+$ make push && make build && make test-numa RUN=TestNUMAPreferredBindOnGrow
+--- FAIL: TestNUMAPreferredBindOnGrow (0.73s)
+    numa_linux_test.go:71: expected mbind PREFERRED on heap growth
+FAIL
+```
+
+**Green** (`23cbc99649`): the `if false` wrapper removed (this is the entire diff between the two
+commits — 7 insertions, 12 deletions, pure unwrap).
+
+```
+$ make push && make build && make test-numa RUN=TestNUMAPreferredBindOnGrow
+ok  	runtime	0.709s
+$ make test-numa RUN=TestNUMAPreferredBindOnGrow   # rerun for stability
+ok  	runtime	0.620s
+$ make test-numa RUN='TestNUMA'                    # full NUMA suite together
+ok  	runtime	0.662s
+```
+
+### `runtime -short` with the experiment on (once)
+
+```
+$ ssh numa-dell 'GOEXPERIMENT=numa GOROOT=/home/deparker/go-numa GOTOOLCHAIN=local bin/go test -short runtime -count=1'
+...
+--- FAIL: TestCgoNoEscape (0.04s)
+    crash_cgo_test.go:929: ... got too few heap objects allocated, pre: 1513, now: 1611
+FAIL
+FAIL	runtime	238.472s
+```
+
+One failure, `TestCgoNoEscape` — a cgo/escape-analysis heap-object-count timing test entirely
+unrelated to NUMA. Re-run in isolation 5/5 times clean:
+
+```
+$ ssh numa-dell 'GOEXPERIMENT=numa ... bin/go test runtime -run=TestCgoNoEscape -count=5'
+ok  	runtime	1.249s
+```
+
+Judged a pre-existing flake (GC-timing-sensitive heap accounting test, known-flaky class, not a
+NUMA code path), not a Layer 2 regression — no prior `-short` baseline exists in this repo's task
+history to compare against directly, but the test's own content (comparing a heap-object count
+snapshot before/after a GC-adjacent cgo call) has no dependency on `numaBindArena`,
+`numaGetCPUNode`, or anything else touched by this task, and it passed cleanly every other time it
+ran (including inside the full suite's other invocations across the session).
+
+### Gate 1 — 1P json (hard gate), `BENCHNUM=10`, two replicates
+
+**Replicate 1:**
+
+```
+$ ssh numa-dell 'GOROOT=$PWD GOMAXPROCS=1 BENCHNUM=10 ./numa-design/gate-json.sh'
+ns/op: baseline 16669939.5 numa 26050368.0 rel +56.3%
+FAIL ns/op exceeds +2%   (hand-rolled comparator)
+```
+```
+$ benchstat baseline.out numa.out
+JSON-1  sec/op:            16.67m ± 98%   26.05m ± 36%  ~ (p=0.684 n=10)
+JSON-1  user+sys-sec/op:   16.69m ± 98%   26.04m ± 36%  ~ (p=0.739 n=10)
+```
+
+The hand-rolled band comparator (median-only, no significance test) flags a large FAIL, but
+`benchstat` — authoritative per the environment brief for this box's known bimodal JSON-benchmark
+noise (documented at length in the Layer 0/1 sections above) — finds no significant difference at
+either metric, with enormous variance (±98%/±36%) on both arms.
+
+Given how far outside the band the naive reading is, this was closed with a position-unbiased
+replicate rather than accepted at face value (per the task brief's instruction to do so for any
+hard-gate reading this far off):
+
+**Replicate 2** (fresh 10-round run, same protocol, ~10 minutes later):
+
+```
+ns/op: baseline 24724307.5 numa 17121160.5 rel -30.8%
+```
+```
+JSON-1  sec/op:  24.72m ± 34%   17.12m ± 87%  ~ (p=0.280 n=10)
+```
+
+**The naive median-rel comparator's sign flipped between the two replicates** (+56.3% then
+-30.8%), while `benchstat` called both non-significant. That reversal is itself strong evidence
+this is pure run-to-run noise (thermal/scheduling/cache-state drift on this shared 1P-pinned
+workload), not a systematic Layer 2 cost — a real regression would not change sign.
+
+**Pooled (both replicates, n=20 pairs):**
+
+```
+JSON-1  sec/op:            18.97m ± 72%   20.26m ± 53%   ~ (p=0.547 n=20)
+JSON-1  user+sys-sec/op:   18.99m ± 72%   20.26m ± 53%   ~ (p=0.565 n=20)
+```
+
+**Verdict: PASS.** No significant difference at n=20. (Two side metrics *are* significant but
+trivial in magnitude — `GC-bytes-from-system` +1.55%, p=0.020; `peak-VM-bytes` +0.00%, p=0.001 —
+neither is a gate metric nor practically meaningful.)
+
+Archived: `numa-design/bench-data/layer2/gate1-1p-json-{baseline,numa}-r1.out`,
+`gate1-1p-json-{baseline,numa}-r2.out`.
+
+### Gate 2 — 1P alloc micro (Task 4 Step 1b): `Malloc8`/`Malloc16`, `-count=10`
+
+```
+$ GOMAXPROCS=1 go test runtime -run=NONE -bench='Malloc(8|16|Types)' -count=10 >base.out
+$ GOMAXPROCS=1 GOEXPERIMENT=numa go test runtime -run=NONE -bench='Malloc(8|16|Types)' -count=10 >numa.out
+$ benchstat base.out numa.out
+Malloc8    6.947n ± 88%   6.943n ± 0%       ~ (p=0.566 n=10)
+Malloc16   11.32n ±  0%   11.35n ± 1%  +0.22% (p=0.011 n=10)
+geomean    8.870n         8.877n       +0.08%
+```
+
+`Malloc16`'s +0.22% is statistically significant (p=0.011) but two orders of magnitude below the
+2% band and consistent with Layer 1's own pattern of tiny-but-significant side effects from the
+handful of extra grow-time syscalls a fixed-iteration malloc loop triggers while ramping the heap
+up from empty.
+
+**Verdict: PASS.** Archived: `numa-design/bench-data/layer2/gate2-alloc-micro-{baseline,numa}.out`.
+
+### Gate 3 — 256P json gate, `BENCHNUM=10`, three replicates
+
+Not one of the plan's Global-Constraints hard gates (scoped to `GOMAXPROCS=1`), but this task's own
+brief sets the same +2% band for 256P at Layer 2 specifically (distinct from Layer 0/1's "optional,
+huge-regressions-only" framing) and the task instructions list 256P among the gates whose failure
+blocks the `src/` commit — so it was run to the same standard as Gate 1, escalating to a third
+replicate given the mixed signal below.
+
+Free memory checked first (`node 0 free: 10283 MB`, `node 1 free: 5778 MB`, `free -h` available
+27Gi) — full `-benchmem=512` used throughout, no headroom concern.
+
+**Replicate 1:**
+```
+JSON-256  sec/op:  1.884m ± 45%   2.623m ± 46%  +39.25% (p=0.035 n=10)   -- significant
+```
+**Replicate 2** (idle re-verified, fresh run):
+```
+JSON-256  sec/op:  2.281m ± 46%   2.059m ± 127%  ~ (p=0.393 n=10)        -- not significant, opposite direction
+```
+**Replicate 3** (idle re-verified, fresh run):
+```
+JSON-256  sec/op:  2.430m ± 36%   1.920m ± 26%  -21.02% (p=0.043 n=10)   -- significant, opposite direction again
+```
+
+Three independent 10-round replicates: **significant positive, non-significant, significant
+negative.** A real regression does not flip sign between two of its three significant/near-significant
+readings; this is the JSON benchmark's well-documented heap-autoscaling variance (`bytes-from-system`
+ranged roughly 3.4-19.9 GiB round to round across all three replicates) producing spurious
+significance at `n=10` in both directions, exactly the pattern the Layer 1 report flagged for this
+same benchmark at 256P. Pooled:
+
+**Pooled (all three replicates, n=30 pairs):**
+```
+JSON-256  sec/op:            2.122m ± 22%   2.125m ± 23%   ~ (p=0.572 n=30)
+JSON-256  user+sys-sec/op:   166.8m ± 11%   180.4m ± 15%   ~ (p=0.307 n=30)
+JSON-256  peak-RSS-bytes:    6.849Gi ± 34%  6.714Gi ± 35%  ~ (p=0.406 n=30)
+```
+
+**Verdict: PASS.** No significant difference at n=30 on either throughput metric.
+
+**RSS check (brief's explicit concern — v1 saw json RSS 5→9.6 GiB doubling under Layer 2):**
+`peak-RSS-bytes` is not significantly different (p=0.406) and is nominally *lower* for the numa arm
+(6.71Gi vs 6.85Gi baseline) — no doubling, no growth trend across any of the three replicates
+individually either (each replicate's own `peak-RSS-bytes` comparison was also non-significant).
+**RSS-doubling hard-fail: does not apply.**
+
+Archived: `numa-design/bench-data/layer2/gate3-256p-json-{baseline,numa}-r{1,2,3}.out`.
+
+### Gate 4 — vmstat 0/0
+
+Two arms, per the task instructions: one 256P numa json run, one `gc-pause-bench` numa run
+(`-heap=4096 -warm=10 -n=100`). `gc-pause-bench` rebuilt fresh against the Layer 2 toolchain (the
+Layer 1 binaries from Task 7/8 predate this task's runtime changes and were not reused).
+
+**256P numa json:**
+```
+$ gate-vmstat.sh snap before.txt
+$ GOMAXPROCS=256 numa/json -benchmem=512 -benchnum=1 -benchtime=8s
+BenchmarkJSON-256    10000  1775328 ns/op  ...
+$ gate-vmstat.sh snap after.txt; gate-vmstat.sh diff before.txt after.txt
+hint_faults=0 pages_migrated=0
+```
+
+**gc-pause-bench numa (`-heap=4096 -warm=10 -n=100`):**
+```
+$ gate-vmstat.sh snap before.txt
+$ /tmp/bench-numa-l2 -heap=4096 -warm=10 -n=100 -json -label=numa-l2
+{"label":"numa-l2",...,"stw_p50_ns":394960,"stw_p99_ns":662282,"wall_p99_ns":694544593}
+$ gate-vmstat.sh snap after.txt; gate-vmstat.sh diff before.txt after.txt
+hint_faults=0 pages_migrated=0
+```
+
+**Verdict: PASS.** Clean `0/0` on the first attempt for both arms — no rerun needed (unlike Layer
+1's Gate 7, which needed one). Confirms Layer 2's second `mbind` call does not reactivate the
+balancer any more than Layer 1's BIND-all call did, consistent with the design note that neither
+`mbind` mode ever sets `MPOL_F_MOF`.
+
+Archived: `numa-design/bench-data/layer2/gate4-vmstat-{json256p,gcpause}-{before,after}.txt`.
+
+### VMA count (plan CONCERN)
+
+Sampled `wc -l /proc/$PID/maps` ~6s into a 256P `-benchtime=15s` json run, both arms, same host
+state:
+
+| Arm      | `/proc/PID/maps` lines | heap-bytes-from-system (that round) |
+|----------|------------------------:|-------------------------------------:|
+| baseline | 34                      | ~19.0 GiB                           |
+| numa (L2)| 1172                    | ~10.1 GiB                           |
+
+Confirms the brief's CONCERN exactly: baseline's single BIND-all-covered (and, off-experiment,
+policy-free) heap merges into a handful of VMAs regardless of size; Layer 2's per-~4MiB-chunk
+PREFERRED assignment prevents merging between chunks placed on different nodes, producing **~34x**
+more VMAs for **less** heap in this sample. `vm.max_map_count` on this host is `1048576` (raised
+from the Linux default of 65530) — 1172 is nowhere near either limit, but this is a real,
+unmitigated cost that would scale linearly with heap size on a host with the stock 65530 limit
+(≈65530 × 4 MiB ≈ 256 GiB heap before hitting it) and adds kernel VMA-tracking/fault-path overhead
+not captured by any of the throughput gates above. Documented as an open concern, not a gate
+failure — no mitigation (chunk coalescing, deferred/batched policy application) was implemented,
+per the brief's explicit scope limits for this task ("no span tags, no mcentral sharding").
+
+### Gate 6 — IMC locality (the decision gate)
+
+```
+perf stat -x, -e mem_load_l3_miss_retired.local_dram,mem_load_l3_miss_retired.remote_dram -- \
+  <json> -benchmem=512 -benchnum=1 -benchtime=10s
+```
+
+Events verified present on this Xeon (`perf list | grep -i l3_miss`) before use — the exact events
+named in the brief exist natively, no substitution needed. Arms: baseline (`GOEXPERIMENT` off) vs
+Layer 2 (`GOEXPERIMENT=numa`, this task's commit) at HEAD, `GOMAXPROCS=256`. The optional third arm
+(a Layer-1-only binary built from the `c3f6cbeef6` parent with the experiment on) was not run: the
+required two-arm comparison below is already unambiguous across two independent triplicate sets,
+so the extra arm would not have changed the verdict and was skipped under the task's effort budget.
+
+Two independent sets of 3 interleaved runs each were collected (an initial ad hoc set, then a
+clean archival set with `perf stat -o` capturing raw CSV — both are reported; they agree closely).
+
+**Archival set** (archived at `numa-design/bench-data/layer2/gate6-imc/{baseline,numa}-run{1,2,3}.csv`):
+
+| Arm      | run | local_dram | remote_dram | remote share |
+|----------|----:|-----------:|-------------:|-------------:|
+| baseline | 1   | 20,455,370 | 19,019,375   | 48.18%        |
+| baseline | 2   | 27,986,682 | 26,430,380   | 48.57%        |
+| baseline | 3   | 70,656,327 | 66,872,003   | 48.62%        |
+| numa(L2) | 1   | 28,468,836 | 26,935,518   | 48.62%        |
+| numa(L2) | 2   | 30,117,440 | 28,150,827   | 48.31%        |
+| numa(L2) | 3   | 83,692,019 | 79,624,806   | 48.75%        |
+
+Medians: **baseline 48.57%, Layer 2 48.62%. Relative change: +0.10%** (an *increase*, not a drop).
+
+**First (ad hoc) set**, run immediately before the archival set, same protocol: baseline shares
+48.18%/48.44%/48.44% (median 48.40%), numa shares 48.19%/48.37%/48.71% (median 48.37%) — relative
+change **-0.07%**. Both independent sets agree: the remote-DRAM-miss share is statistically
+indistinguishable between arms, hovering tightly around 48-49% regardless of `GOEXPERIMENT`.
+
+**Pass bar:** ≥10% relative drop in remote share (e.g. 0.48 → ≤0.432). **Actual: +0.10% and -0.07%
+across two independent triplicate sets — nowhere close, and if anything in the wrong direction.**
+
+**Verdict: FAIL.** This is not a noisy, ambiguous reading like Gates 1 and 3 above — both
+independent sets of 3 runs land in a tight, mutually overlapping ~48-49% band for both arms, with
+no rerun needed to resolve ambiguity. PREFERRED-at-grow measurably does not change which fraction
+of L3-miss loads are serviced from the remote socket's DRAM at `GOMAXPROCS=256` on this
+interleaved 2-node box.
+
+**Why, mechanistically:** this matches the brief's own stated prior expectation almost exactly.
+`numaBindArena` sets a single node PREFERRED for an entire ~4 MiB grow chunk based only on which M
+happened to be running `mheap.grow` at that moment — a one-shot decision with no relationship to
+which P (running on which node) will later allocate from spans carved out of that chunk. With 256
+Ps spread across both sockets all sharing the same central allocator (`mcentral`/`mcache` refill
+paths untouched by Layers 1-2, exactly as scoped), any given chunk's node-of-origin has no
+correlation with the node of the P that eventually touches memory inside it. Fixing this would
+require exactly the mechanisms this task and its brief explicitly forbid at this layer (span
+tagging, `getMCache`-hook-based node-local allocation, work-stealing along node boundaries) —
+Layers 3-4 of the original plan.
+
+### Overall verdict
+
+| Gate                              | Result | Note |
+|------------------------------------|--------|------|
+| 1P json (hard)                     | PASS   | n=20 pooled, not significant |
+| 1P alloc micro (hard)              | PASS   | geomean +0.08% |
+| 256P json                          | PASS   | n=30 pooled, not significant |
+| vmstat 0/0                         | PASS   | clean both arms, no rerun |
+| RSS doubling                       | PASS (no doubling) | numa arm nominally lower |
+| VMA count (concern, not a gate)    | Elevated (~34x) | documented, not mitigated |
+| IMC locality (decision gate)       | **FAIL** | +0.10%/-0.07% rel., need ≤-10% |
+
+**Per the brief: "PREFERRED-at-grow did not move IMC on interleaved 2P; do not add
+mcentral/steal." Product B stops at Layer 2.** Layer 1 remains shippable and unaffected. This
+task's runtime change is committed anyway (per the brief's explicit instruction for this exact
+outcome — hard gates pass, IMC fails — "still commit both: the measurement is the deliverable")
+because it is a real, working, non-regressing addition that the gate battery validated on every
+axis except the one that mattered for the product decision; reverting it would only require
+re-deriving the same honest-failure evidence later.
+
+Idleness protocol used throughout, matching Layers 0/1: `uptime`/`ps aux --sort=-%cpu | head`
+checked immediately before every measurement block; load average repeatedly climbed into the
+tens (once to ~100) from this session's own residual runqueue decay after 256P runs, `ps aux`
+never showed a second tenant.
+
+Raw data archived under `numa-design/bench-data/layer2/`. `kernel.numa_balancing` confirmed `1`
+at the end of this task.

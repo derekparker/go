@@ -1,0 +1,26 @@
+goos: linux
+goarch: amd64
+pkg: runtime
+cpu: INTEL(R) XEON(R) PLATINUM 8592+
+BenchmarkMalloc8  	85867282	        14.03 ns/op
+BenchmarkMalloc8  	93147444	        13.06 ns/op
+BenchmarkMalloc8  	173401016	         6.948 ns/op
+BenchmarkMalloc8  	173149311	         6.925 ns/op
+BenchmarkMalloc8  	172837918	         6.949 ns/op
+BenchmarkMalloc8  	173410899	         6.944 ns/op
+BenchmarkMalloc8  	172698331	         6.967 ns/op
+BenchmarkMalloc8  	173000347	         6.945 ns/op
+BenchmarkMalloc8  	172889718	         6.927 ns/op
+BenchmarkMalloc8  	172217806	         6.940 ns/op
+BenchmarkMalloc16 	100000000	        11.25 ns/op
+BenchmarkMalloc16 	100000000	        11.31 ns/op
+BenchmarkMalloc16 	100000000	        11.31 ns/op
+BenchmarkMalloc16 	100000000	        11.34 ns/op
+BenchmarkMalloc16 	100000000	        11.34 ns/op
+BenchmarkMalloc16 	100000000	        11.29 ns/op
+BenchmarkMalloc16 	100000000	        11.32 ns/op
+BenchmarkMalloc16 	100000000	        11.33 ns/op
+BenchmarkMalloc16 	100000000	        18.00 ns/op
+BenchmarkMalloc16 	100000000	        11.34 ns/op
+PASS
+ok  	runtime	30.798s

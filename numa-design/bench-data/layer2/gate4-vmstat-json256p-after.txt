@@ -1,0 +1,2 @@
+numa_hint_faults 41699108
+numa_pages_migrated 95200905
