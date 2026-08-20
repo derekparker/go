@@ -294,17 +294,12 @@ func numaBindArena(addr unsafe.Pointer, size uintptr) {
 	mask[0] = w0
 	linux.Syscall6(linux.SYS_MBIND, uintptr(addr), size, uintptr(_MPOL_BIND), uintptr(unsafe.Pointer(&mask[0])), numaMaxNode, 0)
 
-	// RED-DEMO-TODO(task-9): PREFERRED half temporarily disabled to show
-	// TestNUMAPreferredBindOnGrow fail before the implementation lands.
-	// Restored before any commit.
-	if false {
-		node, ok := numaGetCPUNode()
-		if !ok || node >= 64 {
-			return
-		}
-		var pmask numaNodemask
-		pmask[uintptr(node)/numaNodemaskBits] = 1 << (uintptr(node) % numaNodemaskBits)
-		linux.Syscall6(linux.SYS_MBIND, uintptr(addr), size, uintptr(_MPOL_PREFERRED), uintptr(unsafe.Pointer(&pmask[0])), numaMaxNode, 0)
-		numaPreferredCalls.Add(1)
+	node, ok := numaGetCPUNode()
+	if !ok || node >= 64 {
+		return
 	}
+	var pmask numaNodemask
+	pmask[uintptr(node)/numaNodemaskBits] = 1 << (uintptr(node) % numaNodemaskBits)
+	linux.Syscall6(linux.SYS_MBIND, uintptr(addr), size, uintptr(_MPOL_PREFERRED), uintptr(unsafe.Pointer(&pmask[0])), numaMaxNode, 0)
+	numaPreferredCalls.Add(1)
 }
