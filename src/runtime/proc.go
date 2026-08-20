@@ -1865,9 +1865,13 @@ func startTheWorldWithSema(now int64, w worldStop) int64 {
 
 	releasem(mp)
 
-	if standingDown {
+	if goexperiment.Numa && standingDown {
 		// mp.locks == 0 here (releasem above) and sched.lock is free:
 		// safe to make syscalls. See numaStandDownWiden's doc comment.
+		// The goexperiment.Numa check is structural, matching the
+		// detection call site above, rather than relying on standingDown
+		// alone being provably false (by optimizer constant propagation)
+		// to eliminate this call in off builds.
 		numaStandDownWiden()
 	}
 

@@ -511,25 +511,33 @@ func numaStandDownWiden() {
 	// unlink) and read here without it.
 	for mp := (*m)(atomic.Loadp(unsafe.Pointer(&allm))); mp != nil; mp = mp.alllink {
 		if mp.freeWait.Load() == freeMWait {
-			// This M is mid-mexit: already unlinked from allm under
-			// sched.lock (we only reached it via a stale alllink pointer
-			// read before that unlink), its g0 stack torn down, and its
-			// procid stale. Skip it -- a live replacement M (if any)
-			// converges itself at its own first park via
-			// numaFixThreadPlacement.
+			// freeMWait (2) is the value mexit stores into freeWait the
+			// moment it removes mp from allm under sched.lock -- it means
+			// "g0 is still in use, NOT yet safe to reap" (the opposite of
+			// torn down). A normal, never-exited M's freeWait sits at its
+			// zero value (freeMStack) for its entire alive lifetime;
+			// freeMWait is a transient marker mexit sets only once it
+			// starts tearing this M down. We only ever observe
+			// freeWait==freeMWait here because our lock-free walk reached
+			// mp via a stale alllink pointer read just before (or racing)
+			// that removal. Skip it -- its procid is no longer
+			// trustworthy -- a live replacement M (if any) converges
+			// itself at its own first park via numaFixThreadPlacement.
 			//
-			// Residual, accepted: an M that finished exiting BEFORE this
-			// walk even started is already gone from allm entirely, so
-			// we never see it -- except for the vanishingly narrow window
-			// where the kernel has already recycled its old tid for a
-			// brand-new, unrelated thread by the time we read
-			// mp.procid below for some OTHER, still-alive M sharing this
-			// walk. sched_setaffinity on a reused tid would misdirect
-			// one setaffinity call to the wrong thread; the eager walk is
-			// a latency optimization only (documented above), so a miss
-			// here has no correctness impact -- it does not affect a
-			// legitimate target M's own convergence, which is guaranteed
-			// separately at its next park.
+			// Residual, accepted: this check closes only the MID-exit
+			// window above. It does not protect against a fully-exited M
+			// -- one whose freeWait has already advanced past freeMWait to
+			// its terminal freeMRef/freeMStack value by the time we read
+			// it -- reached the same way, via a stale alllink pointer.
+			// Such an M reads as "alive" here (freeWait != freeMWait) and
+			// its long-stale procid is still used; on Linux that tid can
+			// eventually be recycled by the kernel for a brand-new,
+			// unrelated thread, so sched_setaffinity could misdirect one
+			// setaffinity call to the wrong thread. The eager walk is a
+			// latency optimization only (documented above), so this has
+			// no correctness impact: it never affects a legitimate target
+			// M's own convergence, which is guaranteed separately, and
+			// correctly, at its next park.
 			continue
 		}
 		if tid := atomic.Load64(&mp.procid); tid != 0 {
