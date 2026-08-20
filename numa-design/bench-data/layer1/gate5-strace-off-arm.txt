@@ -1,0 +1,52 @@
+goos: linux
+goarch: amd64
+pkg: runtime
+cpu: INTEL(R) XEON(R) PLATINUM 8592+
+strace: Process 2360031 attached
+strace: Process 2360032 attached
+strace: Process 2360033 attached
+BenchmarkMalloc8 	100000000	        16.63 ns/op
+PASS
+% time     seconds  usecs/call     calls    errors syscall
+------ ----------- ----------- --------- --------- ------------------
+ 51.89    0.085236         266       320       116 futex
+ 36.07    0.059253          14      4063           nanosleep
+  3.03    0.004977           7       695           epoll_pwait
+  2.54    0.004168          42        97           tgkill
+  2.00    0.003278           5       605           madvise
+  1.03    0.001698          17        98           getpid
+  0.70    0.001144          22        52           mmap
+  0.40    0.000658         658         1           execve
+  0.40    0.000651           5       114           rt_sigaction
+  0.28    0.000458         114         4           munmap
+  0.22    0.000359         119         3           clone3
+  0.22    0.000355           3        97           rt_sigreturn
+  0.19    0.000315          14        22           rt_sigprocmask
+  0.15    0.000242          26         9           read
+  0.12    0.000203          22         9           mprotect
+  0.11    0.000188          23         8           openat
+  0.10    0.000163          20         8           sigaltstack
+  0.09    0.000146          36         4           set_robust_list
+  0.09    0.000141           3        45           sched_yield
+  0.08    0.000133          33         4           rseq
+  0.06    0.000095          13         7           write
+  0.04    0.000073          12         6           fcntl
+  0.04    0.000064           9         7           close
+  0.04    0.000063          15         4           prlimit64
+  0.02    0.000034          11         3           brk
+  0.02    0.000033          16         2           lseek
+  0.02    0.000030           7         4           fstat
+  0.02    0.000030           6         5           gettid
+  0.01    0.000016           8         2           sched_getaffinity
+  0.01    0.000014           7         2           pread64
+  0.01    0.000011          11         1         1 access
+  0.00    0.000008           8         1         1 prctl
+  0.00    0.000008           8         1           getrandom
+  0.00    0.000006           6         1           arch_prctl
+  0.00    0.000006           6         1           set_tid_address
+  0.00    0.000000           0         1           epoll_ctl
+  0.00    0.000000           0         2         2 newfstatat
+  0.00    0.000000           0         1           eventfd2
+  0.00    0.000000           0         1           epoll_create1
+------ ----------- ----------- --------- --------- ------------------
+100.00    0.164257          26      6310       120 total

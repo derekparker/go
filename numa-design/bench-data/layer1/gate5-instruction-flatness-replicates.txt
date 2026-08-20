@@ -1,0 +1,53 @@
+Gate 5 (1P instruction flatness) raw perf stat -e instructions replicates, off vs on.
+Command per sample:
+  GOMAXPROCS=1 perf stat -e instructions -- <canary>.test -test.run=NONE \
+    -test.bench=BenchmarkMalloc8 -test.benchtime=100000000x -test.count=1
+Off canary: /tmp/canary-head-l1.test (GOEXPERIMENT unset)
+On canary:  /tmp/canary-head-on-l1.test (GOEXPERIMENT=numa)
+
+Original 3-run set (as reported in RESULTS.md's headline Gate 5 numbers):
+  off: 11217292171 11194507325 11203272859   (median 11203272859)
+  on:  11173485166 11226354590 11230206131   (median 11226354590)
+  median delta: +23081731 = +0.21%
+
+Extended replication (10 additional runs per arm, gathered during the post-review
+evidence-correction pass, to characterize the harness's run-to-run instruction-count
+noise floor rather than rely on n=3):
+
+off, 10 additional runs:
+  11190691053
+  11170108274
+  11198371043
+  11204824494
+  11183246459
+  11133296398
+  11152058021
+  11252262527
+  11103928675
+  11108612105
+
+on, 10 additional runs:
+  11164956167
+  11215208336
+  11157879126
+  11181926133
+  11209732444
+  11149816532
+  11163470933
+  11156303846
+  11180304350
+  11166021772
+
+Combined (original 3 + extended 10 = 13 per arm):
+  off: n=13 min=11103928675 max=11252262527 median=11190691053 peak-to-peak=1.33%
+  on:  n=13 min=11149816532 max=11230206131 median=11173485166 peak-to-peak=0.72%
+  combined median delta: on - off = -17205887 = -0.15% (sign flips relative to the
+  original n=3 delta of +0.21% -- both deltas are within each arm's own internal
+  peak-to-peak spread, i.e. within the harness's noise floor, not a resolvable
+  fast-path effect).
+
+See RESULTS.md's Gate 5 entry for the corrected interpretation: the plan's literal
+"exactly flat" bar is unachievable on this harness given a ~1-2% peak-to-peak
+run-to-run instruction-count spread on the *off* arm alone; the deterministic
+corroborating check is gate5-strace-on-arm.txt / gate5-strace-off-arm.txt (syscall
+counts), not a sub-percent instruction-count comparison.

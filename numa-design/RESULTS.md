@@ -671,6 +671,10 @@ Machine load: single-user throughout (`who`/`ps aux --sort=-%cpu` checked before
 
 Per the plan's binding Layer 0 lesson: `benchstat`'s Mann-Whitney U test is the authoritative comparator for every timing gate below; `gate-json.sh`'s embedded hand-rolled median comparator is reported alongside for transparency, since it is demonstrably noise-sensitive on this machine at both `GOMAXPROCS=1` and `GOMAXPROCS=256`.
 
+Raw `.out` files backing every `benchstat` verdict below, plus the Gate 5 `strace` transcripts and extended instruction-count replicates, are archived under `numa-design/bench-data/layer1/` (nothing was reaped from `numa-dell`'s `/tmp` before this archive pass).
+
+**Confound note (Task 4's `gate-json.sh`, applies to Gates 1 and 6):** the script's interleave loop always runs `baseline` then `numa` within each round (`run "$OUT/baseline/json" ...; run "$OUT/numa/json" ...`), so `numa` is always measured in the position-2 slot Gate 3's data shows running ~1.5% faster purely from position (head-off, position 2, is −1.53% vs parent, position 1) — i.e. `gate-json.sh`'s own baseline-vs-numa comparison carries a ~1.5% tailwind in numa's favor that could mask a real regression of up to that size and still clear the +2% bar. Gate 3's head-off-vs-head-on comparison is the bias-free replicate that closes this gap — both are measured in the unaffected position-2-vs-3 slot (head-on vs head-off differ by only −0.16% from position alone) — and it directly answers the same off-vs-on question `gate-json.sh` asks, showing **geomean sec/op −0.18%** (`benchstat -format csv`: `0.03164442` vs `0.0315864575`, p=0.529 n=10), well inside noise and in the direction opposite a masked regression.
+
 ### Gate 1 — 1P json, off vs on, same commit (`BENCHNUM=10`, hard gate)
 
 ```
@@ -684,10 +688,11 @@ Hand-rolled comparator:
 | ns/op | 28,423,902.5 | 16,904,808.0 | −40.5% | PASS (only fails on regression >+2%) |
 | user+sys-ns/op | 28,454,323.0 | 16,927,597.5 | −40.5% | PASS |
 
-Both arms are bimodal in the same way Layer 0 documented (baseline: 6/10 rounds in the ~30–33M
-band, 4/10 in the ~16–26M band; numa: 1/10 high, 9/10 low) — the same machine-noise character,
-though the split was more lopsided this run than Layer 0's roughly-even split. `benchstat` is
-therefore the deciding read, not the hand-rolled numbers above:
+Both arms are bimodal in the same way Layer 0 documented (baseline: 5/10 rounds in the ~30–33M
+band — 33.40M, 30.64M, 32.57M, 32.18M, 32.92M — and 5/10 in the ~16–26M band — 26.21M, 16.62M,
+16.37M, 16.29M, 16.26M; numa: 1/10 high, 9/10 low) — the same machine-noise character, though the
+split was more lopsided this run than Layer 0's roughly-even split. `benchstat` is therefore the
+deciding read, not the hand-rolled numbers above:
 
 ```
 $ ssh numa-dell '/tmp/numa-tools/benchstat /tmp/numa-gate-json/baseline.out /tmp/numa-gate-json/numa.out'
@@ -698,11 +703,32 @@ JSON-1  user+sys-sec/op:   28.45m ± 43%  16.93m ± 32%  ~ (p=0.075 n=10)
 **Verdict: PASS** (benchstat: no statistically significant difference on either hard-gate metric;
 p=0.075 is above the 0.05 threshold).
 
-Informational (not hard-gate metrics, but flagged as a **concern** below): `bytes-from-system`
-(+9.45%, p=0.001) and `heap-bytes-from-system` (+10.05%, p=0.012) were both statistically
-*significant* increases in the numa arm; `STW-sec/op` was a significant *decrease* (−45.64%,
-p=0.011, numa faster), consistent with BIND-all suppressing balancer-driven page faults during
-the STW mark-termination scan — the mechanism Layer 1 targets.
+Informational (not hard-gate metrics): in this same-commit off-vs-on comparison,
+`bytes-from-system` (+9.45%, p=0.001) and `heap-bytes-from-system` (+10.05%, p=0.012) were
+statistically *significant* increases in the numa arm, and `STW-sec/op` was a significant
+*decrease* (−45.64%, p=0.011, numa faster). **Neither reproduced on an independent replicate;
+both are closed as benign below rather than carried as open concerns:**
+
+- **`STW-sec/op`**: Gate 3's head-off-vs-head-on data (a second, independently-drawn off/on
+  pair, same commit, same binaries, a different 10-round interleave) gives `4.037µ ± 50%` vs
+  `3.738µ ± 47%` — **−7.4%, p=0.280** — a much smaller, non-significant effect in the same
+  direction. The original −45.64%/p=0.011 reading does not reproduce; the causal claim ("the
+  mechanism Layer 1 targets") is struck and this is treated as noise, not evidence of a
+  Layer-1-driven STW-time change.
+- **`bytes-from-system` / `heap-bytes-from-system`**: the same Gate 3 replicate gives
+  `66.78Mi ± 15%` vs `64.81Mi ± 12%` (**−3.0%, p=0.776**) and `61.69Mi ± 16%` vs `59.72Mi ± 13%`
+  (**−3.2%, p=0.698**) for `bytes-from-system` and `heap-bytes-from-system` respectively — the
+  *sign reverses* relative to Gate 1's reading, and neither is significant. Inspecting the raw
+  `heap-bytes-from-system` values (both Gate 1's own baseline/numa data and Gate 3's replicate)
+  shows the metric takes on a small set of discrete levels roughly one `pallocChunk` (4MiB)
+  apart — e.g. Gate 3: `58392576 → 62554112 → 66748416 → 70942720 → 75169792`B, consecutive
+  gaps of 3.91–4.00MiB (at or just under an exact 4.00MiB chunk), plus a further ~32KiB sub-step
+  within each level; Gate 1 shows the same 3.91–3.94MiB/~32KiB two-tier structure. 1P json's small
+  (~60–75MiB) working set means one extra or fewer heap chunk is a ~5–7% swing, and which level
+  a given round lands on tracks that round's exact `allocs/op` (b.N) composition
+  (26,791–26,828 across all 40 combined Gate 1 + Gate 3 rounds) — not the experiment. Closed as
+  a benign discretization artifact of comparing independently-scheduled runs with a small
+  working set, not a real off-vs-on behavioral difference.
 
 ### Gate 2 — 1P alloc micro (Task 4 Step 1b): `Malloc8`/`Malloc16`, `-count=10`
 
@@ -718,7 +744,8 @@ geomean    8.881n         8.868n       -0.14%
 ```
 
 Unlike Gate 1, both benchmarks were stable this run (no bimodal split; `Malloc8`'s ±98% comes
-from a single 13.96ns outlier in the baseline's first round, everything else clustered ~6.9–8.0ns).
+from two ~14ns outliers in the baseline — round 1 at 13.96ns and round 7 at 13.76ns — with the
+other 8 rounds clustered ~6.9–8.0ns).
 
 **Verdict: PASS** (benchstat: no statistically significant difference on either benchmark).
 
@@ -796,26 +823,57 @@ experiment is off.
 
 ### Gate 5 — 1P instruction flatness (Task 4 Step 1c #2)
 
+The plan's literal bar here (Task 4 Step 1c #2): "The instruction count must be exactly flat —
+achievable because no fast-path code changes, and immune to timing noise." **This bar is not
+achievable on this harness** (see below), so it cannot be reported as literally met. The
+controller's standing interpretation is used instead: the substantive bar is no fast-path
+instruction additions, corroborated deterministically rather than by a sub-percent
+instruction-count comparison. (An earlier draft of this entry attributed the "quantify and
+explain if a small delta appears" language to "the brief" — that sentence was controller
+dispatch guidance, not text from the plan; corrected here.)
+
 `perf stat -e instructions` on `GOMAXPROCS=1 <canary>.test -test.bench=BenchmarkMalloc8
--test.benchtime=100000000x -test.count=1`, off vs on, 3 runs each (`perf_event_paranoid=2`):
+-test.benchtime=100000000x -test.count=1`, off vs on. Original 3 runs each
+(`perf_event_paranoid=2`):
 
 | arm | run 1 | run 2 | run 3 | median |
 |---|---|---|---|---|
 | off | 11,217,292,171 | 11,194,507,325 | 11,203,272,859 | 11,203,272,859 |
 | on | 11,173,485,166 | 11,226,354,590 | 11,230,206,131 | 11,226,354,590 |
 
-Median delta: **+23,081,731 instructions = +0.21%** (on is more, unlike Layer 0's −0.12%).
+Median delta: +23,081,731 instructions = +0.21%.
 
-**Verdict: PASS, with a documented small delta**, matching the brief's own expectation ("Layer 1
-adds work only on grow, which fixed-work Malloc8 barely triggers; if a small delta appears,
-quantify and explain"): unlike Layer 0, Layer 1's two `mheap.grow` call sites do execute
-`numaBindArena`'s `mbind` syscall — gated behind `goexperiment.Numa`, but real work when on — and
-a 100,000,000-iteration `Malloc8` loop does grow the heap a handful of times as it ramps up from
-empty, even though each individual allocation never touches the grow path. +0.21% on ~11.2 billion
-instructions is consistent with a handful of extra `mbind` syscalls (each a few hundred
-instructions of syscall-entry/exit overhead) amortized over the whole run, not a change to the
-allocation fast path itself — Gate 4's static evidence (identical `mallocgc` instruction count,
-off) already rules out a fast-path change.
+**Why "exactly flat" cannot be resolved here:** an extended replication (10 further runs per
+arm, gathered during this evidence-correction pass; raw data in
+`numa-design/bench-data/layer1/gate5-instruction-flatness-replicates.txt`) shows the *off* arm
+alone — no code difference between any of its runs — has a **1.33% peak-to-peak run-to-run
+instruction-count spread** (n=13: min 11,103,928,675, max 11,252,262,527, median
+11,190,691,053); the *on* arm's own internal spread is 0.72% (n=13). +0.21% is well inside that
+noise floor. Folding the extended runs in, the combined-median delta (on − off, n=13 each)
+becomes **−0.15%** — the sign flips relative to the original 3-run reading. The instruction
+count cannot resolve a fast-path change at this precision on this machine; it can only rule out
+a *large* one (nothing near the scale a full fast-path branch/call would cost is visible in
+either direction).
+
+**Deterministic corroborating check used instead: syscall count.** `strace -f -c` on the on-arm
+canary for the identical workload shows **exactly one `mbind`, one `set_mempolicy`, and one
+`get_mempolicy` for the entire process**
+(`numa-design/bench-data/layer1/gate5-strace-on-arm.txt`); the off-arm canary shows **zero**
+occurrences of any of the three (`gate5-strace-off-arm.txt`). This is off by roughly seven
+orders of magnitude from an earlier draft's "a handful of `mbind` syscalls amortized over the
+whole run" framing — there is exactly one `mbind` call for the entire 100,000,000-iteration
+run, not a handful, and its cost is kernel-side inside that one syscall, invisible to the
+userspace `instructions:u` counter either way. The syscall count, not the instruction count, is
+the right noise-immune signal for "Layer 1 adds work only on grow, which fixed-work Malloc8
+barely triggers": the count is fixed, small, and exactly reproducible, which the instruction
+count at this scale is not.
+
+**Verdict: PASS on the substantive bar** (no instruction-count difference resolvable above the
+harness's own ~1–2% noise floor in either direction; the on-arm syscall count is fixed at
+exactly one `mbind`/`set_mempolicy`/`get_mempolicy` triple, deterministically corroborating "grow
+path only, bounded work"). **Not met on the plan's literal "exactly flat" bar**, which this
+harness cannot resolve at the required precision — recorded as an honest gap, not asserted as
+satisfied.
 
 ### Gate 6 — 256P json gate (Task 7 Step 3)
 
@@ -839,7 +897,7 @@ JSON-256  user+sys-sec/op:   188.9m ± 62%   178.7m ± 38%   ~ (p=0.739 n=10)
 ```
 
 **Verdict: PASS** (benchstat: no statistically significant difference; this benchmark's
-per-round heap size auto-scales at 256P — `bytes-from-system` ranged ~3.5GiB to ~12.9GiB
+per-round heap size auto-scales at 256P — `bytes-from-system` ranged ~3.41GiB to ~12.02GiB
 round-to-round in this data — which drives far larger variance than the 1P gates, and is the
 likely source of the hand-rolled comparator's false FAIL). 256P is not one of the plan's hard
 gates (Global Constraints scopes the never-regress bar to `GOMAXPROCS=1`); it passes here anyway.
@@ -956,34 +1014,60 @@ vmstat gate stays 0/0 under the alternate balancer mode, not node fill order.
 ### Overall verdict: **PASS**
 
 All hard gates (1P json off-vs-on, 1P alloc micro, parent-commit comparison both arms, #14406
-vmstat numa/membind arms) pass. Two noise-immune static/counting gates (off-binary identity,
-instruction-count flatness) corroborate: Layer 1 is dead-code-eliminated to byte-identical
-text/data/bss when off, and adds only a small, explainable, quantified instruction cost on the
-(rarely-hit, at fixed-work-Malloc8 scale) heap-growth path when on. The 256P json gate and the
-#14406 vmstat three-way — Layer 1's actual product claim — both pass, with the vmstat numa arm's
-one nonzero reading resolved by the plan's own idle-verify-and-rerun protocol rather than ignored.
+vmstat numa/membind arms) pass. Off-binary identity corroborates deterministically: Layer 1 is
+dead-code-eliminated to byte-identical text/data/bss when off. Instruction-count flatness is
+**not** literally met (the plan's "exactly flat" bar is unresolvable on this harness's ~1–2%
+instruction-count noise floor) but is corroborated on the substantive bar instead by an exact,
+deterministic syscall count (one `mbind`/`set_mempolicy`/`get_mempolicy` triple on the on-arm,
+zero on the off-arm) — see the corrected Gate 5 entry above. The 256P json gate and the #14406
+vmstat three-way — Layer 1's actual product claim — both pass, with the vmstat numa arm's one
+nonzero reading resolved by the plan's own idle-verify-and-rerun protocol rather than ignored.
+
+**A post-implementation review audit of this section found and required correction of several
+evidence-record errors** (misattributed quote, an overstated causal mechanism for Gate 5's
+delta, two non-reproducing causal claims in Gate 1's secondary metrics, an arithmetic slip in
+Gate 1's band count, and a missing raw-data archive). All are fixed in place above and in
+`numa-design/bench-data/layer1/`; none changed the overall PASS verdict — the audit confirmed it
+independently (stratified-by-`b.N` analysis showing the arms indistinguishable at 1P and numa
+equal-or-faster in every 256P stratum) and, if anything, strengthened it.
 
 **Concerns for the controller:**
 
 1. **Machine noise remains large and, this run, asymmetric.** Gate 1's bimodal split was more
-   lopsided between arms than Layer 0's (baseline 6/10 high vs numa 1/10 high, rather than a
-   roughly even split), and Gate 6's 256P variance (±75% / ±62% relative stdev) is larger than
-   Layer 0's optional 256P check. `benchstat` still resolves both as not significant, but the
-   asymmetry means a hand-rolled median comparator would be even more likely to false-fail on
-   this layer's data than on Layer 0's. Recommend (as Layer 0 already did) that `gate-json.sh`
-   itself be changed in a follow-up task to make `benchstat` the primary decision path.
-2. **Gate 1's `bytes-from-system`/`heap-bytes-from-system` increase (+9-10%, statistically
-   significant) is real but not explained by this task.** It is not a hard-gate metric (the gate
-   is ns/op and user+sys-ns/op only), and 1P json's small working set makes a few extra
-   arena-sized pages a large relative percentage, but it is consistent with `numaBindArena`'s
-   `mbind` being called on every `mheap.grow`, which could plausibly change the growth/scavenge
-   pattern under `GOMAXPROCS=1`. Worth a dedicated look if a later layer's heap-footprint gate is
-   added; not investigated further here as it is outside Task 7's scope (timing + vmstat gates
-   only).
+   lopsided between arms than Layer 0's (baseline 5/10 high vs numa 1/10 high, rather than a
+   roughly even split — corrected from an earlier 6/10 miscount; see raw values in the Gate 1
+   entry), and Gate 6's 256P variance (±75% / ±62% relative stdev) is larger than Layer 0's
+   optional 256P check. `benchstat` still resolves both as not significant, but the asymmetry
+   means a hand-rolled median comparator would be even more likely to false-fail on this layer's
+   data than on Layer 0's. Recommend (as Layer 0 already did) that `gate-json.sh` itself be
+   changed in a follow-up task to make `benchstat` the primary decision path.
+2. **Gate 1's `bytes-from-system`/`heap-bytes-from-system`/`STW-sec/op` secondary-metric
+   findings did not reproduce and are now closed as benign** (see the Gate 1 entry above for the
+   Gate 3 replicate data and the pallocChunk-quantization explanation) — no longer carried as an
+   open concern.
 3. **The vmstat numa arm's first attempt was nonzero (77 hint faults) before a clean rerun.**
    Documented in full above rather than only reporting the clean rerun, per the instruction to
    report honest numbers. The brief's own CONCERN section anticipates exactly this failure mode
    for a machine-global counter; the resolution (verify idle, rerun once) is the protocol, not an
-   after-the-fact excuse, and only one rerun was performed.
-4. **IMC/remote-share was not run**, per the plan's explicit instruction that it is not a Layer 1
+   after-the-fact excuse, and only one rerun was performed. Idle-check transcript immediately
+   before that rerun (`uptime; who; ps aux --sort=-%cpu | head -6`, run right before snapping
+   `vmstat-numa-before2.txt`):
+   ```
+   22:48:06 up 84 days,  6:56,  1 user,  load average: 103.27, 71.60, 35.68
+   USER         PID %CPU %MEM    VSZ   RSS TTY      STAT START   TIME COMMAND
+   deparker 2353800 12.5  0.0 228540  3600 ?        Ss   22:48   0:00 bash -c uptime; who; ps aux --sort=-%cpu | head -6
+   root     2353794  2.8  0.0  15768 10932 ?        Ss   22:48   0:00 sshd-session: deparker [priv]
+   root        4490  0.2  0.0  81112  4336 ?        Ssl  May27 314:36 /usr/sbin/irqbalance
+   root     2353569  0.1  0.0  16672  7368 ?        S    22:47   0:00 systemd-userwork: waiting...
+   root     2353641  0.1  0.0  16668  7360 ?        S    22:47   0:00 systemd-userwork: waiting...
+   ```
+   (`who` prints no rows in every check run this session — this non-interactive SSH session does
+   not register a utmp entry — so idleness was judged from `ps aux --sort=-%cpu` showing no
+   competing process, as stated throughout, not from `who` output.)
+4. **`gate-json.sh` always runs `baseline` before `numa` within each interleaved pair, giving
+   `numa` a ~1.5% position tailwind** that could mask a regression of up to that size under the
+   +2% bar — see the confound note near the top of this section. Closed by Gate 3's
+   head-off-vs-head-on comparison, a position-unbiased replicate of the same off-vs-on question
+   (−0.18%, well inside noise), not by `gate-json.sh`'s own Gate 1/Gate 6 readings alone.
+5. **IMC/remote-share was not run**, per the plan's explicit instruction that it is not a Layer 1
    gate.
