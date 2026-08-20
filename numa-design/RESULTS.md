@@ -1095,8 +1095,8 @@ node 0 free: 10864 MB
 node 1 free: 5838 MB
 ```
 
-Total free ~16.3 GiB across both nodes, above the plan's 12 GiB headroom threshold, so the full
-`-benchmem=8192` (8 GiB) from the plan was used — no need to drop to 4096.
+Total free ~16.3 GiB across both nodes, above the controller-set 12 GiB headroom check, so the
+full `-benchmem=8192` (8 GiB) from the plan was used — no need to drop to 4096.
 
 **Install** (`GOROOT=/home/deparker/go-numa`, `GOTOOLCHAIN=local`, `@latest` resolves to the same
 `x/benchmarks` pin already recorded for Layer 1 above):
