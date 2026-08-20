@@ -175,7 +175,12 @@ func main() {
 	fmt.Fprintf(os.Stderr, "total reads=%d elapsed=%v ns/read=%.2f noop-pin(armA)=%v\n",
 		total, elapsed, nsPerRead, noopPin)
 
-	fmt.Fprintf(os.Stdout, "BenchmarkPhaseChase 1 %d ns/op\n", int64(nsPerRead))
+	// nsPerRead is the aggregate cost across all *numReaders parallel
+	// readers, so it is normally sub-nanosecond (e.g. ~1-2 ns/read with 64
+	// readers) — print with decimal precision. Truncating to an integer
+	// here previously collapsed every round to exactly 1 or 2, destroying
+	// all variance and making the metric useless to benchstat.
+	fmt.Fprintf(os.Stdout, "BenchmarkPhaseChase 1 %.4f ns/op\n", nsPerRead)
 }
 
 // allocRings allocates size bytes as node structs (64B each), linked into
