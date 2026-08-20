@@ -17,6 +17,7 @@ import (
 func init() {
 	register("NUMAPlacementInfo", NUMAPlacementInfo)
 	register("NUMAStandDown", NUMAStandDown)
+	register("NUMAStandDownDefaultGOMAXPROCS", NUMAStandDownDefaultGOMAXPROCS)
 }
 
 // getMempolicySyscall: get_mempolicy(2) numbers differ per arch.
@@ -76,5 +77,21 @@ func NUMAStandDown() {
 	start := time.Now()
 	runtime.GOMAXPROCS(runtime.NumCPU())
 	fmt.Printf("standdown-gomaxprocs-wall-ns=%d\n", time.Since(start).Nanoseconds())
+	placementLine("after")
+}
+
+// NUMAStandDownDefaultGOMAXPROCS confines at startup (small explicit
+// GOMAXPROCS via env), then calls SetDefaultGOMAXPROCS and prints
+// before/after placement. Unlike NUMAStandDown, this exercises the
+// SetDefaultGOMAXPROCS reopened-feedback-loop scenario: SetDefaultGOMAXPROCS
+// sets customGOMAXPROCS=false and recomputes its target GOMAXPROCS from the
+// CURRENT (already node-narrowed) affinity mask, so the recomputed value
+// can equal the confined node's CPU count and never satisfy a strict
+// procs > numaConfinedNodeCPUs comparison. Stand-down must still trigger,
+// on the customGOMAXPROCS==false transition alone.
+func NUMAStandDownDefaultGOMAXPROCS() {
+	runtime.LockOSThread()
+	placementLine("before")
+	runtime.SetDefaultGOMAXPROCS()
 	placementLine("after")
 }

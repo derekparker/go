@@ -137,6 +137,55 @@ func TestNUMAConfineSkipsNarrowedAffinity(t *testing.T) {
 	}
 }
 
+func TestNUMAStandDownOnGOMAXPROCSGrowth(t *testing.T) {
+	if runtime.NumaNumAllowedNodes() <= 1 {
+		t.Skip("not multi-node")
+	}
+	if !runtime.NumaHasSetAffinityForTest() {
+		t.Skip("no sched_setaffinity plumbing on this arch")
+	}
+	got := runTestProg(t, "testprog", "NUMAStandDown", "GOMAXPROCS=1")
+	baff, bmode := parsePlacement(t, got, "before")
+	aaff, amode := parsePlacement(t, got, "after")
+	if bmode != 1 || !runtime.NumaIsNodeCPUCountForTest(baff) {
+		t.Fatalf("before stand-down: affinity=%d mode=%d, want node-sized+PREFERRED; %q", baff, bmode, got)
+	}
+	if amode != 2 {
+		t.Fatalf("after stand-down: mode=%d want MPOL_BIND(2); %q", amode, got)
+	}
+	if aaff <= baff {
+		t.Fatalf("after stand-down: affinity=%d not restored past confined %d; %q", aaff, baff, got)
+	}
+}
+
+// TestNUMAStandDownOnSetDefaultGOMAXPROCS exercises the review finding
+// carried from Task 2: SetDefaultGOMAXPROCS sets customGOMAXPROCS=false and
+// recomputes its target GOMAXPROCS from the CURRENT (already node-narrowed)
+// affinity mask, so the recomputed value can equal numaConfinedNodeCPUs and
+// never satisfy a strict procs > numaConfinedNodeCPUs comparison. Stand-down
+// must still trigger on the customGOMAXPROCS==false transition alone (see
+// numaStandDownIfNeeded in numa_linux.go).
+func TestNUMAStandDownOnSetDefaultGOMAXPROCS(t *testing.T) {
+	if runtime.NumaNumAllowedNodes() <= 1 {
+		t.Skip("not multi-node")
+	}
+	if !runtime.NumaHasSetAffinityForTest() {
+		t.Skip("no sched_setaffinity plumbing on this arch")
+	}
+	got := runTestProg(t, "testprog", "NUMAStandDownDefaultGOMAXPROCS", "GOMAXPROCS=64")
+	baff, bmode := parsePlacement(t, got, "before")
+	aaff, amode := parsePlacement(t, got, "after")
+	if bmode != 1 || !runtime.NumaIsNodeCPUCountForTest(baff) {
+		t.Fatalf("before SetDefaultGOMAXPROCS: affinity=%d mode=%d, want node-sized+PREFERRED; %q", baff, bmode, got)
+	}
+	if amode != 2 {
+		t.Fatalf("after SetDefaultGOMAXPROCS: mode=%d want MPOL_BIND(2); %q", amode, got)
+	}
+	if aaff <= baff {
+		t.Fatalf("after SetDefaultGOMAXPROCS: affinity=%d not restored past confined %d; %q", aaff, baff, got)
+	}
+}
+
 func parsePlacement(t *testing.T, out, label string) (aff int, mode int) {
 	t.Helper()
 	for _, line := range strings.Split(out, "\n") {
