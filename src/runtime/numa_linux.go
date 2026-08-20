@@ -265,6 +265,20 @@ var (
 	// numaSavedAffinity is the process's startup affinity mask, saved
 	// by numaShouldConfine before any narrowing, and restored per
 	// thread at/after stand-down.
+	//
+	// numaSavedAffinityLen is the byte length sched_getaffinity actually
+	// reported for that save (numaShouldConfine's `r`); the stand-down
+	// restore path (numaStandDownIfNeeded, numaFixThreadPlacement) never
+	// reads it directly and instead passes the whole numaSavedAffinity
+	// array to numaSetThreadAffinity/sched_setaffinity every time. That is
+	// deliberately equivalent: numaSavedAffinity is package-level and
+	// therefore zero-initialized, numaShouldConfine only ever narrows `r`
+	// down from numaCPUMaskBytes (never grows it), and every byte at
+	// index >= numaSavedAffinityLen is left at its zero value -- so
+	// restoring the full numaCPUMaskBytes-sized array reproduces exactly
+	// the saved mask, with no explicit truncation needed. The field is
+	// kept as a documented invariant anchor (and for future diagnostics)
+	// rather than removed.
 	numaSavedAffinity    [numaCPUMaskBytes]byte
 	numaSavedAffinityLen int32
 )
@@ -305,6 +319,12 @@ func numaShouldConfine(procs int32) (int32, bool) {
 		numaConfineDeclined("layer1 inactive")
 		return 0, false
 	}
+	// Read without sched.lock: numaShouldConfine runs from schedinit, before
+	// any other runtime thread exists (numaConfineIfSmall's call site is
+	// still single-threaded m0), so there is no concurrent writer to race.
+	// Every other reader/writer of sched.customGOMAXPROCS (GOMAXPROCS,
+	// SetDefaultGOMAXPROCS, sysmonUpdateGOMAXPROCS, updateMaxProcsGoroutine)
+	// takes sched.lock because they run concurrently with other Ms.
 	if !sched.customGOMAXPROCS {
 		// Default GOMAXPROCS auto-updates from the affinity mask we are
 		// about to narrow (locked decision 6): only confine a process
@@ -407,10 +427,118 @@ func numaConfine(node int32) bool {
 		numaSetThreadAffinity(0, &numaSavedAffinity)
 		return false
 	}
-	numaConfined.Store(true)
+	// Publish the plain fields BEFORE the atomic flag: numaStandDownIfNeeded
+	// and numaFixThreadPlacement below read numaConfinedNode/
+	// numaConfinedNodeCPUs only after observing numaConfined (or
+	// numaStoodDown) true, so this order plus the Store's release
+	// semantics guarantee they never read them half-written.
 	numaConfinedNode = node
 	numaConfinedNodeCPUs = numaNodeCPUCount(node) // same source as the decision
+	numaConfined.Store(true)
 	return true
+}
+
+// numaStandDownIfNeeded triggers stand-down if either (a) the new
+// GOMAXPROCS exceeds the confined node's CPU count, or (b) customGOMAXPROCS
+// is false, i.e. the process just transitioned (or returned) to
+// default-GOMAXPROCS mode while confined (locked decisions 3-4, plus the
+// SetDefaultGOMAXPROCS fix below). Called from startTheWorldWithSema after
+// sched.lock is released, with procs and customGOMAXPROCS both captured
+// under that same sched.lock critical section as the procs computation
+// itself (lock state matters: see the caller).
+//
+// Why (b) is required, not optional: runtime.SetDefaultGOMAXPROCS sets
+// sched.customGOMAXPROCS = false and computes its newprocs from
+// defaultGOMAXPROCS(0), which reads the CURRENT (already node-narrowed by
+// confinement) CPU affinity mask. So newprocs comes out equal to
+// numaConfinedNodeCPUs, condition (a) never fires, and sysmon's
+// ~1/sec automatic GOMAXPROCS recompute (sysmonUpdateGOMAXPROCS, also
+// customGOMAXPROCS==false) then keeps recomputing from that same narrowed
+// mask forever -- the process would stay confined and never stand down.
+// Standing down unconditionally on any customGOMAXPROCS==false transition
+// closes that loop: it is exactly the signal that GOMAXPROCS control just
+// left "the operator explicitly chose a value" (locked decision 6, the
+// same precondition numaShouldConfine required to confine in the first
+// place) and returned to automatic mode, where confinement's premise no
+// longer holds regardless of what the recomputed value happens to be.
+//
+// One-way: sets numaStoodDown. NOTE it does NOT guarantee every thread is
+// restored on return: the world is already restarting at this point
+// (gcwaiting cleared; startTheWorldWithSema's own loop can newm,
+// proc.go:1813), and Ms can be on allm before their procid is stored
+// (mcommoninit runs before newosproc). The eager walk below is a
+// latency optimization; per-thread correctness is numaFixThreadPlacement.
+func numaStandDownIfNeeded(procs int32, customGOMAXPROCS bool) {
+	if !numaConfined.Load() {
+		return
+	}
+	if procs <= numaConfinedNodeCPUs && customGOMAXPROCS {
+		return
+	}
+	numaConfined.Store(false)
+	numaStoodDown.Store(true)
+	// Eager affinity restore for every M whose tid is visible: latency
+	// optimization only. procid is read atomically -- mcommoninit
+	// publishes an M to allm BEFORE newosproc stores procid (the
+	// runtime's own walks spin on this, os_linux.go:848-853); a zero
+	// procid here just means that M converges at its first park.
+	for mp := allm; mp != nil; mp = mp.alllink {
+		if tid := atomic.Load64(&mp.procid); tid != 0 {
+			numaSetThreadAffinity(int32(tid), &numaSavedAffinity)
+		}
+	}
+	// Revert this thread's own task policy to Layer-1 BIND-all.
+	// numaSetProcessBindAll re-issues set_mempolicy and re-Stores the
+	// already-published numaAllowedNodemask: deliberately idempotent --
+	// the re-issue costs one syscall once per process lifetime, and its
+	// get_mempolicy(MPOL_F_MEMS_ALLOWED) re-read is the documented
+	// "re-read the mask on stand-down triggers" point for dynamic
+	// cpusets (Task 14).
+	numaSetProcessBindAll()
+	getg().m.numa.setPlacementDone()
+	if debug.numa > 0 {
+		if !customGOMAXPROCS {
+			println("numa: confinement stood down, GOMAXPROCS reverted to default (customGOMAXPROCS=false)")
+		} else {
+			println("numa: confinement stood down, GOMAXPROCS", procs, ">", numaConfinedNodeCPUs)
+		}
+	}
+}
+
+// numaFixThreadPlacement converges the calling M's placement after
+// stand-down: restores BOTH its CPU affinity (self-call, no tid
+// needed) AND its task mempolicy to Layer-1 BIND-all (set_mempolicy is
+// per-thread and cannot be applied cross-thread). Called from stopm --
+// parked-M path, never malloc, never steal; one atomic load when the
+// experiment is on and stand-down has not happened, nothing when off.
+// This is the correctness path: every M -- including ones the eager
+// walk missed (unset procid, late clones) -- converges at its first
+// park after stand-down.
+func numaFixThreadPlacement() {
+	if !numaStoodDown.Load() {
+		return
+	}
+	mp := getg().m
+	if mp.numa.placementDone() {
+		return
+	}
+	// Affinity first (idempotent if the eager walk already got us).
+	if !numaSetThreadAffinity(0, &numaSavedAffinity) {
+		return // retry at next park
+	}
+	w0 := numaAllowedNodemask.Load()
+	if w0 == 0 {
+		return
+	}
+	var mask numaNodemask
+	mask[0] = w0
+	if _, _, errno := linux.Syscall6(linux.SYS_SET_MEMPOLICY,
+		uintptr(_MPOL_BIND), uintptr(unsafe.Pointer(&mask[0])), numaMaxNode, 0, 0, 0); errno != 0 {
+		return // retry at next park
+	}
+	// Latch only after every syscall succeeded (I4): latching first
+	// would permanently strand a thread that raced a transient failure.
+	mp.numa.setPlacementDone()
 }
 
 // numaBindArena sets MPOL_BIND, over the same allowed-node mask

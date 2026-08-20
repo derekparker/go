@@ -726,6 +726,14 @@ type m struct {
 
 	// self points this M until mexit clears it to return nil.
 	self mWeakPointer
+
+	// numa is this M's NUMA stand-down convergence state (see
+	// numaFixThreadPlacement in numa_linux.go). Placed at the END of
+	// this struct so no earlier field's offset moves when the
+	// experiment is on, and it is zero-size (mNUMAState struct{}) when
+	// goexperiment.numa is off, so sizeof(m) and every field offset are
+	// unchanged in off builds. See numa_mstate_on.go / numa_mstate_off.go.
+	numa mNUMAState
 }
 
 const mRedZoneSize = (16 << 3) * asanenabledBit // redZoneSize(2048)

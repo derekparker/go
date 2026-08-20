@@ -35,3 +35,20 @@ func numaBindArena(addr unsafe.Pointer, size uintptr) {
 // Linux-specific, has something to call on every GOOS.
 func numaConfineIfSmall(procs int32) {
 }
+
+// numaStandDownIfNeeded is a no-op on non-Linux platforms: confinement
+// (and therefore stand-down) is Linux-only (see numa_linux.go). Its call
+// site in startTheWorldWithSema is also gated on goexperiment.Numa, so
+// this body never runs with the experiment off; it exists purely so
+// proc.go, which is not Linux-specific, has something to call on every
+// GOOS.
+func numaStandDownIfNeeded(procs int32, customGOMAXPROCS bool) {
+}
+
+// numaFixThreadPlacement is a no-op on non-Linux platforms: per-thread
+// stand-down convergence is Linux-only (see numa_linux.go). Its call site
+// in stopm is also gated on goexperiment.Numa, so this body never runs
+// with the experiment off; it exists purely so proc.go, which is not
+// Linux-specific, has something to call on every GOOS.
+func numaFixThreadPlacement() {
+}

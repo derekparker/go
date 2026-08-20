@@ -1795,6 +1795,13 @@ func startTheWorldWithSema(now int64, w worldStop) int64 {
 		procs = newprocs
 		newprocs = 0
 	}
+	// Captured under the same sched.lock critical section as procs: the
+	// NUMA stand-down trigger below must see the customGOMAXPROCS value
+	// that produced this procs (or newprocs), not a value read after
+	// unlock that could race a subsequent GOMAXPROCS/SetDefaultGOMAXPROCS
+	// call. See numaStandDownIfNeeded's doc comment for why this flag
+	// alone (independent of the procs comparison) must trigger stand-down.
+	customGOMAXPROCS := sched.customGOMAXPROCS
 	p1 := procresize(procs)
 	sched.gcwaiting.Store(false)
 	if sched.sysmonwait.Load() {
@@ -1802,6 +1809,10 @@ func startTheWorldWithSema(now int64, w worldStop) int64 {
 		notewakeup(&sched.sysmonnote)
 	}
 	unlock(&sched.lock)
+
+	if goexperiment.Numa {
+		numaStandDownIfNeeded(procs, customGOMAXPROCS)
+	}
 
 	worldStarted()
 
@@ -3015,6 +3026,14 @@ func templateThread() {
 // Stops execution of the current m until new work is available.
 // Returns with acquired P.
 func stopm() {
+	if goexperiment.Numa {
+		// M is parking: never a malloc or steal path. Converges this M's
+		// affinity + task mempolicy after a NUMA stand-down (one atomic
+		// load, no-op when stand-down has not happened or this M already
+		// converged). See numaFixThreadPlacement in numa_linux.go.
+		numaFixThreadPlacement()
+	}
+
 	gp := getg()
 
 	if gp.m.locks != 0 {
