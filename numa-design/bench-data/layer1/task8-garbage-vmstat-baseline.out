@@ -1,0 +1,11 @@
+pkg: golang.org/x/benchmarks
+goos: linux
+goarch: amd64
+
+consumption=3769KB npkg=890
+2026/08/19 23:28:49 Benchmarking 1 iterations
+2026/08/19 23:28:50 Benchmarking 100 iterations
+2026/08/19 23:28:51 Benchmarking 10000 iterations
+# memprof=/tmp/11.prof.txt
+# cpuprof=/tmp/10.prof.txt
+BenchmarkGarbage/benchmem-MB=8192-256    10000	   3020198 ns/op	 219825728 GC-bytes-from-system	  24032937 STW-ns/GC	     24032 STW-ns/op	   6222740 allocated-bytes/op	    145211 allocs/op	16037770768 bytes-from-system	15488548864 heap-bytes-from-system	 313569232 other-bytes-from-system	15679361024 peak-RSS-bytes	17289285632 peak-VM-bytes	  15826944 stack-bytes-from-system	 251377205 user+sys-ns/op

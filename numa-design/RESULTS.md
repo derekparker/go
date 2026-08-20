@@ -1071,3 +1071,126 @@ equal-or-faster in every 256P stratum) and, if anything, strengthened it.
    (−0.18%, well inside noise), not by `gate-json.sh`'s own Gate 1/Gate 6 readings alone.
 5. **IMC/remote-share was not run**, per the plan's explicit instruction that it is not a Layer 1
    gate.
+
+## Layer 1 promotion evidence: garbage vmstat (Task 8, 2026-08-19)
+
+Date: 2026-08-19
+Local/Remote SHA (before this commit): `0633d970f9` (`numa-design: correct Layer 1 gate evidence record`)
+Remote `bin/go` build SHA: `ab294b60e6` — an ancestor of `0633d970f9`; the diff between the two is
+`numa-design/` docs and archived `.out` files only (`git diff --stat ab294b60e6 0633d970f9`, 13
+files, all under `numa-design/`), so the remote binary did not need rebuilding for this task.
+Host: `numa-dell` (`dell-per660-01.khw.eng.rdu2.dc.redhat.com`). Kernel: `6.12.0-211.7.1.el10_2.x86_64`.
+`kernel.numa_balancing`: `1` throughout (left as-is per the task brief, not touched).
+
+This is Task 8 Step 1 of the plan — optional Layer 1 promotion evidence, not a merge-blocking
+gate (Layer 1 already passed on Tasks 6–7's hard gates). It re-runs the `golang.org/x/benchmarks`
+`garbage` benchmark at a larger heap (8 GiB, vs the 64 MiB default and the smaller size used in
+the pre-Stage-1a `Section 3` run above) with the `/proc/vmstat` NUMA-balancer counters gated
+around each arm, mirroring Gate 7's protocol but with the `garbage` binary instead of `json`.
+
+**Free RAM check** (`numactl --hardware`, before either install/run):
+
+```
+node 0 free: 10864 MB
+node 1 free: 5838 MB
+```
+
+Total free ~16.3 GiB across both nodes, above the plan's 12 GiB headroom threshold, so the full
+`-benchmem=8192` (8 GiB) from the plan was used — no need to drop to 4096.
+
+**Install** (`GOROOT=/home/deparker/go-numa`, `GOTOOLCHAIN=local`, `@latest` resolves to the same
+`x/benchmarks` pin already recorded for Layer 1 above):
+
+```
+$ ssh numa-dell 'GOBIN=/tmp/garbage-b go install golang.org/x/benchmarks/garbage@latest'
+$ ssh numa-dell 'GOBIN=/tmp/garbage-n GOEXPERIMENT=numa go install golang.org/x/benchmarks/garbage@latest'
+```
+
+Both installs succeeded; binaries at `/tmp/garbage-b/garbage` (baseline) and `/tmp/garbage-n/garbage`
+(numa, built with `GOEXPERIMENT=numa`).
+
+### Baseline arm
+
+Idle check immediately before snapping:
+
+```
+$ ssh numa-dell 'uptime; ps aux | awk "$3>5"'
+23:28:12 up 84 days, 7:36, 1 user, load average: 0.07, 0.12, 6.09
+(no process over 5% CPU besides the check command itself)
+```
+
+```
+$ ssh numa-dell '/home/deparker/go-numa/numa-design/gate-vmstat.sh snap vmstat-baseline-before.txt'
+$ ssh numa-dell '/tmp/garbage-b/garbage -benchmem=8192 -benchnum=1'
+BenchmarkGarbage/benchmem-MB=8192-256    10000    3020198 ns/op  219825728 GC-bytes-from-system  24032937 STW-ns/GC  24032 STW-ns/op  6222740 allocated-bytes/op  145211 allocs/op  16037770768 bytes-from-system  15488548864 heap-bytes-from-system  313569232 other-bytes-from-system  15679361024 peak-RSS-bytes  17289285632 peak-VM-bytes  15826944 stack-bytes-from-system  251377205 user+sys-ns/op
+$ ssh numa-dell '/home/deparker/go-numa/numa-design/gate-vmstat.sh snap vmstat-baseline-after.txt'
+$ ssh numa-dell '/home/deparker/go-numa/numa-design/gate-vmstat.sh diff vmstat-baseline-before.txt vmstat-baseline-after.txt'
+hint_faults=4242970 pages_migrated=2517110
+```
+
+Clean single run, no rerun needed — the baseline arm triggers the balancer hard, as expected
+(hint_faults and pages_migrated both `>> 0`).
+
+### numa arm
+
+The baseline run above briefly drove `GOMAXPROCS=256` load, so `uptime`'s 1-minute average was
+still elevated (31.00) right after it finished — the same residual-runqueue-decay pattern already
+documented for Gate 8 above, not a second tenant. Per the established protocol, idleness was
+re-verified with `ps aux --sort=-%cpu` (not just `uptime`) immediately before snapping:
+
+```
+$ ssh numa-dell 'uptime; who; ps aux --sort=-%cpu | head -6'
+23:30:45 up 84 days, 7:38, 1 user, load average: 9.70, 7.89, 8.37
+USER         PID %CPU %MEM    VSZ   RSS TTY      STAT START   TIME COMMAND
+deparker 2366338 10.0  0.0 228540  3632 ?        Ss   23:30   0:00 bash -c uptime; who; ps aux --sort=-%cpu | head -6
+root     2366332  3.0  0.0  15768 10876 ?        Ss   23:30   0:00 sshd-session: deparker [priv]
+deparker 2365829  0.2  0.0  22572 14052 ?        Ss   23:29   0:00 /usr/lib/systemd/systemd --user
+root        4490  0.2  0.0  81112  4336 ?        Ssl  May27 314:43 /usr/sbin/irqbalance
+root     2365919  0.0  0.0  16668  7368 ?        S    23:29   0:00 systemd-userwork: waiting...
+```
+
+No competing process (`who` again prints no rows over this non-interactive SSH session, same as
+noted in Gate 7 above; idleness judged from `ps aux --sort=-%cpu`). Proceeded:
+
+```
+$ ssh numa-dell '/home/deparker/go-numa/numa-design/gate-vmstat.sh snap vmstat-numa-before.txt'
+$ ssh numa-dell 'GOEXPERIMENT=numa /tmp/garbage-n/garbage -benchmem=8192 -benchnum=1'
+BenchmarkGarbage/benchmem-MB=8192-256    10000    2817269 ns/op  204202224 GC-bytes-from-system  22487085 STW-ns/GC  22487 STW-ns/op  6222537 allocated-bytes/op  145210 allocs/op  14631392448 bytes-from-system  14121271296 heap-bytes-from-system  290386896 other-bytes-from-system  14293426176 peak-RSS-bytes  15836717056 peak-VM-bytes  15532032 stack-bytes-from-system  254212007 user+sys-ns/op
+$ ssh numa-dell '/home/deparker/go-numa/numa-design/gate-vmstat.sh snap vmstat-numa-after.txt'
+$ ssh numa-dell '/home/deparker/go-numa/numa-design/gate-vmstat.sh diff vmstat-numa-before.txt vmstat-numa-after.txt'
+hint_faults=0 pages_migrated=0
+```
+
+Clean 0/0 on the first attempt — no rerun was needed (unlike Gate 7's numa arm, which needed one
+rerun after a nonzero first attempt).
+
+### Summary
+
+| Arm      | heap  | hint_faults delta | pages_migrated delta |
+|----------|-------|-------------------:|----------------------:|
+| baseline | 8 GiB | 4242970             | 2517110               |
+| numa     | 8 GiB | 0                   | 0                      |
+
+Matches the expected pattern from the plan and from Gate 7's `json`-based three-way: the balancer
+is active under baseline and silent under the BIND-all numa policy. This corroborates Gate 7 on a
+second, independent workload (`garbage`'s allocate/free/pointer-write pattern differs from `json`'s
+marshal/unmarshal pattern) and at a larger heap (8 GiB vs Gate 7's smaller sizes).
+
+**Throughput (not a gate, recorded only per the brief):** single-run `ns/op` was baseline 3020198
+vs numa 2817269 (numa ~6.7% lower in this one run); `STW-ns/op` baseline 24032 vs numa 22487.
+This is `-benchnum=1` — a single sample, not a `benchstat`-backed comparison — so no throughput
+claim is made either way; it is reported for completeness only, per the instruction that
+throughput differences are not a Layer 1 gate.
+
+Raw benchmark output and vmstat snapshots archived at:
+- `numa-design/bench-data/layer1/task8-garbage-vmstat-baseline.out`
+- `numa-design/bench-data/layer1/task8-garbage-vmstat-numa.out`
+- `numa-design/bench-data/layer1/task8-vmstat-baseline-before.txt`
+- `numa-design/bench-data/layer1/task8-vmstat-baseline-after.txt`
+- `numa-design/bench-data/layer1/task8-vmstat-numa-before.txt`
+- `numa-design/bench-data/layer1/task8-vmstat-numa-after.txt`
+
+**Step 2 (full Sweet run) explicitly skipped**, per the plan's Task 8 Step 2, which marks it
+optional ("Do not run full Sweet yet unless you want extra evidence") and per this task's brief,
+which scoped Task 8 to Step 1 (garbage vmstat) plus this RESULTS.md note only. Layer 1's shippable
+status does not depend on it — Tasks 6 and 7's hard gates already passed.
