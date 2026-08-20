@@ -1,0 +1,44 @@
+wsA-cand2-armA-r0: hint_faults=0 pages_migrated=0
+wsA-cand2-armA-r10: hint_faults=0 pages_migrated=0
+wsA-cand2-armA-r1: hint_faults=0 pages_migrated=0
+wsA-cand2-armA-r2: hint_faults=0 pages_migrated=0
+wsA-cand2-armA-r3: hint_faults=0 pages_migrated=0
+wsA-cand2-armA-r4: hint_faults=0 pages_migrated=0
+wsA-cand2-armA-r5: hint_faults=0 pages_migrated=0
+wsA-cand2-armA-r6: hint_faults=0 pages_migrated=0
+wsA-cand2-armA-r7: hint_faults=0 pages_migrated=0
+wsA-cand2-armA-r8: hint_faults=0 pages_migrated=0
+wsA-cand2-armA-r9: hint_faults=0 pages_migrated=0
+wsA-cand2-armB-r0: hint_faults=28286 pages_migrated=906483
+hint_faults=28286 pages_migrated=906483
+wsA-cand2-armB-r10: hint_faults=475745 pages_migrated=571059
+hint_faults=475745 pages_migrated=571059
+wsA-cand2-armB-r1: hint_faults=235133 pages_migrated=934499
+hint_faults=235133 pages_migrated=934499
+wsA-cand2-armB-r2: hint_faults=193377 pages_migrated=1689870
+hint_faults=193377 pages_migrated=1689870
+wsA-cand2-armB-r3: hint_faults=166759 pages_migrated=1530366
+hint_faults=166759 pages_migrated=1530366
+wsA-cand2-armB-r4: hint_faults=233213 pages_migrated=599319
+hint_faults=233213 pages_migrated=599319
+wsA-cand2-armB-r5: hint_faults=269100 pages_migrated=566945
+hint_faults=269100 pages_migrated=566945
+wsA-cand2-armB-r6: hint_faults=238123 pages_migrated=1623615
+hint_faults=238123 pages_migrated=1623615
+wsA-cand2-armB-r7: hint_faults=118932 pages_migrated=1121055
+hint_faults=118932 pages_migrated=1121055
+wsA-cand2-armB-r8: hint_faults=73826 pages_migrated=1444267
+hint_faults=73826 pages_migrated=1444267
+wsA-cand2-armB-r9: hint_faults=38845 pages_migrated=1534765
+hint_faults=38845 pages_migrated=1534765
+wsA-cand2-armC-r0: hint_faults=0 pages_migrated=0
+wsA-cand2-armC-r10: hint_faults=0 pages_migrated=0
+wsA-cand2-armC-r1: hint_faults=0 pages_migrated=0
+wsA-cand2-armC-r2: hint_faults=0 pages_migrated=0
+wsA-cand2-armC-r3: hint_faults=0 pages_migrated=0
+wsA-cand2-armC-r4: hint_faults=0 pages_migrated=0
+wsA-cand2-armC-r5: hint_faults=0 pages_migrated=0
+wsA-cand2-armC-r6: hint_faults=0 pages_migrated=0
+wsA-cand2-armC-r7: hint_faults=0 pages_migrated=0
+wsA-cand2-armC-r8: hint_faults=0 pages_migrated=0
+wsA-cand2-armC-r9: hint_faults=0 pages_migrated=0

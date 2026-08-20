@@ -1,0 +1,54 @@
+pkg: golang.org/x/benchmarks
+goos: linux
+goarch: amd64
+       │ /tmp/wsA-gate1/baseline.out │    /tmp/wsA-gate1/numa.out     │
+       │           sec/op            │    sec/op     vs base          │
+JSON-1                  20.72m ± 57%   17.33m ± 89%  ~ (p=0.631 n=10)
+
+       │ /tmp/wsA-gate1/baseline.out │        /tmp/wsA-gate1/numa.out         │
+       │    GC-bytes-from-system     │ GC-bytes-from-system  vs base          │
+JSON-1                  2.584Mi ± 1%           2.608Mi ± 2%  ~ (p=0.424 n=10)
+
+       │ /tmp/wsA-gate1/baseline.out │    /tmp/wsA-gate1/numa.out     │
+       │         STW-sec/GC          │  STW-sec/GC   vs base          │
+JSON-1                  10.65µ ± 58%   10.38µ ± 53%  ~ (p=0.529 n=10)
+
+       │ /tmp/wsA-gate1/baseline.out │    /tmp/wsA-gate1/numa.out     │
+       │         STW-sec/op          │  STW-sec/op   vs base          │
+JSON-1                  2.416µ ± 60%   2.432µ ± 76%  ~ (p=0.579 n=10)
+
+       │ /tmp/wsA-gate1/baseline.out │       /tmp/wsA-gate1/numa.out        │
+       │     allocated-bytes/op      │ allocated-bytes/op  vs base          │
+JSON-1                  4.103Mi ± 5%         4.250Mi ± 3%  ~ (p=0.052 n=10)
+
+       │ /tmp/wsA-gate1/baseline.out │    /tmp/wsA-gate1/numa.out    │
+       │          allocs/op          │  allocs/op   vs base          │
+JSON-1                   26.79k ± 0%   26.80k ± 0%  ~ (p=0.956 n=10)
+
+       │ /tmp/wsA-gate1/baseline.out │       /tmp/wsA-gate1/numa.out       │
+       │      bytes-from-system      │ bytes-from-system  vs base          │
+JSON-1                  68.91Mi ± 6%        68.91Mi ± 6%  ~ (p=0.457 n=10)
+
+       │ /tmp/wsA-gate1/baseline.out │         /tmp/wsA-gate1/numa.out          │
+       │   heap-bytes-from-system    │ heap-bytes-from-system  vs base          │
+JSON-1                  63.72Mi ± 6%             63.70Mi ± 6%  ~ (p=0.752 n=10)
+
+       │ /tmp/wsA-gate1/baseline.out │          /tmp/wsA-gate1/numa.out          │
+       │   other-bytes-from-system   │ other-bytes-from-system  vs base          │
+JSON-1                  2.305Mi ± 8%              2.329Mi ± 8%  ~ (p=0.404 n=10)
+
+       │ /tmp/wsA-gate1/baseline.out │     /tmp/wsA-gate1/numa.out      │
+       │       peak-RSS-bytes        │ peak-RSS-bytes  vs base          │
+JSON-1                 57.08Mi ± 10%     57.51Mi ± 7%  ~ (p=0.796 n=10)
+
+       │ /tmp/wsA-gate1/baseline.out │     /tmp/wsA-gate1/numa.out     │
+       │        peak-VM-bytes        │ peak-VM-bytes  vs base          │
+JSON-1                  1.236Gi ± 0%    1.236Gi ± 0%  ~ (p=0.182 n=10)
+
+       │ /tmp/wsA-gate1/baseline.out │          /tmp/wsA-gate1/numa.out          │
+       │   stack-bytes-from-system   │ stack-bytes-from-system  vs base          │
+JSON-1                 272.0Ki ± 18%              272.0Ki ± 6%  ~ (p=0.984 n=10)
+
+       │ /tmp/wsA-gate1/baseline.out │      /tmp/wsA-gate1/numa.out      │
+       │       user+sys-sec/op       │ user+sys-sec/op  vs base          │
+JSON-1                  20.74m ± 57%      17.33m ± 90%  ~ (p=0.579 n=10)

@@ -1,0 +1,47 @@
+gc-pause-bench GOMAXPROCS=128 heap=4096MiB warm=45s n=8 idle=1000000 stacks=200 ptrheap=true toucher=false gcgap=5s discard=2
+Allocating pointer-dense heap...
+Spawning 1000000 idle + 200 stack-growing goroutines...
+Warming up (45s) — letting NUMA balancer mark pages...
+  2s elapsed, 0 touch passes
+  4s elapsed, 0 touch passes
+  6s elapsed, 0 touch passes
+  8s elapsed, 0 touch passes
+  10s elapsed, 0 touch passes
+  12s elapsed, 0 touch passes
+  14s elapsed, 0 touch passes
+  16s elapsed, 0 touch passes
+  18s elapsed, 0 touch passes
+  20s elapsed, 0 touch passes
+  22s elapsed, 0 touch passes
+  24s elapsed, 0 touch passes
+  26s elapsed, 0 touch passes
+  28s elapsed, 0 touch passes
+  30s elapsed, 0 touch passes
+  32s elapsed, 0 touch passes
+  34s elapsed, 0 touch passes
+  36s elapsed, 0 touch passes
+  38s elapsed, 0 touch passes
+  40s elapsed, 0 touch passes
+  42s elapsed, 0 touch passes
+  44s elapsed, 0 touch passes
+  46s elapsed, 0 touch passes
+Warm-up done (0 touch passes).
+Measuring 10 GC cycles (2 discarded, 8 measured, gcgap=5s)...
+  [discard 1/2] wall=3.732527541s stw=195.883µs
+  [discard 2/2] wall=3.060939169s stw=109.254µs
+
+=== GC Pause Results ===
+heap=4096  MiB  n=8     GOMAXPROCS=128   idle-goroutines=1000000  stack-goroutines=200  ptrheap=true  toucher=false  gcgap=5s  discard=2
+
+Wall-clock time per runtime.GC() call (includes concurrent phases):
+  p50=3.044587721s  p75=3.048658888s  p90=3.051114084s  p95=3.051114084s  p99=3.051114084s  max=3.051114084s
+  mean=3.04347463s  total=24.347797041s  pauses>5ms: 8/8 (100.0%)
+
+Runtime STW-only time (from MemStats.PauseNs, excludes concurrent GC):
+  p50=118.738µs   p95=334.058µs   p99=334.058µs   max=334.058µs   mean=153.377µs 
+
+Notes:
+  - Build with GOEXPERIMENT=numa to enable mbind(MPOL_PREFERRED) on arenas.
+  - Ensure kernel.numa_balancing=1 (check: cat /proc/sys/kernel/numa_balancing).
+  - Run on a machine with 2+ NUMA nodes for meaningful results.
+  - Larger -heap and longer -warm show more pronounced differences.

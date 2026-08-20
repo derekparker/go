@@ -1,0 +1,18 @@
+idle_check: top process at 1000% CPU; sleeping 30s
+idle_check: top process at 600% CPU; sleeping 30s
+idle_check: top process at 600% CPU; sleeping 30s
+idle_check: top process at 700% CPU; sleeping 30s
+idle_check: top process at 700% CPU; sleeping 30s
+idle_check: top process at 600% CPU; sleeping 30s
+idle_check: top process at 600% CPU; sleeping 30s
+idle_check: top process at 600% CPU; sleeping 30s
+idle_check: top process at 700% CPU; sleeping 30s
+idle_check: top process at 600% CPU; sleeping 30s
+idle_check: top process at 600% CPU; sleeping 30s
+idle_check: top process at 600% CPU; sleeping 30s
+idle_check: top process at 800% CPU; sleeping 30s
+idle_check: top process at 600% CPU; sleeping 30s
+idle_check: top process at 500% CPU; sleeping 30s
+idle_check: top process at 500% CPU; sleeping 30s
+idle_check: top process at 800% CPU; sleeping 30s
+sweep complete: /tmp/pb/wsA-cand2 (archive under numa-design/bench-data/wsA-cand2/)

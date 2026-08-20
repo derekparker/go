@@ -1,0 +1,66 @@
+wsA-cand1-armA-r0: hint_faults=0 pages_migrated=0
+wsA-cand1-armA-r10: hint_faults=0 pages_migrated=0
+wsA-cand1-armA-r11: hint_faults=0 pages_migrated=0
+wsA-cand1-armA-r12: hint_faults=0 pages_migrated=0
+wsA-cand1-armA-r13: hint_faults=0 pages_migrated=0
+wsA-cand1-armA-r14: hint_faults=0 pages_migrated=0
+wsA-cand1-armA-r15: hint_faults=0 pages_migrated=0
+wsA-cand1-armA-r1: hint_faults=0 pages_migrated=0
+wsA-cand1-armA-r2: hint_faults=0 pages_migrated=0
+wsA-cand1-armA-r3: hint_faults=0 pages_migrated=0
+wsA-cand1-armA-r4: hint_faults=0 pages_migrated=0
+wsA-cand1-armA-r5: hint_faults=0 pages_migrated=0
+wsA-cand1-armA-r6: hint_faults=0 pages_migrated=0
+wsA-cand1-armA-r7: hint_faults=0 pages_migrated=0
+wsA-cand1-armA-r8: hint_faults=0 pages_migrated=0
+wsA-cand1-armA-r9: hint_faults=0 pages_migrated=0
+wsA-cand1-armB-r0: hint_faults=222384 pages_migrated=1339531
+hint_faults=222384 pages_migrated=1339531
+wsA-cand1-armB-r10: hint_faults=186618 pages_migrated=1476583
+hint_faults=186618 pages_migrated=1476583
+wsA-cand1-armB-r11: hint_faults=106803 pages_migrated=1076577
+hint_faults=106803 pages_migrated=1076577
+wsA-cand1-armB-r12: hint_faults=198894 pages_migrated=1449241
+hint_faults=198894 pages_migrated=1449241
+wsA-cand1-armB-r13: hint_faults=221134 pages_migrated=1426198
+hint_faults=221134 pages_migrated=1426198
+wsA-cand1-armB-r14: hint_faults=140920 pages_migrated=1260535
+hint_faults=140920 pages_migrated=1260535
+wsA-cand1-armB-r15: hint_faults=251859 pages_migrated=1462821
+hint_faults=251859 pages_migrated=1462821
+wsA-cand1-armB-r1: hint_faults=176520 pages_migrated=1331658
+hint_faults=176520 pages_migrated=1331658
+wsA-cand1-armB-r2: hint_faults=265164 pages_migrated=1460530
+hint_faults=265164 pages_migrated=1460530
+wsA-cand1-armB-r3: hint_faults=211729 pages_migrated=1349540
+hint_faults=211729 pages_migrated=1349540
+wsA-cand1-armB-r4: hint_faults=215222 pages_migrated=1392496
+hint_faults=215222 pages_migrated=1392496
+wsA-cand1-armB-r5: hint_faults=81409 pages_migrated=943290
+hint_faults=81409 pages_migrated=943290
+wsA-cand1-armB-r6: hint_faults=211878 pages_migrated=1345718
+hint_faults=211878 pages_migrated=1345718
+wsA-cand1-armB-r7: hint_faults=160038 pages_migrated=1232004
+hint_faults=160038 pages_migrated=1232004
+wsA-cand1-armB-r8: hint_faults=208576 pages_migrated=1448219
+hint_faults=208576 pages_migrated=1448219
+wsA-cand1-armB-r9: hint_faults=239137 pages_migrated=1475188
+hint_faults=239137 pages_migrated=1475188
+wsA-cand1-armC-r0: hint_faults=0 pages_migrated=0
+wsA-cand1-armC-r10: hint_faults=0 pages_migrated=0
+wsA-cand1-armC-r11: hint_faults=0 pages_migrated=0
+wsA-cand1-armC-r12: hint_faults=0 pages_migrated=0
+wsA-cand1-armC-r13: hint_faults=0 pages_migrated=0
+wsA-cand1-armC-r14: hint_faults=2 pages_migrated=1
+hint_faults=2 pages_migrated=1
+wsA-cand1-armC-r15: hint_faults=0 pages_migrated=0
+wsA-cand1-armC-r1: hint_faults=0 pages_migrated=0
+wsA-cand1-armC-r2: hint_faults=0 pages_migrated=0
+wsA-cand1-armC-r3: hint_faults=0 pages_migrated=0
+wsA-cand1-armC-r4: hint_faults=0 pages_migrated=0
+wsA-cand1-armC-r5: hint_faults=0 pages_migrated=0
+wsA-cand1-armC-r6: hint_faults=3 pages_migrated=0
+hint_faults=3 pages_migrated=0
+wsA-cand1-armC-r7: hint_faults=0 pages_migrated=0
+wsA-cand1-armC-r8: hint_faults=0 pages_migrated=0
+wsA-cand1-armC-r9: hint_faults=0 pages_migrated=0

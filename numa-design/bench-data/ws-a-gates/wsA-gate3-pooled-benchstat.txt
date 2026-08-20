@@ -1,0 +1,54 @@
+pkg: golang.org/x/benchmarks
+goos: linux
+goarch: amd64
+         │ /tmp/wsA-gate3-pooled-baseline.out │ /tmp/wsA-gate3-pooled-numa.out │
+         │               sec/op               │    sec/op     vs base          │
+JSON-256                         2.371m ± 11%   2.025m ± 14%  ~ (p=0.197 n=30)
+
+         │ /tmp/wsA-gate3-pooled-baseline.out │     /tmp/wsA-gate3-pooled-numa.out     │
+         │        GC-bytes-from-system        │ GC-bytes-from-system  vs base          │
+JSON-256                        30.16Mi ± 47%          33.35Mi ± 36%  ~ (p=0.820 n=30)
+
+         │ /tmp/wsA-gate3-pooled-baseline.out │ /tmp/wsA-gate3-pooled-numa.out │
+         │             STW-sec/GC             │  STW-sec/GC   vs base          │
+JSON-256                         40.21m ± 19%    37.92m ± 9%  ~ (p=0.142 n=30)
+
+         │ /tmp/wsA-gate3-pooled-baseline.out │ /tmp/wsA-gate3-pooled-numa.out │
+         │             STW-sec/op             │  STW-sec/op   vs base          │
+JSON-256                         149.3µ ± 12%   159.5µ ± 29%  ~ (p=0.878 n=30)
+
+         │ /tmp/wsA-gate3-pooled-baseline.out │    /tmp/wsA-gate3-pooled-numa.out    │
+         │         allocated-bytes/op         │ allocated-bytes/op  vs base          │
+JSON-256                        6.435Mi ± 21%        7.545Mi ± 23%  ~ (p=0.562 n=30)
+
+         │ /tmp/wsA-gate3-pooled-baseline.out │ /tmp/wsA-gate3-pooled-numa.out │
+         │             allocs/op              │  allocs/op    vs base          │
+JSON-256                          26.83k ± 0%    26.82k ± 0%  ~ (p=0.473 n=30)
+
+         │ /tmp/wsA-gate3-pooled-baseline.out │   /tmp/wsA-gate3-pooled-numa.out    │
+         │         bytes-from-system          │ bytes-from-system  vs base          │
+JSON-256                        6.235Gi ± 43%       6.114Gi ± 50%  ~ (p=0.752 n=30)
+
+         │ /tmp/wsA-gate3-pooled-baseline.out │      /tmp/wsA-gate3-pooled-numa.out      │
+         │       heap-bytes-from-system       │ heap-bytes-from-system  vs base          │
+JSON-256                        6.127Gi ± 43%            5.995Gi ± 50%  ~ (p=0.764 n=30)
+
+         │ /tmp/wsA-gate3-pooled-baseline.out │      /tmp/wsA-gate3-pooled-numa.out       │
+         │      other-bytes-from-system       │ other-bytes-from-system  vs base          │
+JSON-256                        71.15Mi ± 35%             71.00Mi ± 37%  ~ (p=0.752 n=30)
+
+         │ /tmp/wsA-gate3-pooled-baseline.out │  /tmp/wsA-gate3-pooled-numa.out  │
+         │           peak-RSS-bytes           │ peak-RSS-bytes  vs base          │
+JSON-256                        6.192Gi ± 42%    6.059Gi ± 48%  ~ (p=0.741 n=30)
+
+         │ /tmp/wsA-gate3-pooled-baseline.out │ /tmp/wsA-gate3-pooled-numa.out  │
+         │           peak-VM-bytes            │ peak-VM-bytes  vs base          │
+JSON-256                        7.384Gi ± 37%   7.270Gi ± 42%  ~ (p=0.741 n=30)
+
+         │ /tmp/wsA-gate3-pooled-baseline.out │      /tmp/wsA-gate3-pooled-numa.out       │
+         │      stack-bytes-from-system       │ stack-bytes-from-system  vs base          │
+JSON-256                         17.14Mi ± 2%              17.62Mi ± 3%  ~ (p=0.114 n=30)
+
+         │ /tmp/wsA-gate3-pooled-baseline.out │  /tmp/wsA-gate3-pooled-numa.out   │
+         │          user+sys-sec/op           │ user+sys-sec/op  vs base          │
+JSON-256                          179.6m ± 7%      170.4m ± 10%  ~ (p=0.382 n=30)

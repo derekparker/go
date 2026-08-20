@@ -1,0 +1,54 @@
+pkg: golang.org/x/benchmarks
+goos: linux
+goarch: amd64
+                             │ /tmp/pb/wsA-cand1/wsA-cand1-armB-recorded.out │ /tmp/pb/wsA-cand1/wsA-cand1-armC-recorded.out │
+                             │                    sec/op                     │        sec/op          vs base                │
+Garbage/benchmem-MB=4096-128                                    2.558m ± 17%             1.801m ± 9%  -29.61% (p=0.000 n=15)
+
+                             │ /tmp/pb/wsA-cand1/wsA-cand1-armB-recorded.out │ /tmp/pb/wsA-cand1/wsA-cand1-armC-recorded.out │
+                             │             GC-bytes-from-system              │  GC-bytes-from-system   vs base               │
+Garbage/benchmem-MB=4096-128                                    100.2Mi ± 2%             105.8Mi ± 2%  +5.65% (p=0.001 n=15)
+
+                             │ /tmp/pb/wsA-cand1/wsA-cand1-armB-recorded.out │ /tmp/pb/wsA-cand1/wsA-cand1-armC-recorded.out │
+                             │                  STW-sec/GC                   │      STW-sec/GC        vs base                │
+Garbage/benchmem-MB=4096-128                                    6.126m ± 26%            4.847m ± 21%  -20.89% (p=0.045 n=15)
+
+                             │ /tmp/pb/wsA-cand1/wsA-cand1-armB-recorded.out │ /tmp/pb/wsA-cand1/wsA-cand1-armC-recorded.out │
+                             │                  STW-sec/op                   │      STW-sec/op        vs base                │
+Garbage/benchmem-MB=4096-128                                   12.252µ ± 24%            9.208µ ± 22%  -24.84% (p=0.037 n=15)
+
+                             │ /tmp/pb/wsA-cand1/wsA-cand1-armB-recorded.out │ /tmp/pb/wsA-cand1/wsA-cand1-armC-recorded.out │
+                             │              allocated-bytes/op               │   allocated-bytes/op    vs base               │
+Garbage/benchmem-MB=4096-128                                    5.933Mi ± 0%             5.932Mi ± 0%  -0.01% (p=0.000 n=15)
+
+                             │ /tmp/pb/wsA-cand1/wsA-cand1-armB-recorded.out │ /tmp/pb/wsA-cand1/wsA-cand1-armC-recorded.out │
+                             │                   allocs/op                   │       allocs/op         vs base               │
+Garbage/benchmem-MB=4096-128                                     145.2k ± 0%              145.2k ± 0%  -0.00% (p=0.000 n=15)
+
+                             │ /tmp/pb/wsA-cand1/wsA-cand1-armB-recorded.out │ /tmp/pb/wsA-cand1/wsA-cand1-armC-recorded.out │
+                             │               bytes-from-system               │   bytes-from-system     vs base               │
+Garbage/benchmem-MB=4096-128                                    6.960Gi ± 2%             7.390Gi ± 3%  +6.18% (p=0.002 n=15)
+
+                             │ /tmp/pb/wsA-cand1/wsA-cand1-armB-recorded.out │ /tmp/pb/wsA-cand1/wsA-cand1-armC-recorded.out │
+                             │            heap-bytes-from-system             │ heap-bytes-from-system  vs base               │
+Garbage/benchmem-MB=4096-128                                    6.713Gi ± 2%             7.132Gi ± 3%  +6.23% (p=0.002 n=15)
+
+                             │ /tmp/pb/wsA-cand1/wsA-cand1-armB-recorded.out │ /tmp/pb/wsA-cand1/wsA-cand1-armC-recorded.out  │
+                             │            other-bytes-from-system            │ other-bytes-from-system  vs base               │
+Garbage/benchmem-MB=4096-128                                    145.6Mi ± 1%              152.0Mi ± 3%  +4.39% (p=0.002 n=15)
+
+                             │ /tmp/pb/wsA-cand1/wsA-cand1-armB-recorded.out │ /tmp/pb/wsA-cand1/wsA-cand1-armC-recorded.out │
+                             │                peak-RSS-bytes                 │     peak-RSS-bytes      vs base               │
+Garbage/benchmem-MB=4096-128                                    6.914Gi ± 2%             7.343Gi ± 3%  +6.21% (p=0.001 n=15)
+
+                             │ /tmp/pb/wsA-cand1/wsA-cand1-armB-recorded.out │ /tmp/pb/wsA-cand1/wsA-cand1-armC-recorded.out │
+                             │                 peak-VM-bytes                 │     peak-VM-bytes       vs base               │
+Garbage/benchmem-MB=4096-128                                    8.157Gi ± 1%             8.544Gi ± 3%  +4.74% (p=0.003 n=15)
+
+                             │ /tmp/pb/wsA-cand1/wsA-cand1-armB-recorded.out │ /tmp/pb/wsA-cand1/wsA-cand1-armC-recorded.out │
+                             │            stack-bytes-from-system            │   stack-bytes-from-system    vs base          │
+Garbage/benchmem-MB=4096-128                                    8.719Mi ± 2%                  8.812Mi ± 2%  ~ (p=0.328 n=15)
+
+                             │ /tmp/pb/wsA-cand1/wsA-cand1-armB-recorded.out │ /tmp/pb/wsA-cand1/wsA-cand1-armC-recorded.out │
+                             │                user+sys-sec/op                │    user+sys-sec/op     vs base                │
+Garbage/benchmem-MB=4096-128                                     157.7m ± 4%             128.3m ± 3%  -18.62% (p=0.000 n=15)

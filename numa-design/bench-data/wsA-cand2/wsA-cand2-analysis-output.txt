@@ -1,0 +1,25 @@
+n rounds: A=10 B=10 C=10
+round medians (ns) A: ['3030.8ms', '3091.6ms', '3124.7ms', '3102.8ms', '3171.5ms', '3126.4ms', '3116.0ms', '3181.3ms', '3269.2ms', '3099.2ms']
+round medians (ns) B: ['3672.9ms', '3953.1ms', '3954.7ms', '3847.0ms', '3843.2ms', '3981.8ms', '3708.5ms', '4296.9ms', '4292.7ms', '3891.4ms']
+round medians (ns) C: ['3171.3ms', '3205.9ms', '3131.1ms', '3116.9ms', '3087.9ms', '3246.4ms', '3352.7ms', '3027.1ms', '3082.9ms', '3375.4ms']
+arm A: ICC=0.984 (MSB=3.331e+16 MSW=6.760e+13), effective_n=10.1 (raw n_cycles=80, n_rounds=10)
+arm B: ICC=0.813 (MSB=3.226e+17 MSW=9.034e+15), effective_n=12.0 (raw n_cycles=80, n_rounds=10)
+arm C: ICC=0.994 (MSB=1.095e+17 MSW=8.815e+13), effective_n=10.1 (raw n_cycles=80, n_rounds=10)
+
+=== Primary: B vs C (round medians, exact/normal-approx Mann-Whitney U) ===
+B median-of-round-medians=3922.26ms  C median-of-round-medians=3151.21ms  rel=-19.66%
+U1=100.0 U2=0.0 p=0.0002  SIGNIFICANT
+CV: B=5.34% C=3.64%
+
+=== Secondary/context: A vs B ===
+A median=3120.34ms  B median=3922.26ms  rel(B vs A)=+25.70%
+U1=0.0 U2=100.0 p=0.0002  SIGNIFICANT
+
+=== C vs A (raw MWU, context) ===
+A median=3120.34ms  C median=3151.21ms  rel(C vs A)=+0.99%
+U1=41.0 U2=59.0 p=0.5205  not significant
+CV: A=2.05%
+
+Pooled round-level CV (B,C): 4.57%; achieved MDE at n=10, alpha=0.05, power=0.80: 5.72%
+n=10 point_estimate_C/A-1=+1.51% 95%CI=[-2.01%, +5.15%]
+Non-inferiority (upper bound <= +10%): PASS

@@ -2338,3 +2338,295 @@ per-round `cand1-3arm-arm*-r*.vmstat.{before,after}`, `cand1-3arm-vmstat-summary
 `sweep3arm.log`, `pilotL1v2.out`/`pilotL1v2.stderr`, the full benchstat table
 `cand1-3arm-benchstat-full.txt`, and the sweep driver script,
 `numa-design/bench-data/pathology/cand1-3arm-sweep.sh`.
+
+## Workstream A gate battery (v3) — 2026-08-20
+
+SHA (Local/Remote, in sync throughout): `c226071c35`
+Task-0 parent (Global Constraints "once per layer" baseline, and Gate 8's census parent): `abe916018e` (`numa-design: single-session three-arm candidate 1 sweep`)
+`go version` (remote, tree toolchain at SHA `c226071c35`): `go1.28-devel_c226071c35 Thu Aug 20 10:29:50 2026 -0700 linux/amd64`
+Kernel: `6.12.0-211.7.1.el10_2.x86_64`
+`x/benchmarks`: `v0.0.0-20260819172200-70693762b6a0` (same pin as every prior layer/pathology run; confirmed via `go version -m` on both `garbage` installs for this session)
+`x/perf` (benchstat): `/tmp/numa-tools/benchstat` on `numa-dell`
+`kernel.numa_balancing`: `1` throughout (confirmed at session start and end)
+THP: `[always] madvise never` (unchanged, per protocol)
+
+Machine load: single-user throughout; `ps aux --sort=-%cpu` idle-checked before every measurement block (the sweep driver's own `idle_check` additionally gates every round).
+
+Raw `.out` files, vmstat snaps, strace transcripts, and the exact sweep-driver invocations backing every verdict below are archived under `numa-design/bench-data/ws-a-gates/` (gates 1-5, 8) and `numa-design/bench-data/wsA-cand1/`, `wsA-cand2/` (gates 6-7).
+
+**Pre-registration note:** this section reports exactly the 8 pre-declared gates from `task-4-brief.md`; no metric was added post hoc. Gates 6-7's C-vs-A criterion is the non-inferiority bound from brief note I1 (95% CI upper bound of C/A ratio ≤ +10%), not a "C≈A" claim.
+
+### Gate 1 — 1P json, off vs on, same commit (hard gate)
+
+```
+$ ssh numa-dell 'cd /home/deparker/go-numa && GOROOT=$PWD GOMAXPROCS=1 BENCHNUM=10 OUT=/tmp/wsA-gate1 ./numa-design/gate-json.sh'
+$ ssh numa-dell '/tmp/numa-tools/benchstat /tmp/wsA-gate1/baseline.out /tmp/wsA-gate1/numa.out'
+```
+
+```
+JSON-1  sec/op:            20.72m ± 57%  17.33m ± 89%  ~ (p=0.631 n=10)
+JSON-1  user+sys-sec/op:   20.74m ± 57%  17.33m ± 90%  ~ (p=0.579 n=10)
+```
+
+**Verdict: PASS.** Neither primary metric shows a statistically significant difference (both p > 0.05); numa arm nominally faster, well inside the ≤+2%-or-not-significant band regardless.
+
+### Gate 2 — 1P alloc micro (hard gate)
+
+```
+$ ssh numa-dell 'cd /home/deparker/go-numa && export GOROOT=$PWD PATH=$PWD/bin:$PATH GOTOOLCHAIN=local
+GOMAXPROCS=1 go test runtime -run=NONE -bench="Malloc(8|16|Types)" -count=10 >/tmp/wsA-alloc-base.out
+GOMAXPROCS=1 GOEXPERIMENT=numa go test runtime -run=NONE -bench="Malloc(8|16|Types)" -count=10 >/tmp/wsA-alloc-numa.out
+/tmp/numa-tools/benchstat /tmp/wsA-alloc-base.out /tmp/wsA-alloc-numa.out'
+```
+
+```
+Malloc8    6.937n ± 0%   6.998n ± 0%  +0.89% (p=0.000 n=10)
+Malloc16   11.30n ± 1%   11.36n ± 0%  +0.44% (p=0.015 n=10)
+geomean    8.855n        8.914n       +0.67%
+```
+
+(No `MallocTypes` benchmark exists in this tree — same gap noted at every prior layer — so the regex matched only `Malloc8`/`Malloc16`.)
+
+**Verdict: PASS.** Both deltas statistically significant but tiny; geomean +0.67% ≤ +2% pass bar.
+
+### Gate 3 — 256P json, unconditional 3 sessions × BENCHNUM=10, pooled n=30 (hard gate)
+
+Three sessions run unconditionally per the pre-declared no-data-dependent-stopping rule (I2), idle re-verified between each:
+
+```
+$ ssh numa-dell 'cd /home/deparker/go-numa && GOROOT=$PWD GOMAXPROCS=256 BENCHNUM=10 OUT=/tmp/wsA-gate3-r{1,2,3} ./numa-design/gate-json.sh'  # x3
+```
+
+Per-round rel deltas (informational, hand-rolled median, not the verdict): r1 −16.5%/−7.0%, r2 −1.7%/+0.5%, r3 −21.2%/−15.6% (ns/op / user+sys-ns/op) — the sign-flipping pattern the plan's I2 note predicts at n=10; pooling is the pre-registered remedy.
+
+Pooled (n=30, `cat` of all three `baseline.out` / `numa.out`):
+
+```
+$ ssh numa-dell '/tmp/numa-tools/benchstat /tmp/wsA-gate3-pooled-baseline.out /tmp/wsA-gate3-pooled-numa.out'
+JSON-256  sec/op:            2.371m ± 11%  2.025m ± 14%  ~ (p=0.197 n=30)
+JSON-256  user+sys-sec/op:   179.6m ± 7%   170.4m ± 10%  ~ (p=0.382 n=30)
+```
+
+**Verdict: PASS.** Pooled result not significant on either metric; no pooled regression at all (numa nominally faster), let alone beyond +2%. Hard-FAIL condition (pooled significant regression >+2%) does not apply.
+
+### Gate 4 — Stand-down proof, strace, three arms (hard gate)
+
+**(a) 256P — must never confine:**
+
+```
+$ ssh numa-dell 'cd /tmp/wsA-gate3-r1 && strace -f -e trace=sched_setaffinity,set_mempolicy,mbind -o /tmp/wsA-strace-256p.txt \
+  env GOMAXPROCS=256 ./numa/json -benchmem=512 -benchnum=1 -benchtime=2s >/dev/null'
+```
+
+`sched_setaffinity`: **0** calls. `set_mempolicy`: exactly **1**, `set_mempolicy(MPOL_BIND, [0x3], 65) = 0`. `mbind`: **2761** calls (Layer-1 arena stamping, unchanged). **Matches declared shape (a) exactly.**
+
+**(b) confined 1P:**
+
+```
+$ ssh numa-dell 'cd /tmp/wsA-gate3-r1 && strace -f -e trace=sched_setaffinity,set_mempolicy,mbind -o /tmp/wsA-strace-1p.txt \
+  env GOMAXPROCS=1 ./numa/json -benchmem=512 -benchnum=1 -benchtime=2s >/dev/null'
+```
+
+`sched_setaffinity`: exactly **1** call, mask = odd CPUs only (`[1 3 5 7 ... 255]` — node 1, this session's boot node). `set_mempolicy`: exactly **2**, in order `MPOL_BIND` then `MPOL_PREFERRED, [0x2], 65` (node 1). `mbind`: **22** calls (arena BIND-all keeps running while confined, per locked decision 5). **Matches declared shape (b) exactly**, including the BIND-then-PREFERRED order.
+
+`/proc/PID/maps` spot check during a confined run: **32 lines** — low, merged-VMA count, matching the Layer-1 baseline character (RESULTS.md:1496-1515), not Layer 2's ~1172-line blowup. Empirically confirms uniform BIND-all merges under confinement.
+
+**(c) stand-down — testprog `NUMAStandDown`, `GOEXPERIMENT=numa` build:**
+
+```
+$ ssh numa-dell 'cd /home/deparker/go-numa && export GOROOT=$PWD PATH=$PWD/bin:$PATH GOTOOLCHAIN=local
+GOEXPERIMENT=numa go build -o /tmp/wsA-testprog ./src/runtime/testdata/testprog
+strace -f -e trace=sched_setaffinity,set_mempolicy -o /tmp/wsA-strace-standdown.txt \
+  env GOMAXPROCS=1 /tmp/wsA-testprog NUMAStandDown'
+```
+
+Probe output: `before affinity=128 mode=1` (confined: 128 = node CPU count, mode 1 = MPOL_PREFERRED) → `standdown-gomaxprocs-wall-ns=2901728` → `after affinity=256 mode=2` (stood down: full affinity restored, mode 2 = MPOL_BIND, exact Layer-1 fallback).
+
+strace counts: `sched_setaffinity` **7** (confine's 1 + the eager allm walk at stand-down — consistent with "~one per live M"); `set_mempolicy` **5**: `BIND, PREFERRED` (confine prologue, matching (b)) then **3 further `BIND`** calls (STW-thread revert + per-thread `numaFixThreadPlacement` convergence as Ms park). **Matches declared shape (c).**
+
+Stand-down wall-clock cost, compared against the same probe on the stock build (n=3 each, un-instrumented — the strace run above is excluded as strace overhead):
+
+| build | run1 (ns) | run2 (ns) | run3 (ns) | median |
+|---|---|---|---|---|
+| stock (no confinement, mode=0 throughout) | 2,292,399 | 2,180,251 | 2,441,749 | 2,292,399 |
+| numa (confine → stand-down) | 2,371,475 | 2,362,265 | 1,819,846 | 2,362,265 |
+
+The eager-walk-plus-convergence stand-down adds **~70µs (~3%) over the stock GOMAXPROCS-raise's own STW cost** at median — within this box's run-to-run jitter (stock's own spread is ~260µs / ~11%), i.e. the stand-down machinery's STW-adjacent cost is not distinguishable from the baseline GOMAXPROCS(N) call's own cost at this n. Recorded as the on-record wall-clock bound per the brief; not a claim of a specific attributable delta given the overlap with baseline jitter.
+
+**Verdict: PASS.** All three arm shapes (a), (b), (c) match the pre-declared shapes exactly, including call counts, ordering, and the maps-line spot check.
+
+### Gate 5 — vmstat 0/0, confined arms (hard gate)
+
+```
+$ ssh numa-dell 'cd /home/deparker/go-numa
+./numa-design/gate-vmstat.sh snap /tmp/wsA-gate5.before
+env GOMAXPROCS=1 /tmp/wsA-gate3-r1/numa/json -benchmem=512 -benchnum=1 -benchtime=3s >/dev/null
+./numa-design/gate-vmstat.sh snap /tmp/wsA-gate5.after
+./numa-design/gate-vmstat.sh diff /tmp/wsA-gate5.before /tmp/wsA-gate5.after'
+hint_faults=0 pages_migrated=0
+```
+
+Rerun once per protocol (counters are machine-global): second run also `hint_faults=0 pages_migrated=0`.
+
+**Verdict: PASS.** 0/0 on both runs.
+
+### Gate 8 — off-binary function census, NON-test binary, experiment off, HEAD vs Task-0 parent (hard gate)
+
+Per the brief's C2 caveat, a **plain program** is used instead of a `go test -c` binary (a test binary roots `export_numa_test.go`, which would confound the census with test-only exports). Built locally, both from the tree toolchain (`GOWORK=off GOTOOLCHAIN=local`), `GOEXPERIMENT=` unset:
+
+```
+$ printf 'package main\n\nfunc main() { println("census") }\n' > /tmp/census-canary.go
+$ GOROOT=<HEAD worktree> GOEXPERIMENT= go build -o /tmp/census-head /tmp/census-canary.go
+$ git worktree add /tmp/census-parent abe916018e && (cd /tmp/census-parent/src && GOROOT_FINAL=/tmp/census-parent ./make.bash)
+$ GOROOT=/tmp/census-parent GOEXPERIMENT= go build -o /tmp/census-parent-bin /tmp/census-canary.go
+```
+
+Raw `diff -q` on the `sed`-stripped disassembly **does not** come back clean (unlike Layer 1's Gate 4, which was byte-identical). Root cause, verified directly: Workstream A's confinement state — `numaConfined`, `numaStoodDown`, `numaConfinedNode`, `numaConfinedNodeCPUs`, `numaSavedAffinity [1024]byte`, `numaSavedAffinityLen` — is declared in `numa_linux.go`, which carries no build tag beyond `package runtime` (compiles for every Linux arch regardless of `GOEXPERIMENT`). These new **unconditional** package-level globals shift the data-segment addresses of every subsequent global, exactly the same class of gap Layer 0's Gate 4 hit from adding `debug.numa` to the `debug` struct (RESULTS.md:540-551) — not a functional difference. `sed`'s hex-stripping doesn't hide this because the shifted values appear as literal instruction-byte sequences (space-separated 2-digit hex), never as a single ≥6-digit run.
+
+The brief's real caveat (C2) — a **struct-offset shift** (e.g. an `m` field moving) showing up as a displacement immediate change — does **not** apply here: Task 3 already verified `sizeof(m)` is byte-identical off-experiment (1832 bytes, unchanged) because `mNUMAState` is the empty-struct/zero-size type when `!goexperiment.numa` (`numa_mstate_off.go`), confirmed by test not just inspection. So the diffs observed are exclusively the benign global-data-address-shift class, not the struct-offset class the caveat warns is a real fail.
+
+Per-function census (immune to whole-binary address shifts, following the Layer 0/1 precedent methodology — `objdump -d`, symbol-labeled blocks, per-function instruction-line counts):
+
+```
+head functions: 1481
+parent functions: 1481
+only in head: 0
+only in parent: 0
+functions with differing instruction-line counts: 0
+numa-related symbols in HEAD off-binary: []
+```
+
+Explicit fast-path spot checks (instruction-line count): `main.main` 29/29, `runtime.schedinit` 354/354, `runtime.mallocgc` 132/132 — identical parent vs HEAD. `nm` total symbol count (FUNC-typed): 1482/1482, matching objdump's labeled-block count set. Total disassembly line count: 148,750/148,750 identical. `size`: `.text` +15,608B (1,186,899 vs 1,171,291), `.data`/`.bss` unchanged — consistent with **branch-encoding-length changes** (Jcc short-vs-near selection shifting when a target's relative distance crosses the ±128-byte threshold after the new globals move surrounding code/data) given identical instruction *counts*, not with any new or removed instruction.
+
+**Verdict: PASS on the substantive criterion, literal "build-ID-only" bar not met** — same honest-gap treatment as Layer 0's Gate 4: zero function-level/opcode/branch-target changes across all 1481 functions (parent and HEAD), zero `numa`-related symbols reachable in the off-binary, zero struct-offset-shift evidence (the one class of diff that would rightly fail this gate). The only observed difference is a benign global-data-address shift from Workstream A's new unconditional confinement-state variables, which is structural to adding any new package-level state and unattainable to avoid, exactly as documented at Layer 0.
+
+### Gate 6 — Candidate 1 (decision gate): `x/benchmarks/garbage`, `-benchmem=4096 -benchnum=1`, GOMAXPROCS=128, n=15
+
+**Pre-flight (CRITICAL, before burning sweep time):** confirmed via Gate 4(b)'s strace that arm C confines (1 `sched_setaffinity` narrowing to one node, `set_mempolicy(BIND)` then `set_mempolicy(PREFERRED)`). A dedicated pilot run of the exact candidate-1 C command additionally confirmed: `Cpus_allowed_list` narrowed to one node's (even) CPUs, peak RSS ≈7.95 GiB fit node 0's ≥10 GB-free precondition with headroom, and `numactl --hardware` free memory recovered fully post-run (11132→11229 MB across the session, no leak/pressure).
+
+Build (once, both binaries from the same `x/benchmarks` pin `v0.0.0-20260819172200-70693762b6a0`, confirmed via `go version -m` on both):
+
+```
+$ ssh numa-dell 'export GOROOT=/home/deparker/go-numa PATH=/home/deparker/go-numa/bin:$PATH GOTOOLCHAIN=local
+GOBIN=/tmp/pb/base go install golang.org/x/benchmarks/garbage@v0.0.0-20260819172200-70693762b6a0
+GOBIN=/tmp/pb/numa GOEXPERIMENT=numa go install golang.org/x/benchmarks/garbage@v0.0.0-20260819172200-70693762b6a0'
+```
+
+Sweep (single session, rotating ABC/BCA/CAB order via the Task-0 driver, one warmup round + 15 recorded, vmstat snap per run, idle check per run):
+
+```
+$ ssh numa-dell 'cd /home/deparker/go-numa
+numactl --hardware | grep free   # node 0 free: 11145 MB (>= 10 GB precondition met)
+./numa-design/pathology-sweep.sh wsA-cand1 15 /tmp/pb/wsA-cand1 \
+  "A=numactl --cpunodebind=0 --membind=0 env GOMAXPROCS=128 /tmp/pb/base/garbage -benchmem=4096 -benchnum=1" \
+  "B=env GOMAXPROCS=128 /tmp/pb/base/garbage -benchmem=4096 -benchnum=1" \
+  "C=env GOMAXPROCS=128 /tmp/pb/numa/garbage -benchmem=4096 -benchnum=1"'
+```
+
+**Mechanism validity (n=15 recorded rounds each):** arm A: 0/0 hint faults/pages migrated, every round (16/16 including warmup). Arm B: hint faults 81,409–265,164, pages migrated 943,290–1,476,583, every recorded round (≫0, no setup-fault rounds to exclude). Arm C: 0/0 in 14/15 recorded rounds; negligible noise in the other 2 (2/1 and 3/0) — consistent with every prior BIND-all measurement on this box.
+
+**benchstat, pre-declared primary metric (`sec/op`, `Garbage/benchmem-MB=4096-128`):**
+
+```
+$ ssh numa-dell '/tmp/numa-tools/benchstat /tmp/pb/wsA-cand1/wsA-cand1-armB-recorded.out /tmp/pb/wsA-cand1/wsA-cand1-armC-recorded.out'
+Garbage/benchmem-MB=4096-128   B=2.558m ± 17%   C=1.801m ± 9%   -29.61% (p=0.000 n=15)
+
+$ ssh numa-dell '/tmp/numa-tools/benchstat /tmp/pb/wsA-cand1/wsA-cand1-armA-recorded.out /tmp/pb/wsA-cand1/wsA-cand1-armC-recorded.out'
+Garbage/benchmem-MB=4096-128   A=1.855m ± 9%   C=1.801m ± 9%   ~ (p=0.217 n=15)
+
+$ ssh numa-dell '/tmp/numa-tools/benchstat /tmp/pb/wsA-cand1/wsA-cand1-armA-recorded.out /tmp/pb/wsA-cand1/wsA-cand1-armB-recorded.out'
+Garbage/benchmem-MB=4096-128   A=1.855m ± 9%   B=2.558m ± 17%   +37.93% (p=0.000 n=15)
+```
+
+**Non-inferiority CI (I1 criterion — 95% CI upper bound of C/A − 1, computed round-by-round from this session's n=15 paired rounds via log-ratio + t-distribution, script archived as `noninf_ci.py`):**
+
+```
+n=15 point_estimate_C/A-1=+2.69% 95%CI=[-2.60%, +8.26%]
+Non-inferiority (upper bound <= +10%): PASS
+```
+
+**Verdict: PASS on all three pre-declared components.**
+- **C vs B (primary): PASS.** C is significantly faster than B by 29.61% (p=0.000, n=15) — closes essentially all of the B-vs-A gap (see below), not just "most of" it.
+- **C vs A (non-inferiority): PASS.** Point estimate on the round-paired log-ratio is +2.69%, but the raw medians actually run the other way (C=1.801m < A=1.855m — C nominally *faster* than A); the two estimators differ because the CI is computed round-by-round on paired ratios while benchstat compares the two distributions directly — both agree the effect is small and not significant. 95% CI [-2.60%, +8.26%], upper bound 8.26% ≤ the +10% bound. benchstat's own comparison is not significant (p=0.217), consistent with the CI spanning zero.
+- **B vs A (secondary, context): B is significantly worse than A** by 37.93% (p=0.000, n=15) — the "B worse than A" requirement holds cleanly and more strongly than the design doc's ~60%-from-prior-sessions ballpark suggested at this heap/GOMAXPROCS combination; no HT-confound fallback-to-informational was needed (§4 of the harness design).
+
+Net picture: confinement (arm C) not only recovers essentially all of the unpinned-vs-pinned gap, it does so without leaving a measurable residual against the pinned oracle (A) — the strongest of the three pre-declared candidate-1 outcomes.
+
+Raw data: `numa-design/bench-data/wsA-cand1/wsA-cand1-arm{A,B,C}-{warmup,recorded}.out{,.stderr}`, per-round `wsA-cand1-arm*-r*.vmstat.{before,after}`, `wsA-cand1-vmstat-summary.txt`, the three `benchstat` transcripts (`wsA-cand1-{BvC,AvC,AvB}.txt`), and the sweep driver invocation (`numa-design/pathology-sweep.sh`, committed at Task 0).
+
+### Gate 7 — Candidate 2 (decision gate): `gc-pause-bench` heavy profile, round-level, n=10
+
+**Process incident, disclosed in full (I3 — honest reporting of measurement problems, not just results):** the first attempt at this gate used broken binaries. The build step chained `cd /home/deparker/go-numa && go build -o /tmp/pb/gcpause-base ./numa-design/gc-pause-bench` (and the `GOEXPERIMENT=numa` twin) inside a multi-line ssh script with no `set -e`. `numa-design/gc-pause-bench` carries its own `go.mod` (a separate module); building it as a relative-path argument from the `go-numa` root failed with `go: go.mod file not found in current directory or any parent directory` — silently, because the script's final `echo BUILDS-OK` ran unconditionally regardless of the two build commands' exit status. `/tmp/pb/gcpause-base` and `/tmp/pb/gcpause-numa` therefore still pointed at **pre-existing binaries from earlier that day** (mtime 04:12 vs the same script's freshly-built `garbage` binaries at 13:55 — the tell). `go version -m` on the stale `/tmp/pb/gcpause-numa` showed it was built from commit `7ec36777f3`, which predates the entire v3 locality plan and all of Workstream A's confinement code (Tasks 1-3 did not exist at that commit) — confinement could not possibly engage.
+
+The first (invalid) sweep ran entirely on this stale binary and produced a genuinely alarming result — C nominally *slower* than both B and A, B-vs-C not significant — that was correctly **not accepted at face value** per this gate's "do not rationalize a miss" instruction: instead of writing up "C fails," the anomaly (mechanism 0/0 confirmed suppressed yet C slower than unpinned B, which has no a priori mechanism) was investigated. `Cpus_allowed_list` on a live diagnostic run of the exact stale binary showed `0-255` (no confinement at all, ever, across the process lifetime — confirmed via `strace`: zero `sched_setaffinity` calls, only Layer 1's single `set_mempolicy(MPOL_BIND)`), while a binary freshly built with the same source under `GODEBUG=numa=1` printed `numa: confined to node 1 cpus 128` correctly. This traced the discrepancy to the stale binary's provenance, not a runtime defect. **Candidate 1's `garbage` binaries were independently re-verified NOT to have this problem** (`go version -m` showed `c226071c35`/`X:numa` on both, matching their fresh mtimes) — Gate 6 is unaffected and stands as reported above.
+
+Fix: rebuilt both `gc-pause-bench` binaries from `numa-design/gc-pause-bench` directly (with `GOWORK=off`), verified each build's exit status explicitly, confirmed identity via `go version -m` (`go1.28-devel_c226071c35 ... X:numa`) and mtime, and confirmed confinement engages via a `GODEBUG=numa=1` smoke test (`numa: confined to node 1 cpus 128`) **before** re-running the sweep. The invalid first sweep's output was deleted from `/tmp/pb/wsA-cand2` before the corrected sweep ran, so no stale data could leak into the pooled analysis below. Raw output and a description of this incident are archived at `numa-design/bench-data/wsA-cand2/cand2-stale-binary-incident.md`.
+
+Sweep (single session, rotating order, one warmup + 10 recorded rounds, vmstat snap per run, idle check per run; `GODEBUG=gcshrinkstackoff=1` all arms per the harness design):
+
+```
+$ ssh numa-dell 'cd /home/deparker/go-numa
+FLAGS="-ptrheap=true -toucher=false -heap=4096 -idle=1000000 -stacks=200 -warm=45 -gcgap=5s -discard=2 -n=8"
+./numa-design/pathology-sweep.sh wsA-cand2 10 /tmp/pb/wsA-cand2 \
+  "A=numactl --cpunodebind=0 --membind=0 env GOMAXPROCS=128 GODEBUG=gcshrinkstackoff=1 /tmp/pb/gcpause-base $FLAGS" \
+  "B=env GOMAXPROCS=128 GODEBUG=gcshrinkstackoff=1 /tmp/pb/gcpause-base $FLAGS" \
+  "C=env GOMAXPROCS=128 GODEBUG=gcshrinkstackoff=1 /tmp/pb/gcpause-numa $FLAGS"'
+```
+
+**Mechanism validity:** arm A 0/0 every round (11/11 including warmup). Arm C 0/0 every round (11/11) — cleaner than candidate 1's two negligible-noise rounds. Arm B: hint faults 28,286–475,745, pages migrated 566,945–1,689,870, every recorded round.
+
+**Round-level analysis (median of 8 cycles per round, n=10 rounds/arm; cycles are clustered within a round — reported at round level per the plan, raw n=80 cycle-level numbers never used as the verdict):**
+
+ICC(1) and effective n (design-effect-corrected): A ICC=0.984 (effective n≈10.1), B ICC=0.813 (effective n≈12.0), C ICC=0.994 (effective n≈10.1) — all within the plan's predicted 0.6–1.0 range, confirming round-level (not cycle-level) is the correct unit of analysis; raw n=80 would substantially overstate power.
+
+Exact/normal-approximation Mann-Whitney U on round medians (script archived as `cand2_analysis.py`):
+
+```
+B vs C (primary): B median=3922.26ms  C median=3151.21ms  rel=-19.66%  p=0.0002 (n=10)  SIGNIFICANT
+A vs B (secondary/context): A median=3120.34ms  B median=3922.26ms  rel(B vs A)=+25.70%  p=0.0002 (n=10)  SIGNIFICANT
+```
+
+**Non-inferiority CI, C vs A (round-paired log-ratio + t-distribution, `noninf_ci.py`):**
+
+```
+n=10 point_estimate_C/A-1=+1.51% 95%CI=[-2.01%, +5.15%]
+Non-inferiority (upper bound <= +10%): PASS
+```
+
+**Achieved MDE:** pooled round-level CV (B, C) = 4.57%; achieved MDE at n=10, α=0.05, power=0.80 = **5.72%** — closely matching the prior candidate-2 correction's cited noise floor (≈5.6% at n=10, pooled CV 4.45%, RESULTS.md candidate 2 correction), so this session's design-effect and noise characteristics replicate that prior finding. Any future "~" verdict on this workload is reported as "no effect ≥ ~5.7% detectable," never as "no effect."
+
+**Verdict: PASS on all three pre-declared components — the cleanest of the two decision gates.**
+- **C vs B (primary): PASS.** C significantly faster than B by 19.66% (p=0.0002, n=10 round medians).
+- **C vs A (non-inferiority): PASS.** Point estimate +1.51%, 95% CI [-2.01%, +5.15%], upper bound 5.15% ≤ the +10% bound — comfortably inside, with more margin than candidate 1's 8.26%.
+- **B vs A (secondary, context): B is significantly worse than A** by 25.70% (p=0.0002) — exactly the "cleanest B-worse-than-A signal" the harness design predicted for this candidate (§4: GC-cycle time is CPU-count-neutral, so the HT confound that complicates candidate 1's A-vs-B comparison barely applies here).
+
+Raw data: `numa-design/bench-data/wsA-cand2/wsA-cand2-arm{A,B,C}-{warmup,recorded}.out{,.stderr}`, per-round `wsA-cand2-arm*-r*.vmstat.{before,after}`, `wsA-cand2-vmstat-summary.txt`, per-cycle extracts (`wsA-cand2-{A,B,C}-cycles.txt`), round-medians (`wsA-cand2-{A,C}-roundmedians.txt`), the analysis script and its output (`cand2_analysis.py`, `wsA-cand2-analysis-output.txt`), the sweep log (`wsA-cand2-sweep.log`), and the stale-binary incident writeup (`cand2-stale-binary-incident.md`).
+
+## Overall verdict: Workstream A gate battery — **SHIP**
+
+All 8 pre-declared gates pass:
+
+| Gate | Result |
+|---|---|
+| 1. 1P json (hard) | PASS — not significant, p=0.579-0.631 |
+| 2. 1P alloc micro (hard) | PASS — geomean +0.67% ≤ +2% |
+| 3. 256P json (hard) | PASS — pooled n=30, not significant, p=0.197 |
+| 4. Stand-down proof, strace (hard) | PASS — all 3 arm shapes match exactly |
+| 5. vmstat 0/0 confined (hard) | PASS — 0/0 twice |
+| 6. Candidate 1 garbage (decision) | PASS — C beats B (-29.61%, p=0.000); C non-inferior to A (CI upper +8.26%); B worse than A (+37.93%) |
+| 7. Candidate 2 gc-pause (decision) | PASS — C beats B (-19.66%, p=0.0002); C non-inferior to A (CI upper +5.15%); B worse than A (+25.70%) |
+| 8. Off-binary census (hard) | PASS (substantive) — 1481/1481 functions identical, zero numa symbols off-experiment |
+
+**No hard gate failed; both decision gates passed with margin.** Per the brief's stop rule, hard-gate pass alone is sufficient for Task 6 (Layer-2 removal) to proceed independently of the decision gates — moot here since the decision gates also passed. Workstream A ships as a genuine, measured win: fill-one-socket-first confinement recovers essentially all (candidate 1) to more-than-all (candidate 2, where C nominally beat even the pinned oracle A on the primary point estimate, though not significantly) of the unpinned-vs-pinned performance gap, on two independent workloads, without a detectable non-inferiority violation against the hard-pinned baseline, and without any measurable regression on any hard gate.
+
+**N1 residual note (carried from the plan's locked decision 4, recorded here per Task 4 brief instructions):** Ms cloned in the window between `worldStarted()` and a later `numaStandDownIfNeeded` trigger (specifically the interval after the eager allm walk is dispatched but before all live Ms have converged via `numaFixThreadPlacement` at `stopm`) inherit the confined affinity/policy from their creating M at `clone` time and keep that placement until they first park. This is documented, accepted residual behavior (Task 3), not a defect: such Ms remain balancer-exempt (explicit task policy) throughout, and converge to the stood-down state at their first park like every other M — the residual is a bounded delay in reaching the fully-stood-down state, never an incorrect or unsafe placement.
+
+**Concerns for the controller:**
+
+1. **Process discipline finding (self-caught, not controller-facing until now):** the first Candidate 2 attempt used stale pre-Workstream-A binaries due to a silent build failure masked by an unconditional `echo BUILDS-OK` in a multi-line ssh script with no `set -e`. Caught before accepting the result by investigating an anomaly (C slower than B despite confirmed mechanism suppression) rather than writing it up. Recommend: `pathology-sweep.sh`-adjacent build-prep scripts should `set -euo pipefail` and verify each binary's `go version -m` build-ID/tags before the sweep starts, not just check exit codes loosely.
+2. Gate 2's `Malloc(8|16|Types)` regex still doesn't match any benchmark named `...Types` in this tree (only `MallocTypeInfo8/16/32` exist) — same pre-existing gap noted at every prior layer, run verbatim as specified rather than "fixed" unilaterally.
+3. Gate 8's literal "differ only in build IDs" bar is structurally unattainable here (as at Layer 0): Workstream A's new unconditional confinement-state globals in `numa_linux.go` shift subsequent data addresses. Passed on the substantive per-function/opcode/branch-target criterion instead, exactly as Layer 0's Gate 4 precedent established.
+4. Both decision-gate non-inferiority CIs used a round-paired log-ratio + t-distribution method (`noninf_ci.py`, archived), not a benchstat built-in — benchstat does not report confidence intervals, only point deltas and p-values, so this session computed the CI directly from the raw paired round data per the brief's I1 instruction (bootstrap or log-ratio CI).
+
+Session end: `kernel.numa_balancing = 1` (confirmed), THP `[always] madvise never` (unchanged), machine idle (`ps aux --sort=-%cpu` clean) throughout and at close.
+

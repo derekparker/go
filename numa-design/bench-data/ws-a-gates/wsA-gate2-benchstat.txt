@@ -1,0 +1,9 @@
+goos: linux
+goarch: amd64
+pkg: runtime
+cpu: INTEL(R) XEON(R) PLATINUM 8592+
+         │ /tmp/wsA-alloc-base.out │      /tmp/wsA-alloc-numa.out       │
+         │         sec/op          │   sec/op     vs base               │
+Malloc8                6.937n ± 0%   6.998n ± 0%  +0.89% (p=0.000 n=10)
+Malloc16               11.30n ± 1%   11.36n ± 0%  +0.44% (p=0.015 n=10)
+geomean                8.855n        8.914n       +0.67%
