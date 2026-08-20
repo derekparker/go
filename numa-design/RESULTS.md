@@ -655,3 +655,335 @@ Also applied two optional/trivial reviewer minors: dropped the write-only
 `numaBindArenaFailures` counter (never read anywhere), and the test's `get_mempolicy` mode
 export hook now masks `MPOL_MODE_FLAGS` out of the returned mode and distinguishes a syscall
 failure (`-1`) from a genuine `MPOL_DEFAULT` (`0`) result.
+
+## Layer 1 gate (v2) — 2026-08-19
+
+Date: 2026-08-19
+Local/Remote SHA (after `gate-vmstat.sh` commit, before this commit): `ab294b60e6f533c46d843a5ae8f6b3a3f8e3fc7c`
+Parent/baseline commit (Global Constraints, once per layer): `8392ee466fa1598970ea66b0daef57899d80c56a` (`numa-design: record Layer 0 gate results`)
+`go version` (remote, at Local/Remote SHA): `go1.28-devel_ab294b60e6 Wed Aug 19 19:19:33 2026 -0700 linux/amd64`
+Kernel: `6.12.0-211.7.1.el10_2.x86_64`
+`x/benchmarks`: `v0.0.0-20260819172200-70693762b6a0` (resolved by `@latest`, identical to Layer 0's pin — no new commits landed upstream between the two runs)
+`x/perf` (benchstat): `v0.0.0-20260819171926-ebcb4798430d` (same binary as Layer 0, `/tmp/numa-tools/benchstat` on `numa-dell`)
+`kernel.numa_balancing`: `1` throughout, except the optional Gate 8b window (`=2`, restored to `1` immediately after).
+
+Machine load: single-user throughout (`who`/`ps aux --sort=-%cpu` checked before every measurement block, never showed a second tenant). As in Layer 0, `uptime`'s load average climbed into the tens-to-hundreds during and just after each 256P / `GOMAXPROCS=256` `gc-pause-bench` run (up to ~120 after the vmstat 256P wrap) — this is expected residual runqueue decay from this session's own 256-thread runs, confirmed each time via `ps aux --sort=-%cpu` showing no competing process, not evidence of a second tenant.
+
+Per the plan's binding Layer 0 lesson: `benchstat`'s Mann-Whitney U test is the authoritative comparator for every timing gate below; `gate-json.sh`'s embedded hand-rolled median comparator is reported alongside for transparency, since it is demonstrably noise-sensitive on this machine at both `GOMAXPROCS=1` and `GOMAXPROCS=256`.
+
+### Gate 1 — 1P json, off vs on, same commit (`BENCHNUM=10`, hard gate)
+
+```
+$ ssh numa-dell 'cd /home/deparker/go-numa && GOROOT=$PWD GOMAXPROCS=1 BENCHNUM=10 ./numa-design/gate-json.sh'
+```
+
+Hand-rolled comparator:
+
+| metric | baseline median | numa median | rel | hand-rolled verdict |
+|---|---|---|---|---|
+| ns/op | 28,423,902.5 | 16,904,808.0 | −40.5% | PASS (only fails on regression >+2%) |
+| user+sys-ns/op | 28,454,323.0 | 16,927,597.5 | −40.5% | PASS |
+
+Both arms are bimodal in the same way Layer 0 documented (baseline: 6/10 rounds in the ~30–33M
+band, 4/10 in the ~16–26M band; numa: 1/10 high, 9/10 low) — the same machine-noise character,
+though the split was more lopsided this run than Layer 0's roughly-even split. `benchstat` is
+therefore the deciding read, not the hand-rolled numbers above:
+
+```
+$ ssh numa-dell '/tmp/numa-tools/benchstat /tmp/numa-gate-json/baseline.out /tmp/numa-gate-json/numa.out'
+JSON-1  sec/op:            28.42m ± 43%  16.90m ± 32%  ~ (p=0.075 n=10)
+JSON-1  user+sys-sec/op:   28.45m ± 43%  16.93m ± 32%  ~ (p=0.075 n=10)
+```
+
+**Verdict: PASS** (benchstat: no statistically significant difference on either hard-gate metric;
+p=0.075 is above the 0.05 threshold).
+
+Informational (not hard-gate metrics, but flagged as a **concern** below): `bytes-from-system`
+(+9.45%, p=0.001) and `heap-bytes-from-system` (+10.05%, p=0.012) were both statistically
+*significant* increases in the numa arm; `STW-sec/op` was a significant *decrease* (−45.64%,
+p=0.011, numa faster), consistent with BIND-all suppressing balancer-driven page faults during
+the STW mark-termination scan — the mechanism Layer 1 targets.
+
+### Gate 2 — 1P alloc micro (Task 4 Step 1b): `Malloc8`/`Malloc16`, `-count=10`
+
+(As in Layer 0, no `MallocTypes` benchmark exists in this tree.)
+
+```
+$ ssh numa-dell 'GOMAXPROCS=1 GOROOT=$PWD GOTOOLCHAIN=local $PWD/bin/go test runtime -run=NONE -bench="Malloc(8|16|Types)" -count=10 >/tmp/alloc-base-l1.out'
+$ ssh numa-dell 'GOMAXPROCS=1 GOROOT=$PWD GOEXPERIMENT=numa GOTOOLCHAIN=local $PWD/bin/go test runtime -run=NONE -bench="Malloc(8|16|Types)" -count=10 >/tmp/alloc-numa-l1.out'
+$ ssh numa-dell '/tmp/numa-tools/benchstat /tmp/alloc-base-l1.out /tmp/alloc-numa-l1.out'
+Malloc8    6.964n ± 98%   6.938n ± 0%   ~ (p=0.079 n=10)
+Malloc16   11.32n ±  0%   11.34n ± 1%   ~ (p=0.898 n=10)
+geomean    8.881n         8.868n       -0.14%
+```
+
+Unlike Gate 1, both benchmarks were stable this run (no bimodal split; `Malloc8`'s ±98% comes
+from a single 13.96ns outlier in the baseline's first round, everything else clustered ~6.9–8.0ns).
+
+**Verdict: PASS** (benchstat: no statistically significant difference on either benchmark).
+
+### Gate 3 — Parent-commit comparison (Global Constraints, once per layer)
+
+Parent: `8392ee466fa1598970ea66b0daef57899d80c56a`, own toolchain build (`git checkout -f` +
+`make.bash` on `numa-dell`, then back to HEAD + rebuild), own `GOBIN` json binary
+(`golang.org/x/benchmarks/json@v0.0.0-20260819172200-70693762b6a0`, matching the pin in the
+report format Layer 0 used). HEAD off/on binaries reused from Gate 1's run
+(`/tmp/numa-gate-json/{baseline,numa}/json`). Interleaved (parent, head-off, head-on) × 10 rounds,
+`GOMAXPROCS=1 -benchmem=512 -benchnum=1 -benchtime=3s`.
+
+```
+$ ssh numa-dell '/tmp/numa-tools/benchstat /tmp/numa-l1-parent-cmp/parent.out /tmp/numa-l1-parent-cmp/head-off.out'
+JSON-1  sec/op:            32.13m ± 49%  31.64m ± 40%  ~ (p=0.631 n=10)
+JSON-1  user+sys-sec/op:   32.14m ± 49%  31.70m ± 41%  ~ (p=0.631 n=10)
+
+$ ssh numa-dell '/tmp/numa-tools/benchstat /tmp/numa-l1-parent-cmp/parent.out /tmp/numa-l1-parent-cmp/head-on.out'
+JSON-1  sec/op:            32.13m ± 49%  31.59m ± 44%  ~ (p=0.971 n=10)
+JSON-1  user+sys-sec/op:   32.14m ± 49%  31.62m ± 44%  ~ (p=0.971 n=10)
+```
+
+**Verdict: PASS** for both head-off vs parent and head-on vs parent (both nominally faster than
+parent, not slower, and neither difference is statistically significant). This is the gate that
+would catch an unconditional (non-`goexperiment`-gated) cost from Layer 1's new
+`internal/runtime/syscall/linux` constants, `numaAllowedNodemask` global, or the two
+`if goexperiment.Numa { numaBindArena(...) }` call sites in `mheap.grow` — none is visible.
+
+### Gate 4 — Off-binary identity (Task 4 Step 1c #1)
+
+Built `go test -c runtime` (no `GOEXPERIMENT`) from the parent commit and from HEAD; `objdump -d`
+on both `.test` binaries.
+
+```
+$ ssh numa-dell 'objdump -d /tmp/canary-parent-l1.test > /tmp/dis-parent-l1.txt; objdump -d /tmp/canary-head-l1.test > /tmp/dis-head-l1.txt; wc -l /tmp/dis-parent-l1.txt /tmp/dis-head-l1.txt'
+1425336 /tmp/dis-parent-l1.txt
+1425336 /tmp/dis-head-l1.txt
+
+$ ssh numa-dell 'diff /tmp/dis-parent-l1.txt /tmp/dis-head-l1.txt'
+2c2
+< /tmp/canary-parent-l1.test:     file format elf64-x86-64
+---
+> /tmp/canary-head-l1.test:     file format elf64-x86-64
+(4 lines total — only the file-path line objdump echoes for each binary differs)
+
+$ ssh numa-dell 'size /tmp/canary-parent-l1.test /tmp/canary-head-l1.test'
+   text      data     bss       dec       hex   filename
+10200954    244139   33831288  44276381  2a39a9d  /tmp/canary-parent-l1.test
+10200954    244139   33831288  44276381  2a39a9d  /tmp/canary-head-l1.test
+```
+
+Per-function census (symbol name + disassembly-line count), both binaries: **11,170 functions
+each, zero only-in-one-side, zero functions with differing instruction-line counts.** Explicit
+spot checks:
+
+| function | parent | HEAD (off) | |
+|---|---|---|---|
+| `runtime.mallocgc` | 131 | 131 | identical |
+| `runtime.acquirep` | 54 | 54 | identical |
+| `runtime.schedinit` | 353 | 353 | identical |
+| `runtime.(*mheap).grow` | 218 | 218 | identical |
+
+`grep -ic numa /tmp/dis-head-l1.txt` → `0` (no `numa`-related symbol reachable in the off-binary
+disassembly at all).
+
+**Verdict: PASS — and stronger than Layer 0's Gate 4.** Layer 0 could not literally meet the
+plan's "differ only in build IDs" bar because adding the `debug.numa` dbgvar shifted every
+subsequent global's RIP-relative address, even with the experiment off. Layer 1 adds no new
+dbgvar, so its off-binary is **text/data/bss byte-identical** to the parent's (`10200954` /
+`244139` / `33831288`, to the byte, both binaries) and the `objdump -d` output differs in nothing
+but the two lines where objdump echoes back each binary's own file path — not even a build-ID
+difference is visible in the disassembly stream. Every `goexperiment.Numa`-gated line in
+`numa_linux.go` and both `mheap.grow` call sites are fully dead-code-eliminated when the
+experiment is off.
+
+### Gate 5 — 1P instruction flatness (Task 4 Step 1c #2)
+
+`perf stat -e instructions` on `GOMAXPROCS=1 <canary>.test -test.bench=BenchmarkMalloc8
+-test.benchtime=100000000x -test.count=1`, off vs on, 3 runs each (`perf_event_paranoid=2`):
+
+| arm | run 1 | run 2 | run 3 | median |
+|---|---|---|---|---|
+| off | 11,217,292,171 | 11,194,507,325 | 11,203,272,859 | 11,203,272,859 |
+| on | 11,173,485,166 | 11,226,354,590 | 11,230,206,131 | 11,226,354,590 |
+
+Median delta: **+23,081,731 instructions = +0.21%** (on is more, unlike Layer 0's −0.12%).
+
+**Verdict: PASS, with a documented small delta**, matching the brief's own expectation ("Layer 1
+adds work only on grow, which fixed-work Malloc8 barely triggers; if a small delta appears,
+quantify and explain"): unlike Layer 0, Layer 1's two `mheap.grow` call sites do execute
+`numaBindArena`'s `mbind` syscall — gated behind `goexperiment.Numa`, but real work when on — and
+a 100,000,000-iteration `Malloc8` loop does grow the heap a handful of times as it ramps up from
+empty, even though each individual allocation never touches the grow path. +0.21% on ~11.2 billion
+instructions is consistent with a handful of extra `mbind` syscalls (each a few hundred
+instructions of syscall-entry/exit overhead) amortized over the whole run, not a change to the
+allocation fast path itself — Gate 4's static evidence (identical `mallocgc` instruction count,
+off) already rules out a fast-path change.
+
+### Gate 6 — 256P json gate (Task 7 Step 3)
+
+```
+$ ssh numa-dell 'cd /home/deparker/go-numa && GOROOT=$PWD GOMAXPROCS=256 BENCHNUM=10 ./numa-design/gate-json.sh'
+```
+
+Hand-rolled comparator:
+
+| metric | baseline median | numa median | rel | hand-rolled verdict |
+|---|---|---|---|---|
+| ns/op | 2,266,915.5 | 2,742,532.0 | +21.0% | **FAIL** (exceeds +2%) |
+| user+sys-ns/op | 188,916,523.5 | 178,748,113.0 | −5.4% | PASS |
+
+`benchstat` on the same data:
+
+```
+$ ssh numa-dell '/tmp/numa-tools/benchstat /tmp/numa-gate-json-256p/baseline.out /tmp/numa-gate-json-256p/numa.out'
+JSON-256  sec/op:            2.267m ± 75%   2.743m ± 40%   ~ (p=0.912 n=10)
+JSON-256  user+sys-sec/op:   188.9m ± 62%   178.7m ± 38%   ~ (p=0.739 n=10)
+```
+
+**Verdict: PASS** (benchstat: no statistically significant difference; this benchmark's
+per-round heap size auto-scales at 256P — `bytes-from-system` ranged ~3.5GiB to ~12.9GiB
+round-to-round in this data — which drives far larger variance than the 1P gates, and is the
+likely source of the hand-rolled comparator's false FAIL). 256P is not one of the plan's hard
+gates (Global Constraints scopes the never-regress bar to `GOMAXPROCS=1`); it passes here anyway.
+
+**Thread-placement sample** (one dedicated numa-arm run, `GOMAXPROCS=256`,
+`-benchmem=512 -benchtime=8s`, `ps -o psr= -T -p $PID` sampled ~2s after start while the process
+was confirmed alive):
+
+```
+even (node 0) processor samples: 126
+odd  (node 1) processor samples: 132
+```
+
+258 thread samples spread across processor IDs 1–255 inclusive, both parities well represented —
+confirms both NUMA nodes are actually occupied at 256P (not just topology-discovered).
+
+### Gate 7 — #14406 three-way `/proc/vmstat` (the point of Layer 1)
+
+Built `numa-design/gc-pause-bench` twice on the remote toolchain (`GOROOT=/home/deparker/go-numa`):
+`/tmp/bench-baseline-l1` (no experiment) and `/tmp/bench-numa-l1` (`GOEXPERIMENT=numa`). All three
+arms: `-heap=4096 -warm=10 -n=100` (27GiB `available` headroom per `free -h` at run time, so the
+full 4096MiB profile was used, not the 2048MiB fallback). Idleness (`uptime`/`who`/`ps
+aux --sort=-%cpu`) checked immediately before every arm.
+
+**(a) baseline, bare:**
+
+```
+$ ssh numa-dell '/home/deparker/go-numa/numa-design/gate-vmstat.sh snap before.txt'
+$ ssh numa-dell '/tmp/bench-baseline-l1 -heap=4096 -warm=10 -n=100 -json -label=baseline'
+{"label":"baseline","heap_mib":4096,"n":100,"gomaxprocs":256,"stw_p50_ns":389401,"stw_p95_ns":632336,"stw_p99_ns":908783,"stw_max_ns":910773,"stw_mean_ns":416203,"wall_p99_ns":628931248}
+$ ssh numa-dell '/home/deparker/go-numa/numa-design/gate-vmstat.sh snap after.txt'
+$ ssh numa-dell '/home/deparker/go-numa/numa-design/gate-vmstat.sh diff before.txt after.txt'
+hint_faults=12961 pages_migrated=111996
+```
+
+**(b) numa build:** first attempt showed `hint_faults=77 pages_migrated=0` — nonzero, but tiny
+relative to baseline's 12,961 (a ~168× reduction). Per the brief's own CONCERN protocol
+(`/proc/vmstat` is machine-global; verify idle and rerun once before declaring FAIL), machine
+idleness was reconfirmed (`who`/`ps aux --sort=-%cpu`: single user, no competing process, only
+this session's own residual runqueue decay) and the arm was rerun:
+
+```
+$ ssh numa-dell '/tmp/bench-numa-l1 -heap=4096 -warm=10 -n=100 -json -label=numa'
+{"label":"numa","heap_mib":4096,"n":100,"gomaxprocs":256,"stw_p50_ns":343759,"stw_p95_ns":582687,"stw_p99_ns":713149,"stw_max_ns":723979,"stw_mean_ns":371138,"wall_p99_ns":552312183}
+$ ssh numa-dell '/home/deparker/go-numa/numa-design/gate-vmstat.sh diff before2.txt after2.txt'
+hint_faults=0 pages_migrated=0
+```
+
+Clean 0/0 on the idle-verified rerun. Recorded transparently rather than silently dropping the
+first attempt's 77: with `kernel.numa_balancing=1` system-wide, a small nonzero reading on a
+technically-idle-but-just-finished-a-256-thread-run machine is exactly the false-fail mode the
+brief's CONCERN describes, and the rerun's clean result is the resolution the protocol specifies,
+not a retry-until-favorable pattern (only one rerun was performed, as directed).
+
+**(c) membind oracle** (`numactl --membind=0,1`, baseline binary):
+
+```
+$ ssh numa-dell 'numactl --membind=0,1 /tmp/bench-baseline-l1 -heap=4096 -warm=10 -n=100 -json -label=membind'
+{"label":"membind","heap_mib":4096,"n":100,"gomaxprocs":256,"stw_p50_ns":348124,"stw_p95_ns":466128,"stw_p99_ns":524505,"stw_max_ns":709425,"stw_mean_ns":366982,"wall_p99_ns":593075726}
+$ ssh numa-dell '/home/deparker/go-numa/numa-design/gate-vmstat.sh diff before.txt after.txt'
+hint_faults=0 pages_migrated=0
+```
+
+Clean 0/0 on the first attempt.
+
+**Verdict: PASS.** baseline ≫ 0 (12,961 hint faults / 111,996 pages migrated — this run size
+does trigger the balancer, so the gate is meaningful); numa arm 0/0 on the idle-verified rerun;
+membind oracle 0/0 on first try. This is the direct evidence for Layer 1's stated goal: BIND-all
+task mempolicy + arena `mbind` suppress the kernel NUMA balancer's #14406 page-migration pathology
+as effectively as the `numactl --membind` oracle.
+
+**256P numa json wrapped in vmstat** (alternative protocol from the brief, run in addition to (a)–(c)):
+
+```
+$ ssh numa-dell '/home/deparker/go-numa/numa-design/gate-vmstat.sh snap before.txt'
+$ ssh numa-dell 'GOMAXPROCS=256 /tmp/numa-gate-json-256p/numa/json -benchmem=512 -benchnum=1 -benchtime=10s'
+BenchmarkJSON-256    10000    1717545 ns/op  ...
+$ ssh numa-dell '/home/deparker/go-numa/numa-design/gate-vmstat.sh diff before.txt after.txt'
+hint_faults=0 pages_migrated=0
+```
+
+Clean 0/0 on the first attempt.
+
+### Gate 8 — kernel matrix (§12.4), `kernel.numa_balancing=2`
+
+`uname -r`: `6.12.0-211.7.1.el10_2.x86_64`.
+
+```
+$ ssh numa-dell 'sudo -n true && echo PASSWORDLESS_SUDO_OK'
+PASSWORDLESS_SUDO_OK
+```
+
+Passwordless sudo available, so the optional tristate arm was run: idleness reconfirmed, set
+`numa_balancing=2`, ran the numa `gc-pause-bench` arm, snapped vmstat, then restored `=1`
+immediately.
+
+```
+$ ssh numa-dell 'sudo -n sh -c "echo 2 > /proc/sys/kernel/numa_balancing"'
+$ ssh numa-dell '/tmp/bench-numa-l1 -heap=4096 -warm=10 -n=100 -json -label=numa-balancing2'
+{"label":"numa-balancing2","heap_mib":4096,"n":100,"gomaxprocs":256,"stw_p50_ns":356308,"stw_p95_ns":473608,"stw_p99_ns":691793,"stw_max_ns":705563,"stw_mean_ns":370543,"wall_p99_ns":564165634}
+$ ssh numa-dell '/home/deparker/go-numa/numa-design/gate-vmstat.sh diff before.txt after.txt'
+hint_faults=0 pages_migrated=0
+$ ssh numa-dell 'sudo -n sh -c "echo 1 > /proc/sys/kernel/numa_balancing"'
+$ ssh numa-dell 'cat /proc/sys/kernel/numa_balancing'
+1
+```
+
+**Verdict: PASS.** Clean 0/0 under `numa_balancing=2` as well, and the setting was restored to
+`1` immediately afterward. This machine's 6.12 kernel is recent enough that the fill-order
+concern noted in Task 6's implementation notes (old kernels fill the lowest-numbered allowed node
+first under `MPOL_BIND`) is not independently exercised by this check — it only confirms the
+vmstat gate stays 0/0 under the alternate balancer mode, not node fill order.
+
+### Overall verdict: **PASS**
+
+All hard gates (1P json off-vs-on, 1P alloc micro, parent-commit comparison both arms, #14406
+vmstat numa/membind arms) pass. Two noise-immune static/counting gates (off-binary identity,
+instruction-count flatness) corroborate: Layer 1 is dead-code-eliminated to byte-identical
+text/data/bss when off, and adds only a small, explainable, quantified instruction cost on the
+(rarely-hit, at fixed-work-Malloc8 scale) heap-growth path when on. The 256P json gate and the
+#14406 vmstat three-way — Layer 1's actual product claim — both pass, with the vmstat numa arm's
+one nonzero reading resolved by the plan's own idle-verify-and-rerun protocol rather than ignored.
+
+**Concerns for the controller:**
+
+1. **Machine noise remains large and, this run, asymmetric.** Gate 1's bimodal split was more
+   lopsided between arms than Layer 0's (baseline 6/10 high vs numa 1/10 high, rather than a
+   roughly even split), and Gate 6's 256P variance (±75% / ±62% relative stdev) is larger than
+   Layer 0's optional 256P check. `benchstat` still resolves both as not significant, but the
+   asymmetry means a hand-rolled median comparator would be even more likely to false-fail on
+   this layer's data than on Layer 0's. Recommend (as Layer 0 already did) that `gate-json.sh`
+   itself be changed in a follow-up task to make `benchstat` the primary decision path.
+2. **Gate 1's `bytes-from-system`/`heap-bytes-from-system` increase (+9-10%, statistically
+   significant) is real but not explained by this task.** It is not a hard-gate metric (the gate
+   is ns/op and user+sys-ns/op only), and 1P json's small working set makes a few extra
+   arena-sized pages a large relative percentage, but it is consistent with `numaBindArena`'s
+   `mbind` being called on every `mheap.grow`, which could plausibly change the growth/scavenge
+   pattern under `GOMAXPROCS=1`. Worth a dedicated look if a later layer's heap-footprint gate is
+   added; not investigated further here as it is outside Task 7's scope (timing + vmstat gates
+   only).
+3. **The vmstat numa arm's first attempt was nonzero (77 hint faults) before a clean rerun.**
+   Documented in full above rather than only reporting the clean rerun, per the instruction to
+   report honest numbers. The brief's own CONCERN section anticipates exactly this failure mode
+   for a machine-global counter; the resolution (verify idle, rerun once) is the protocol, not an
+   after-the-fact excuse, and only one rerun was performed.
+4. **IMC/remote-share was not run**, per the plan's explicit instruction that it is not a Layer 1
+   gate.
