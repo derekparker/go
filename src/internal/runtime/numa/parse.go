@@ -21,6 +21,17 @@ const maxCPUs = 8192
 // range. If data contains more ids than fit in dst, ParseNodeList returns
 // an error.
 func ParseNodeList(dst []int32, data []byte) (int, error) {
+	n, _, err := parseList(dst, data, MaxNodes)
+	return n, err
+}
+
+// ParseNodeListTruncated is like ParseNodeList, but additionally reports
+// whether any node id >= MaxNodes was present in data and silently
+// skipped. ReadTopology uses this to detect a host with more NUMA nodes
+// than Topology can represent, so callers can stand down NUMA
+// optimizations instead of silently treating a >MaxNodes host as if it
+// only had nodes [0, MaxNodes).
+func ParseNodeListTruncated(dst []int32, data []byte) (n int, truncated bool, err error) {
 	return parseList(dst, data, MaxNodes)
 }
 
@@ -31,7 +42,8 @@ func ParseNodeList(dst []int32, data []byte) (int, error) {
 // CPU ids >= 8192 are silently skipped rather than written out of range. If
 // data contains more ids than fit in dst, ParseCPUList returns an error.
 func ParseCPUList(dst []int32, data []byte) (int, error) {
-	return parseList(dst, data, maxCPUs)
+	n, _, err := parseList(dst, data, maxCPUs)
+	return n, err
 }
 
 // parseList parses a Linux kernel "list format" value: a comma-separated
@@ -39,8 +51,64 @@ func ParseCPUList(dst []int32, data []byte) (int, error) {
 // ("2-7"), terminated by a single trailing newline. See cpuset(7) "Formats"
 // for the format this mirrors (used throughout /sys/devices/system/node).
 //
-// Ids >= limit are skipped rather than written to dst.
-func parseList(dst []int32, data []byte, limit int32) (int, error) {
+// Ids >= limit are skipped rather than written to dst; truncated reports
+// whether any id was actually skipped for that reason.
+func parseList(dst []int32, data []byte, limit int32) (n int, truncated bool, err error) {
+	i := bytealg.IndexByte(data, '\n')
+	if i < 0 {
+		return 0, false, errMalformedFile
+	}
+	data = data[:i]
+
+	for len(data) > 0 {
+		var tok []byte
+		if i := bytealg.IndexByte(data, ','); i >= 0 {
+			tok = data[:i]
+			data = data[i+1:]
+		} else {
+			tok = data
+			data = nil
+		}
+
+		start, end, err := parseRange(tok)
+		if err != nil {
+			return 0, false, err
+		}
+
+		for v := start; v <= end; v++ {
+			if v >= int64(limit) {
+				// Ids only increase within a range, and ranges
+				// are visited in increasing order, so nothing
+				// past this point (in this range or any later
+				// token) can be in range either... except a
+				// later token isn't guaranteed to be
+				// increasing, so only stop this range, not
+				// the whole list.
+				truncated = true
+				break
+			}
+			if n >= len(dst) {
+				return 0, false, errBufferTooSmall
+			}
+			dst[n] = int32(v)
+			n++
+		}
+	}
+
+	return n, truncated, nil
+}
+
+// parseCPUListIntoNodeMap parses a Linux kernel list-format value naming
+// CPU ids (see ParseCPUList) and, for each CPU id in data, records nodeID
+// directly in dst[id]. It returns the number of CPU ids recorded.
+//
+// This exists so ReadTopology can fill Topology.CPUToNode without an
+// intermediate []int32 buffer sized to hold every CPU id (up to maxCPUs
+// entries, 32 KiB as int32 on the stack): ReadTopology runs during
+// schedinit on m0's g0, which has a much smaller stack budget than that.
+//
+// CPU ids >= maxCPUs are silently skipped, matching ParseCPUList.
+func parseCPUListIntoNodeMap(dst *[maxCPUs]int8, nodeID int8, data []byte) (int, error) {
 	i := bytealg.IndexByte(data, '\n')
 	if i < 0 {
 		return 0, errMalformedFile
@@ -64,20 +132,11 @@ func parseList(dst []int32, data []byte, limit int32) (int, error) {
 		}
 
 		for v := start; v <= end; v++ {
-			if v >= int64(limit) {
-				// Ids only increase within a range, and ranges
-				// are visited in increasing order, so nothing
-				// past this point (in this range or any later
-				// token) can be in range either... except a
-				// later token isn't guaranteed to be
-				// increasing, so only stop this range, not
-				// the whole list.
+			if v >= maxCPUs {
+				// See parseList: only this range stops early.
 				break
 			}
-			if n >= len(dst) {
-				return 0, errBufferTooSmall
-			}
-			dst[n] = int32(v)
+			dst[v] = nodeID
 			n++
 		}
 	}

@@ -2,13 +2,16 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-package numa
+package numa_test
 
-import "testing"
+import (
+	"internal/runtime/numa"
+	"testing"
+)
 
 func TestParseNodeList(t *testing.T) {
-	var buf [MaxNodes]int32
-	n, err := ParseNodeList(buf[:], []byte("0-1\n"))
+	var buf [numa.MaxNodes]int32
+	n, err := numa.ParseNodeList(buf[:], []byte("0-1\n"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -20,15 +23,15 @@ func TestParseNodeList(t *testing.T) {
 func TestParseCPUListInterleave(t *testing.T) {
 	// Shape of numa-dell node0: even CPUs. Use a short fixture.
 	var buf [16]int32
-	n, err := ParseCPUList(buf[:], []byte("0,2,4,6\n"))
+	n, err := numa.ParseCPUList(buf[:], []byte("0,2,4,6\n"))
 	if err != nil || n != 4 || buf[1] != 2 {
 		t.Fatalf("%v %v", buf[:n], err)
 	}
 }
 
 func TestParseNodeListSingle(t *testing.T) {
-	var buf [MaxNodes]int32
-	n, err := ParseNodeList(buf[:], []byte("0\n"))
+	var buf [numa.MaxNodes]int32
+	n, err := numa.ParseNodeList(buf[:], []byte("0\n"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -38,8 +41,8 @@ func TestParseNodeListSingle(t *testing.T) {
 }
 
 func TestParseNodeListMultiRange(t *testing.T) {
-	var buf [MaxNodes]int32
-	n, err := ParseNodeList(buf[:], []byte("0-1,3-4\n"))
+	var buf [numa.MaxNodes]int32
+	n, err := numa.ParseNodeList(buf[:], []byte("0-1,3-4\n"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -55,8 +58,8 @@ func TestParseNodeListMultiRange(t *testing.T) {
 }
 
 func TestParseNodeListEmpty(t *testing.T) {
-	var buf [MaxNodes]int32
-	n, err := ParseNodeList(buf[:], []byte("\n"))
+	var buf [numa.MaxNodes]int32
+	n, err := numa.ParseNodeList(buf[:], []byte("\n"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -68,8 +71,8 @@ func TestParseNodeListEmpty(t *testing.T) {
 func TestParseNodeListBoundsSkip(t *testing.T) {
 	// Node ids >= MaxNodes must be silently skipped, never written out
 	// of range.
-	var buf [MaxNodes]int32
-	n, err := ParseNodeList(buf[:], []byte("0,64,65,2\n"))
+	var buf [numa.MaxNodes]int32
+	n, err := numa.ParseNodeList(buf[:], []byte("0,64,65,2\n"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -87,7 +90,7 @@ func TestParseNodeListBoundsSkip(t *testing.T) {
 func TestParseCPUListBoundsSkip(t *testing.T) {
 	// CPU ids >= 8192 must be silently skipped.
 	var buf [16]int32
-	n, err := ParseCPUList(buf[:], []byte("0,8192,8193,5\n"))
+	n, err := numa.ParseCPUList(buf[:], []byte("0,8192,8193,5\n"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -105,15 +108,15 @@ func TestParseCPUListBoundsSkip(t *testing.T) {
 func TestParseListBoundsSkipHugeRange(t *testing.T) {
 	// A range extending far past the bound must not hang or overflow;
 	// it should stop recording once ids reach the limit.
-	var buf [MaxNodes]int32
-	n, err := ParseNodeList(buf[:], []byte("0-1000000000\n"))
+	var buf [numa.MaxNodes]int32
+	n, err := numa.ParseNodeList(buf[:], []byte("0-1000000000\n"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	if n != MaxNodes {
-		t.Fatalf("n=%d, want %d", n, MaxNodes)
+	if n != numa.MaxNodes {
+		t.Fatalf("n=%d, want %d", n, numa.MaxNodes)
 	}
-	for i := int32(0); i < MaxNodes; i++ {
+	for i := int32(0); i < numa.MaxNodes; i++ {
 		if buf[i] != i {
 			t.Errorf("buf[%d] = %d, want %d", i, buf[i], i)
 		}
@@ -122,9 +125,9 @@ func TestParseListBoundsSkipHugeRange(t *testing.T) {
 
 func TestParseListBufferTooSmall(t *testing.T) {
 	var buf [2]int32
-	_, err := ParseNodeList(buf[:], []byte("0-5\n"))
-	if err != errBufferTooSmall {
-		t.Fatalf("err = %v, want errBufferTooSmall", err)
+	_, err := numa.ParseNodeList(buf[:], []byte("0-5\n"))
+	if err != numa.ErrBufferTooSmall {
+		t.Fatalf("err = %v, want ErrBufferTooSmall", err)
 	}
 }
 
@@ -142,8 +145,8 @@ func TestParseListMalformed(t *testing.T) {
 	}
 	for _, tc := range tests {
 		t.Run(tc, func(t *testing.T) {
-			var buf [MaxNodes]int32
-			_, err := ParseNodeList(buf[:], []byte(tc))
+			var buf [numa.MaxNodes]int32
+			_, err := numa.ParseNodeList(buf[:], []byte(tc))
 			if err == nil {
 				t.Fatalf("ParseNodeList(%q) = nil error, want error", tc)
 			}
@@ -152,8 +155,8 @@ func TestParseListMalformed(t *testing.T) {
 }
 
 func TestParseDistance(t *testing.T) {
-	var buf [MaxNodes]uint8
-	n, err := ParseDistance(buf[:], []byte("10 20 20 30\n"))
+	var buf [numa.MaxNodes]uint8
+	n, err := numa.ParseDistance(buf[:], []byte("10 20 20 30\n"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -179,8 +182,8 @@ func TestParseDistanceMalformed(t *testing.T) {
 	}
 	for _, tc := range tests {
 		t.Run(tc, func(t *testing.T) {
-			var buf [MaxNodes]uint8
-			_, err := ParseDistance(buf[:], []byte(tc))
+			var buf [numa.MaxNodes]uint8
+			_, err := numa.ParseDistance(buf[:], []byte(tc))
 			if err == nil {
 				t.Fatalf("ParseDistance(%q) = nil error, want error", tc)
 			}
@@ -190,14 +193,14 @@ func TestParseDistanceMalformed(t *testing.T) {
 
 func TestParseDistanceBufferTooSmall(t *testing.T) {
 	var buf [2]uint8
-	_, err := ParseDistance(buf[:], []byte("10 20 30\n"))
-	if err != errBufferTooSmall {
-		t.Fatalf("err = %v, want errBufferTooSmall", err)
+	_, err := numa.ParseDistance(buf[:], []byte("10 20 30\n"))
+	if err != numa.ErrBufferTooSmall {
+		t.Fatalf("err = %v, want ErrBufferTooSmall", err)
 	}
 }
 
 func TestNodeOfCPU(t *testing.T) {
-	var top Topology
+	var top numa.Topology
 	for i := range top.CPUToNode {
 		top.CPUToNode[i] = -1
 	}
@@ -218,12 +221,12 @@ func TestNodeOfCPU(t *testing.T) {
 }
 
 func TestNodeAllowedAndAllowedNode(t *testing.T) {
-	var top Topology
+	var top numa.Topology
 	top.NumNodes = 3
 	top.NumAllowedNodes = 2
-	top.Nodes[0] = Node{ID: 0, NumCPUs: 4}
-	top.Nodes[1] = Node{ID: 2, NumCPUs: 4}
-	top.Nodes[2] = Node{ID: 5, NumCPUs: 0} // not in the allowed prefix
+	top.Nodes[0] = numa.Node{ID: 0, NumCPUs: 4}
+	top.Nodes[1] = numa.Node{ID: 2, NumCPUs: 4}
+	top.Nodes[2] = numa.Node{ID: 5, NumCPUs: 0} // not in the allowed prefix
 
 	if !top.NodeAllowed(0) {
 		t.Error("NodeAllowed(0) = false, want true")
@@ -252,6 +255,41 @@ func TestNodeAllowedAndAllowedNode(t *testing.T) {
 	}
 }
 
+func TestParseNodeListTruncated(t *testing.T) {
+	// Node ids >= MaxNodes must be silently skipped from dst, but must
+	// also be reported via the truncated bool so ReadTopology can stand
+	// down NUMA optimizations on a host with more nodes than Topology
+	// can represent.
+	var buf [numa.MaxNodes]int32
+	n, truncated, err := numa.ParseNodeListTruncated(buf[:], []byte("0,64,65,2\n"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := []int32{0, 2}
+	if n != len(want) {
+		t.Fatalf("n=%d buf=%v", n, buf[:n])
+	}
+	for i, w := range want {
+		if buf[i] != w {
+			t.Errorf("buf[%d] = %d, want %d", i, buf[i], w)
+		}
+	}
+	if !truncated {
+		t.Error("truncated = false, want true")
+	}
+}
+
+func TestParseNodeListTruncatedFalse(t *testing.T) {
+	var buf [numa.MaxNodes]int32
+	_, truncated, err := numa.ParseNodeListTruncated(buf[:], []byte("0-1,3-4\n"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if truncated {
+		t.Error("truncated = true, want false")
+	}
+}
+
 // TestReadTopology is a portable sanity check of ReadTopology: on Linux it
 // exercises the real sysfs reader, and on other platforms the stub. It only
 // asserts invariants that hold on every machine and platform, since this
@@ -259,10 +297,10 @@ func TestNodeAllowedAndAllowedNode(t *testing.T) {
 // single-node machines with no /sys/devices/system/node NUMA directories at
 // all).
 func TestReadTopology(t *testing.T) {
-	var top Topology
-	var scratch [ScratchSize]byte
-	err := ReadTopology(&top, scratch[:])
-	if err == ErrNoTopology {
+	var top numa.Topology
+	var scratch [numa.ScratchSize]byte
+	err := numa.ReadTopology(&top, scratch[:])
+	if err == numa.ErrNoTopology {
 		t.Skip("no NUMA topology available on this machine")
 	}
 	if err != nil {

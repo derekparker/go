@@ -36,7 +36,7 @@ const (
 	_MPOL_PREFERRED      = 1
 	_MPOL_BIND           = 2
 	_MPOL_F_MEMS_ALLOWED = 4      // get_mempolicy flag: return the kernel's allowed-node mask
-	_MPOL_MODE_FLAGS     = 0xc000 // MPOL_F_STATIC_NODES | MPOL_F_RELATIVE_NODES: optional flag bits get_mempolicy may OR into its returned mode
+	_MPOL_MODE_FLAGS     = 0xe000 // MPOL_F_NUMA_BALANCING (1<<13) | MPOL_F_RELATIVE_NODES (1<<14) | MPOL_F_STATIC_NODES (1<<15): optional flag bits get_mempolicy may OR into its returned mode
 
 	numaNodemaskBits = 8 * unsafe.Sizeof(uintptr(0))
 	// numaNodemaskWords is the number of native uintptr words needed to
@@ -154,8 +154,9 @@ func numaInitTopology() {
 // numaGetCPUNode wrapper -- see numa_linux_getcpu.go for why this file
 // never calls getcpu directly).
 //
-// It returns -1 if the experiment is off, if topology discovery found only
-// one (or zero) nodes, or if the getcpu syscall itself fails.
+// It returns 0 if the experiment is off or if topology discovery found
+// only one (or zero) nodes -- there is no other node it could report in
+// either case. It returns -1 only if the getcpu syscall itself fails.
 func numaCurrentNode() int32 {
 	if !goexperiment.Numa || numaTopology.NumNodes < 2 {
 		return 0
@@ -181,6 +182,15 @@ func numaCurrentNode() int32 {
 // syscall, leaving numaAllowedNodemask at zero so numaBindArena stays a
 // no-op too.
 //
+// Stand-down constraint: if topology discovery observed a node id >=
+// numa.MaxNodes (64) -- numaTopology.TruncatedNodes -- this host has more
+// NUMA nodes than Topology, and therefore this function's nodemask, can
+// represent. numaSetProcessBindAll returns immediately in that case too,
+// again before any syscall and leaving numaAllowedNodemask unpublished:
+// binding the process to only nodes 0-63 would silently exclude the
+// dropped nodes' memory from the policy, which is worse than leaving the
+// NUMA experiment inactive on this host.
+//
 // The allowed-node mask is read from the kernel itself
 // (get_mempolicy(MPOL_F_MEMS_ALLOWED)) rather than derived from
 // numaTopology: this automatically respects cpusets (e.g. a container's
@@ -198,6 +208,13 @@ func numaCurrentNode() int32 {
 // kernel rejected.
 func numaSetProcessBindAll() {
 	if numaTopology.NumNodes < 2 {
+		return
+	}
+	if numaTopology.TruncatedNodes {
+		// This host has NUMA nodes beyond what Topology (and this
+		// function's nodemask) can represent. Stand down rather than
+		// silently bind to a truncated subset of nodes -- see the
+		// doc comment above.
 		return
 	}
 

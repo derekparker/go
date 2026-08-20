@@ -49,6 +49,17 @@ type Topology struct {
 
 	Nodes [MaxNodes]Node
 
+	// TruncatedNodes reports whether the machine has more NUMA nodes
+	// than Topology can represent: at least one online node id was >=
+	// MaxNodes and was silently dropped from Nodes rather than written
+	// out of range (see ParseNodeListTruncated).
+	//
+	// Callers that bind process or memory policy to "every allowed
+	// node" must treat TruncatedNodes as a stand-down signal: binding
+	// to only the nodes Nodes could represent would silently exclude
+	// the dropped nodes' memory, which is worse than doing nothing.
+	TruncatedNodes bool
+
 	// Distance is the inter-node distance table, indexed by node index
 	// (not node id). It is not populated by ReadTopology: nothing
 	// consumes inter-node distance yet. Use ParseDistance directly on a

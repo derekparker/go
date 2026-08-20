@@ -44,6 +44,7 @@ func ReadTopology(t *Topology, scratch []byte) error {
 	}
 	t.NumNodes = 0
 	t.NumAllowedNodes = 0
+	t.TruncatedNodes = false
 
 	n, err := readSysfsFile([]byte(nodeDir+"online\x00"), scratch)
 	if err != nil {
@@ -51,12 +52,12 @@ func ReadTopology(t *Topology, scratch []byte) error {
 	}
 
 	var nodeIDs [MaxNodes]int32
-	numNodes, err := ParseNodeList(nodeIDs[:], scratch[:n])
+	numNodes, truncated, err := ParseNodeListTruncated(nodeIDs[:], scratch[:n])
 	if err != nil {
 		return err
 	}
+	t.TruncatedNodes = truncated
 
-	var cpuIDs [maxCPUs]int32
 	var pathBuf [64]byte
 	for i := 0; i < numNodes; i++ {
 		id := nodeIDs[i]
@@ -73,12 +74,9 @@ func ReadTopology(t *Topology, scratch []byte) error {
 			return err
 		}
 
-		numCPUs, err := ParseCPUList(cpuIDs[:], scratch[:cn])
+		numCPUs, err := parseCPUListIntoNodeMap(&t.CPUToNode, int8(id), scratch[:cn])
 		if err != nil {
 			return err
-		}
-		for _, cpu := range cpuIDs[:numCPUs] {
-			t.CPUToNode[cpu] = int8(id)
 		}
 		t.Nodes[i].NumCPUs = int32(numCPUs)
 	}

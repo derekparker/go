@@ -164,6 +164,10 @@ It is a comma-separated list of name=val pairs setting these named variables:
 	When set to 0 memory profiling is disabled.  Refer to the description of
 	MemProfileRate for the default value.
 
+	numa: setting numa=1 causes the runtime to print a line to standard error
+	tracing NUMA topology discovery and memory-policy calls performed under
+	GOEXPERIMENT=numa. It has no effect when that experiment is not enabled.
+
 	profstackdepth: profstackdepth=128 (the default) will set the maximum stack
 	depth used by all pprof profilers except for the CPU profiler to 128 frames.
 	Stack traces that exceed this limit will be truncated to the limit starting

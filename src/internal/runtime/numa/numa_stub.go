@@ -15,6 +15,7 @@ package numa
 func ReadTopology(t *Topology, scratch []byte) error {
 	t.NumNodes = 1
 	t.NumAllowedNodes = 1
+	t.TruncatedNodes = false
 	t.Nodes[0] = Node{ID: 0}
 	for i := range t.CPUToNode {
 		t.CPUToNode[i] = 0
