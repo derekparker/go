@@ -41,8 +41,17 @@ func numaConfineIfSmall(procs int32) {
 // site in startTheWorldWithSema is also gated on goexperiment.Numa, so
 // this body never runs with the experiment off; it exists purely so
 // proc.go, which is not Linux-specific, has something to call on every
-// GOOS.
-func numaStandDownIfNeeded(procs int32, customGOMAXPROCS bool) {
+// GOOS. Always reports no stand-down (false), so the guarded
+// numaStandDownWiden call at the end of startTheWorldWithSema never runs
+// either.
+func numaStandDownIfNeeded(procs int32, customGOMAXPROCS bool) bool {
+	return false
+}
+
+// numaStandDownWiden is a no-op on non-Linux platforms, for the same
+// reason as numaStandDownIfNeeded above; see numa_linux.go for the real
+// implementation.
+func numaStandDownWiden() {
 }
 
 // numaFixThreadPlacement is a no-op on non-Linux platforms: per-thread

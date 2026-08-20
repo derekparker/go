@@ -7,10 +7,14 @@
 package runtime
 
 // mNUMAState is empty when the experiment is off: m.numa (runtime2.go)
-// then costs zero bytes, so sizeof(m) and every field's offset are
-// byte-identical to a build with no NUMA field at all. See
-// numa_mstate_on.go for the experiment-on definition and the C2 layout
-// rule this split exists to satisfy.
+// then costs zero bytes at its (non-last) position in m, so sizeof(m)
+// and every field's offset -- verified by test, not just inspection --
+// are byte-identical to a build with no NUMA field at all. See
+// numa_mstate_on.go for the experiment-on definition, and m.numa's own
+// doc comment in runtime2.go for why the field is placed immediately
+// before self rather than last (a zero-size field placed last would
+// trigger the compiler's trailing-zero-size padding rule and grow
+// sizeof(m) even here).
 type mNUMAState struct{}
 
 func (s *mNUMAState) placementDone() bool { return false }

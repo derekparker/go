@@ -724,16 +724,24 @@ type m struct {
 	locksHeldLen int
 	locksHeld    [10]heldLockInfo
 
+	// numa is this M's NUMA stand-down convergence state (see
+	// numaFixThreadPlacement in numa_linux.go). Placed immediately
+	// BEFORE self, which stays the struct's actual last field: a
+	// zero-size field placed anywhere except last costs zero bytes and
+	// shifts nothing that follows it, whereas a zero-size field placed
+	// LAST triggers the compiler's trailing-zero-size padding rule
+	// (extra padding so &m.numa can never alias the next heap object)
+	// and grows sizeof(m) even with the experiment off -- an earlier
+	// version of this field learned that the hard way (see the C2
+	// history in git blame / task-3-report.md). With self kept last and
+	// mNUMAState empty (struct{}) when goexperiment.numa is off, every
+	// field's offset -- including self's -- and sizeof(m) itself are
+	// byte-identical to a build with no numa field at all. See
+	// numa_mstate_on.go / numa_mstate_off.go.
+	numa mNUMAState
+
 	// self points this M until mexit clears it to return nil.
 	self mWeakPointer
-
-	// numa is this M's NUMA stand-down convergence state (see
-	// numaFixThreadPlacement in numa_linux.go). Placed at the END of
-	// this struct so no earlier field's offset moves when the
-	// experiment is on, and it is zero-size (mNUMAState struct{}) when
-	// goexperiment.numa is off, so sizeof(m) and every field offset are
-	// unchanged in off builds. See numa_mstate_on.go / numa_mstate_off.go.
-	numa mNUMAState
 }
 
 const mRedZoneSize = (16 << 3) * asanenabledBit // redZoneSize(2048)

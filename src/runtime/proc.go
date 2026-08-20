@@ -1810,8 +1810,17 @@ func startTheWorldWithSema(now int64, w worldStop) int64 {
 	}
 	unlock(&sched.lock)
 
+	// NUMA stand-down: detection only here. mp.locks != 0 (acquirem
+	// above) and the design's Forbidden list bans syscalls under
+	// sched.lock or with mp.locks != 0 (same rule as Task 10's
+	// schedule() hook), so numaStandDownIfNeeded only flips atomic
+	// state -- no syscalls. If it reports a fresh trigger, the
+	// syscall-bearing widening (eager allm walk + this M's own
+	// convergence) is deferred to numaStandDownWiden below, run only
+	// after releasem once the world has fully restarted.
+	standingDown := false
 	if goexperiment.Numa {
-		numaStandDownIfNeeded(procs, customGOMAXPROCS)
+		standingDown = numaStandDownIfNeeded(procs, customGOMAXPROCS)
 	}
 
 	worldStarted()
@@ -1855,6 +1864,12 @@ func startTheWorldWithSema(now int64, w worldStop) int64 {
 	wakep()
 
 	releasem(mp)
+
+	if standingDown {
+		// mp.locks == 0 here (releasem above) and sched.lock is free:
+		// safe to make syscalls. See numaStandDownWiden's doc comment.
+		numaStandDownWiden()
+	}
 
 	return now
 }
@@ -3026,11 +3041,14 @@ func templateThread() {
 // Stops execution of the current m until new work is available.
 // Returns with acquired P.
 func stopm() {
-	if goexperiment.Numa {
-		// M is parking: never a malloc or steal path. Converges this M's
-		// affinity + task mempolicy after a NUMA stand-down (one atomic
-		// load, no-op when stand-down has not happened or this M already
-		// converged). See numaFixThreadPlacement in numa_linux.go.
+	// M is parking: never a malloc or steal path. The numaStoodDown
+	// check is inlined here (rather than left as numaFixThreadPlacement's
+	// own first statement) so the steady-state cost at every park --
+	// experiment on, but never confined or not yet stood down -- is one
+	// inlined atomic load with a not-taken branch, not a full call into
+	// numa_linux.go. See numaStoodDown's doc comment (numa_standdown.go)
+	// and numaFixThreadPlacement's (numa_linux.go).
+	if goexperiment.Numa && numaStoodDown.Load() {
 		numaFixThreadPlacement()
 	}
 

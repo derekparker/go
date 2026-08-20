@@ -165,6 +165,18 @@ func TestNUMAStandDownOnGOMAXPROCSGrowth(t *testing.T) {
 // never satisfy a strict procs > numaConfinedNodeCPUs comparison. Stand-down
 // must still trigger on the customGOMAXPROCS==false transition alone (see
 // numaStandDownIfNeeded in numa_linux.go).
+//
+// This isolates the new trigger arm (b, !customGOMAXPROCS) from the
+// original one (a, procs > numaConfinedNodeCPUs) by construction, not
+// just by exercising a different runtime API than
+// TestNUMAStandDownOnGOMAXPROCSGrowth: on numa-dell (128 CPUs/node),
+// confining at GOMAXPROCS=64 narrows this process's affinity to that
+// node's 128 CPUs, so SetDefaultGOMAXPROCS's defaultGOMAXPROCS(0) call
+// -- which reads that already-narrowed mask -- recomputes newprocs=128,
+// exactly equal to numaConfinedNodeCPUs. Arm (a)'s strict "procs >
+// numaConfinedNodeCPUs" comparison is therefore false (128 is not > 128)
+// on this hardware, so the stand-down this test observes can only be
+// arm (b) firing.
 func TestNUMAStandDownOnSetDefaultGOMAXPROCS(t *testing.T) {
 	if runtime.NumaNumAllowedNodes() <= 1 {
 		t.Skip("not multi-node")
