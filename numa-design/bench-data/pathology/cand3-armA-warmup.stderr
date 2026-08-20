@@ -1,0 +1,7 @@
+phase-shift GOMAXPROCS=128 heap=6144MiB readers=64 phase=30s phases=4
+allowed cpuset: 128 even (node0) CPUs, 0 odd (node1) CPUs
+Allocating 6144MiB pointer-dense working set...
+Running 4 phases x 30s (noop-pin=true)...
+
+=== Phase Chase Results ===
+total reads=58200653824 elapsed=2m0.01688306s ns/read=2.06 noop-pin(armA)=true

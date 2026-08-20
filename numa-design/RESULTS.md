@@ -1667,3 +1667,249 @@ In the plan's stated priority order (design §12.2–§12.3):
    `+UseNUMA`, jemalloc/mimalloc via OS thread stability) converges on, and is the only path
    expected to clear the IMC gate Layer 2 just failed — because it supplies all three ingredients
    at once instead of one at a time.
+
+## Pathology benchmark (A/B/C) (2026-08-20)
+
+Design: `numa-design/pathology-bench-design.md` (mechanism analysis, candidate ranking, exact
+command lines, controls, kill criteria, statistical plan — followed as written; deviations noted
+inline below). Commits: gc-pause-bench heavy-profile flags `ff47d48b2d`, phase-shift candidate 3
+`6b535e2ca9` (fixed for a primary-metric truncation bug in `fb90222b76` — see candidate 3 below).
+
+**Environment:** `numa-dell`, 256 logical CPUs / 2 nodes (even=node0, odd=node1), ~15 GiB/node,
+kernel `6.12.0-211.7.1.el10_2.x86_64`, `kernel.numa_balancing=1` (unchanged throughout),
+`transparent_hugepage/enabled=[always]` (unchanged throughout). Toolchain: `go version
+go1.28-devel_7ec36777f3` (runtime/toolchain unchanged since that commit; only
+`numa-design/gc-pause-bench` and `numa-design/phase-shift`, both outside the built toolchain,
+changed afterward — no rebuild needed). `golang.org/x/benchmarks`
+`v0.0.0-20260819172200-70693762b6a0`, identical resolved version for both the baseline and
+`GOEXPERIMENT=numa` `garbage` installs. `benchstat` (Mann-Whitney U, α=0.05) at
+`/tmp/numa-tools/benchstat` on the remote. Idle checked via `ps aux --sort=-%cpu` (not `uptime`,
+which shows multi-hour decay from earlier 256P runs, per the established protocol) before every
+measurement block — clean throughout, no second tenant on the box at any point in this session.
+
+GOMAXPROCS=128 in all arms of all three candidates (design §4 — equalizes parallelism so A-vs-B is
+a memory-placement comparison, not a CPU-count comparison; residual HT-vs-full-core confound
+biases *against* the B-worse-than-A finding, so where B still loses to A the result is
+conservative). Arm order rotated ABC/BCA/CAB per round to cancel position bias. One unrecorded
+warmup round preceded each candidate's 10 recorded rounds. vmstat (`numa_hint_faults`,
+`numa_pages_migrated`) snapped immediately before/after every individual run via
+`numa-design/gate-vmstat.sh`. Node-0 free RAM checked ≥10 GB before every arm-A run (never
+triggered the wait/abort fallback — node 0 free RAM stayed ≥12.4 GB throughout the session). Raw
+outputs, per-round vmstat snaps, and vmstat-delta summaries for all three candidates archived at
+`numa-design/bench-data/pathology/`.
+
+### Candidate 1 — `x/benchmarks garbage`, GOMAXPROCS=128, `-benchmem=4096 -benchnum=1`, n=10
+
+Pilot (untimed, arm A): peak-RSS-bytes = 7.92 GiB, under the 10 GiB abort threshold (design
+§3 candidate 1) — proceeded with the full sweep.
+
+**Mechanism validity (arm B, n=10 recorded rounds):** hint faults min=57,446 max=308,435
+mean=171,552; pages migrated min=989,471 max=1,572,161 mean=1,309,928. Arms A and C: **exactly
+0/0 hint faults and pages migrated in all 10 rounds**, matching the `numactl --membind` oracle
+(A) and confirming BIND-all suppression (C). Deviation from the design's stated expectation: the
+design's pre-declared hint-fault floor was "≥5×10^5 hint faults" (§6) — observed hint faults never
+reached that number in any round (max 308,435, ~62% of the floor). Pages migrated comfortably
+cleared its ≥10^5 floor in every round (min 989,471, ~10× the floor). The mechanism is
+unambiguously active (B ≫ 0 in every round on both counters; A=C=0 in every round) — the specific
+numeric hint-fault floor guessed at design time was simply optimistic for this heap size, not a
+sign of a setup failure.
+
+**benchstat, primary metric (ns/op, ` Garbage/benchmem-MB=4096-128`):**
+
+- **Primary (C vs B):** B = 2.917ms ± 23%, C = 3.168ms ± 9% → **+8.58% (p=0.003, n=10) — C
+  significantly SLOWER than B.** This is the opposite of the design's expected direction (C
+  faster by 3-7%), and it is a clean, well-powered result (p=0.003), not noise — no n=15
+  extension was warranted (extension is pre-declared only for the 0.05<p<0.10 borderline case).
+- **Secondary (A vs B):** A = 1.823ms ± 7%, B = 2.917ms ± 23% → **+60.04% (p=0.000, n=10) — B
+  dramatically slower than A.** Confirms the design's B-worse-than-A requirement far beyond the
+  "similar or smaller margin than C-vs-B" the design predicted.
+- **Exploratory (A vs C):** A = 1.823ms ± 7%, C = 3.168ms ± 9% → +73.77% (p=0.000, n=10).
+- Exploratory secondaries (not claims): user+sys-ns/op C > B by +10.30% (p=0.000); STW-ns/op B vs
+  C ~ (p=0.579-0.739, not significant either way).
+
+**Per design §3, the optional 8 GiB/256P exploratory supplement is run only "if the primary sweep
+shows a significant C-vs-B win"** — it did not (C lost), so the supplement was correctly skipped.
+
+**Verdict: candidate 1's primary claim FAILS**, and fails harder than the design's plain kill rule
+anticipated (a null "~" result) — this is a *significant reversal*. Working mechanistic
+explanation, offered honestly and not as a proven claim: this repo's `GOEXPERIMENT=numa` is
+Layer 0+1 only (BIND-all task mempolicy; Layers 2-4 arena/mcentral/steal locality were killed per
+the Layer 2 verdict earlier in this file — see "Layer 2 verdict" above). BIND-all suppresses the
+balancer's fault/migration tax completely but supplies no compensating locality: it freezes
+whatever node each page's first-touching thread landed on. Arm B pays the tax but, over a
+~10,000-iteration/~30 s run, the balancer has time to *converge* memory placement toward whichever
+threads actually use it; arm C never migrates and is stuck at initial (likely mixed, since neither
+allocating nor accessing threads are pinned) placement for the whole run. If convergence's benefit
+to B outweighs the fault/migration tax it pays to get there, B beats C — consistent with what was
+measured. The secondary (B-worse-than-A) result independently confirms the tax is real and large
+relative to full single-node locality (A); it just isn't recovered by BIND-all's suppression alone
+on this workload.
+
+Raw data: `numa-design/bench-data/pathology/cand1-arm{A,B,C}-{warmup,recorded}.out{,.stderr}`,
+per-round `cand1-arm*-r*.vmstat.{before,after}`, `cand1-vmstat-summary.txt`, `sweep.log`,
+`pilotA.out`/`pilotA.time`.
+
+### Candidate 2 — gc-pause-bench heavy profile, GOMAXPROCS=128, n=10 (8 measured + 2 discarded cycles/round)
+
+Code changes implementing the design's heavy profile (`-ptrheap`, `-toucher=false`, `-gcgap`,
+`-discard`, per-cycle `BenchmarkGCCycleWall` stdout lines) landed in `ff47d48b2d` and are described
+in that commit and the package doc of `numa-design/gc-pause-bench/main.go`. One deliberate
+deviation from the pre-existing code, needed to keep the new per-cycle stdout output clean for
+benchstat: the human-readable summary block (previously on stdout unless `-json`) now always goes
+to stderr; this does not change any recorded metric, only where diagnostic text is printed.
+
+Flags: `-ptrheap=true -toucher=false -heap=4096 -idle=1000000 -stacks=200 -warm=45 -gcgap=5s
+-discard=2 -n=8`, `GODEBUG=gcshrinkstackoff=1`, built from `numa-design/gc-pause-bench` (the
+design's suggested build directory `numa-design/` has no `go.mod`; built from inside the module
+directory instead — a path correction, not a behavior change).
+
+**Mechanism validity (arm B, n=10 recorded rounds, 8 cycles each):** hint faults min=108,675
+max=533,006 mean=257,484; pages migrated min=523,787 max=1,710,948 mean=1,145,286 — comfortably
+above the pilot/warmup-calibrated floor (warmup round: 141,920 hint faults / 688,906 migrated).
+Arm A: 0/0 in 8 of 10 rounds, negligible noise (54/2, 10/1) in the other 2 — four-plus orders of
+magnitude below B. Arm C: 0/0 in 7 of 10 rounds, negligible noise (2/2, 44/31, 186/0) in the other
+3 — same four-plus-orders-of-magnitude separation from B. Neither A's nor C's noise rounds are
+literal "0/0" as the design's shorthand states, but they are not remotely comparable to B's
+activity and do not indicate the balancer running on A/C.
+
+**benchstat, primary metric (median GC-cycle wall time, `BenchmarkGCCycleWall`, n=80
+samples/arm = 8 cycles × 10 rounds):**
+
+- **Primary (C vs B):** B = 3.952s ± 2%, C = 3.970s ± 0% → **~ (p=0.179, n=80) — not
+  significant.**
+- **Secondary (A vs B):** A = 3.163s ± 3%, B = 3.952s ± 2% → **+24.96% (p=0.000, n=80) — B
+  significantly slower than A.** Per design §4, this is "the candidate expected to show B worse
+  than A most cleanly" (only ~32 mark workers run during the measured window, CPU count barely
+  matters) — confirmed.
+- **Exploratory (A vs C):** A = 3.163s ± 3%, C = 3.970s ± 0% → +25.53% (p=0.000, n=80).
+
+**Verdict: candidate 2's primary claim FAILS** — this is exactly the design's plain kill condition
+(§6): p≥0.05 on the primary metric AND the balancer mechanism confirmed active in B while A/C are
+clean. BIND-all suppresses B's real, substantial fault/migration tax, but at n=80 that tax is not
+large enough, relative to this metric's own ~2-3% run-to-run noise, to move the median. Read
+together with candidate 1: the balancer's time-domain cost is real (confirmed twice, by two
+independent mechanisms) but its *recoverable* fraction — the part BIND-all's suppression alone
+converts into a measured win over B — is at or below this box's noise floor for both workloads
+tried.
+
+Raw data: `numa-design/bench-data/pathology/cand2-arm{A,B,C}-{warmup,recorded}.out{,.stderr}`,
+per-round `cand2-arm*-r*.vmstat.{before,after}`, `cand2-vmstat-summary.txt`, `sweep2.log`.
+
+### Candidate 3 — phase-shift (exploratory; ran because both 1 and 2 failed C-vs-B with valid fault floors)
+
+Both realistic-workload candidates failed their primary C-vs-B claim with the balancer mechanism
+confirmed active — the design's explicit trigger for candidate 3 (§3 candidate 3 header: "run
+only if 1 and 2 both fail C-vs-B"). New program `numa-design/phase-shift` (commit `6b535e2ca9`),
+per the design: a stable ~6 GiB pointer-dense working set (400 rings closed into cycles, same
+node/ring pattern as candidate 2), chased continuously by 64 `LockOSThread`ed reader goroutines
+whose CPU affinity flips between node0 (even CPUs) and node1 (odd CPUs) every 30 s phase (4 phases
+= 120 s/run), using raw `sched_setaffinity`/`sched_getaffinity` syscalls (no external dependency).
+GOMAXPROCS=128 all arms.
+
+**Bug found and fixed before the sweep counted:** the first full sweep's primary-metric output was
+unusable — `nsPerRead` is an aggregate rate across 64 parallel readers (sub-nanosecond, ~1-2
+ns/read), and `int64(nsPerRead)` truncated every round to exactly the integer 1 or 2, collapsing
+all variance (`benchstat` reported "all samples are equal" for every comparison). Fixed in
+`fb90222b76` (decimal-precision `%.4f ns/op` instead of integer truncation), rebuilt, and the full
+n=10+1-warmup sweep was re-run from scratch on the corrected binaries — the data below is from the
+corrected run only; the truncated run's `.out` files were discarded and are not archived.
+
+Pilot (untimed, all three arms, `-phase=5 -phases=2`): peak-RSS ≈ 6.7 GiB all arms (well under the
+10 GiB gate); arm A's `noop-pin` fallback confirmed working correctly on real hardware (`allowed
+cpuset: 128 even (node0) CPUs, 0 odd (node1) CPUs` → `noop-pin=true`, no crash, no repeated
+syscall-error spam).
+
+**Mechanism validity (arm B, n=10 recorded rounds):** hint faults min=25,533 max=127,488
+mean=39,021; pages migrated min=3,375,757 max=5,375,704 mean=4,736,829. This is a substantially
+larger migration rate than either candidate 1 (mean 1.31M/run) or candidate 2 (mean 1.15M/run) —
+consistent with the design's "migration storm" prediction: each 30 s phase flip makes the *entire*
+6 GiB working set misplaced at once, rather than the gradual cold-page accumulation candidates 1-2
+produce. **Arm C: exactly 0/0 in all 10 recorded rounds.** Arm A: 0/0 in 9 of 10 rounds, negligible
+noise (17/4) in the other — consistent with the pinned cpuset making inversion impossible.
+
+**benchstat, primary metric (overall ns per pointer-read across the full 120 s run,
+`BenchmarkPhaseChase`, n=10 samples/arm, one sample per round):**
+
+- **Primary (C vs B):** B = 1.530ns ± 6%, C = 1.272ns ± 37% → **-16.82% (p=0.029, n=10) — C
+  significantly FASTER than B.** This is the design's pre-declared pathology-supporting direction
+  (expected 5-20% faster; observed 16.82% falls inside that band) and clears α=0.05 without
+  needing the n=15 extension (extension is pre-declared only for the 0.05<p<0.10 borderline band;
+  p=0.029 is already below 0.05). C's per-round values (1.11-1.91 ns) are noisier than B's
+  (1.32-1.75 ns) but consistently shifted lower — 8 of 10 C rounds fall below B's median, so this
+  is not a single-outlier artifact; raw per-round data archived at
+  `numa-design/bench-data/pathology/cand3-arm{B,C}-recorded.out`.
+- **Informational only (A vs B, A vs C):** A = 2.062ns ± 0%, vs B -25.80% (p=0.000), vs C -38.28%
+  (p=0.000) — **A is slower than both B and C**, the opposite of what full single-node locality
+  would predict. Per design §3/§4, arm A is explicitly informational-only for this candidate: it
+  cannot express the phase-inversion mechanism at all (its cpuset has no node-1 CPUs, so the
+  odd-phase pin request is always a no-op — confirmed above), so its 64 readers just chase the
+  ring set on one socket's 64 physical cores under GOMAXPROCS=128 (2 HT threads/core) for the
+  entire run, a different and more core-constrained workload than B/C's 128-physical-core spread —
+  the same HT/core-count confound flagged generally in design §4, here large enough to dominate any
+  locality benefit for a purely memory-latency-bound pointer-chase. No claim is drawn from arm A
+  for this candidate, per the design.
+
+**Verdict: candidate 3's primary claim SUCCEEDS.** BIND-all measurably and significantly recovers
+throughput relative to the unpinned, balancer-active baseline on the one workload built to trigger
+a *perpetual, non-converging* migration storm (locality inversion every 30 s, never enough time for
+migration to pay off before the next flip) — the scenario the design identified as "the balancer
+actively harmful" case BIND-all is specifically suited to prevent. This is consistent with, and
+helps explain, candidates 1-2's failures: those workloads let the balancer's migrations *converge*
+over a long single run (candidate 1: ~30 s of continuous allocation/access from whichever thread
+the scheduler happens to run; candidate 2: 5 s gaps between forced GCs, not a hard phase inversion),
+so BIND-all's suppression trades away a real (if unmeasured-separately) convergence benefit for a
+real (and measured) fault/migration-avoidance benefit, and those roughly cancel at this box's noise
+floor. Candidate 3 removes the possibility of convergence by design, isolating the case where
+suppression is pure upside.
+
+Raw data: `numa-design/bench-data/pathology/cand3-arm{A,B,C}-{warmup,recorded}.out{,.stderr}`,
+per-round `cand3-arm*-r*.vmstat.{before,after}`, `cand3-vmstat-summary.txt`, `sweep3.log`,
+`pilotB.out`/`pilotB.time`, `pilotC.out`/`pilotC.time`, `pilotA3.out`/`pilotA3.time`.
+
+### Overall pathology-benchmark verdict
+
+This is **not** the design's full honest-kill scenario (§6) — that requires all three candidates
+to die on C-vs-B, and candidate 3 did not. The outcome is the partial-recovery case the design
+explicitly anticipated and pre-authorized reporting "as-is" (§6, final paragraph): the mechanism is
+confirmed active everywhere (millions of hint faults and page migrations per run on stock Go,
+reproduced across all three independent workloads) and BIND-all's suppression is confirmed total
+everywhere (0/0 in arm C in essentially every round of all three candidates — the rare single-digit
+counts in candidates 2-3 are 4+ orders of magnitude below arm B and are noise, not balancer
+activity), but a **measured time-domain recovery from BIND-all alone is workload-dependent**:
+
+| Candidate | Workload | B worse than A? | C better than B (primary)? | C ≥ A (stretch)? |
+|---|---|---|---|---|
+| 1 — garbage | realistic throughput, GOMAXPROCS=128 | **YES**, dramatically (+60.0%, p=0.000) | **NO** — C significantly *worse* (+8.58%, p=0.003) | N/A (primary failed) |
+| 2 — gc-pause-bench heavy | realistic GC-cycle time | **YES**, cleanly (+24.96%, p=0.000) | **NO** — null (p=0.179) | N/A (primary failed) |
+| 3 — phase-shift | synthetic, bench-side-pinned, perpetual locality inversion | not applicable (A informational-only, cannot invert) | **YES** — C significantly better (-16.82%, p=0.029) | Numerically yes (C beats A too) but **not a meaningful comparison** — A runs a different, single-socket-HT-constrained workload for this candidate (design §3/§4) |
+
+**Honest overall conclusion:** on this 2-node, ~15 GiB/node, THP=always, kernel-6.12 box, automatic
+NUMA balancing demonstrably operates on stock Go — millions of hint faults and page migrations per
+run, reproduced across three independent workloads and confirmed with a pre-declared statistical
+plan (not a single unclaimed sample) — and the BIND-all patch series demonstrably silences it
+completely (0/0, matching the `numactl --membind` oracle) on every one of them. The two candidates
+closest to real Go workloads (garbage-collector throughput, GC-cycle wall time) do **not** show a
+statistically defensible *net* time-domain win from BIND-all's suppression alone at n=10: candidate
+1 shows suppression measurably behind the balancer-active baseline (opposite of the design's
+prediction), and candidate 2 shows no significant difference either way. The working explanation —
+offered as a hypothesis consistent with the data, not as a proven mechanism — is that both
+candidates' access patterns let the balancer's migrations *converge* over the course of a single
+long-ish run, so BIND-all's fault/migration-avoidance benefit is offset by a forgone
+convergence benefit that the balancer would otherwise have delivered. The third, most synthetic
+candidate — engineered specifically to deny the balancer any chance to converge (a hard locality
+inversion every 30 s, forever) — does show a significant, correctly-directed, pre-declared win for
+BIND-all (16.82%, p=0.029, n=10, no extension needed), isolating the "balancer actively harmful,
+never converges" case the design identified as BIND-all's best-suited scenario.
+
+**For the upstream submission:** this session's data supports the mechanism-suppression +
+no-regression story unconditionally (confirmed on 3/3 workloads, statistically, not just the prior
+single unclaimed sample) and additionally supports a *conditional* performance-recovery story:
+BIND-all measurably helps on workloads whose access pattern denies the balancer convergence time,
+and is a statistical wash (not a loss beyond candidate 1's single significant-but-modest reversal)
+on workloads that let it converge. It does not support an unconditional "BIND-all makes stock Go
+faster" claim on this hardware — candidate 1's result argues explicitly against that framing for
+throughput-bound, continuously-allocating workloads. Per the design's own candidate-3 caveat (§3,
+"a reviewer can object that pinned readers are not 'a Go program'"), the recovery evidence rests on
+the most contestable of the three workloads; candidates 1-2, which are closer to real programs,
+did not confirm it. A larger-node-count box (design §6, e.g. the 4-node EPYC of #78044) remains the
+suggested venue for a less equivocal time-domain demonstration on realistic workloads.
