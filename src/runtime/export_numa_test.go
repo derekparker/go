@@ -31,6 +31,13 @@ func NumaNumAllowedNodes() int32    { return numaTopology.NumAllowedNodes }
 func NumaNodeOfCPU(cpu int) int32   { return numaTopology.NodeOfCPU(cpu) }
 func NumaCurrentNodeForTest() int32 { return numaCurrentNode() }
 
+// NumaPreferredBindCalls returns the number of Layer 2 MPOL_PREFERRED
+// mbind calls numaBindArena has attempted so far (see numaPreferredCalls
+// in numa_linux.go). Used by TestNUMAPreferredBindOnGrow to observe that
+// heap growth attempts the PREFERRED mbind, without asserting anything
+// about node placement itself.
+func NumaPreferredBindCalls() uint32 { return numaPreferredCalls.Load() }
+
 // NumaTaskMemPolicyModeForTest returns this process's current task memory
 // policy mode via get_mempolicy(2) (mode only, no MPOL_F_MEMS_ALLOWED, no
 // nodemask), for TestNUMABindAllTaskPolicy to check against MPOL_BIND (2).

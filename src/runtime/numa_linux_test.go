@@ -53,3 +53,21 @@ func TestNUMABindAllTaskPolicy(t *testing.T) {
 		t.Fatalf("mempolicy mode=%d want BIND(2)", mode)
 	}
 }
+
+func TestNUMAPreferredBindOnGrow(t *testing.T) {
+	if runtime.NumaNumAllowedNodes() <= 1 {
+		t.Skip()
+	}
+	before := runtime.NumaPreferredBindCalls()
+	runtime.GC()
+	var a []byte
+	// ~256 MiB: crosses many 4 MiB grow chunks. The original 1<<20
+	// (4 GiB + append-copy peak) is pointless on a shared ~30 GiB box.
+	for i := 0; i < 1<<16; i++ {
+		a = append(a, make([]byte, 4096)...)
+	}
+	runtime.KeepAlive(a)
+	if runtime.NumaPreferredBindCalls() <= before {
+		t.Fatal("expected mbind PREFERRED on heap growth")
+	}
+}
