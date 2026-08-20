@@ -1,0 +1,54 @@
+pkg: golang.org/x/benchmarks
+goos: linux
+goarch: amd64
+                             │ /tmp/pb/data/cand1-3arm-armB-recorded.out │ /tmp/pb/data/cand1-3arm-armCFULL-recorded.out │ /tmp/pb/data/cand1-3arm-armCL1-recorded.out │
+                             │                  sec/op                   │         sec/op          vs base               │        sec/op         vs base               │
+Garbage/benchmem-MB=4096-128                                 3.018m ± 3%              3.174m ± 3%  +5.17% (p=0.001 n=15)            3.176m ± 2%  +5.24% (p=0.001 n=15)
+
+                             │ /tmp/pb/data/cand1-3arm-armB-recorded.out │ /tmp/pb/data/cand1-3arm-armCFULL-recorded.out │ /tmp/pb/data/cand1-3arm-armCL1-recorded.out │
+                             │           GC-bytes-from-system            │  GC-bytes-from-system   vs base               │ GC-bytes-from-system  vs base               │
+Garbage/benchmem-MB=4096-128                                100.0Mi ± 1%             102.8Mi ± 2%  +2.80% (p=0.005 n=15)           101.5Mi ± 1%  +1.43% (p=0.004 n=15)
+
+                             │ /tmp/pb/data/cand1-3arm-armB-recorded.out │ /tmp/pb/data/cand1-3arm-armCFULL-recorded.out │ /tmp/pb/data/cand1-3arm-armCL1-recorded.out │
+                             │                STW-sec/GC                 │         STW-sec/GC           vs base          │        STW-sec/GC          vs base          │
+Garbage/benchmem-MB=4096-128                                 7.740m ± 8%                   8.128m ± 9%  ~ (p=0.305 n=15)                 8.147m ± 8%  ~ (p=0.389 n=15)
+
+                             │ /tmp/pb/data/cand1-3arm-armB-recorded.out │ /tmp/pb/data/cand1-3arm-armCFULL-recorded.out │ /tmp/pb/data/cand1-3arm-armCL1-recorded.out │
+                             │                STW-sec/op                 │         STW-sec/op           vs base          │        STW-sec/op          vs base          │
+Garbage/benchmem-MB=4096-128                                 15.47µ ± 8%                   16.06µ ± 6%  ~ (p=0.468 n=15)                 16.11µ ± 9%  ~ (p=0.539 n=15)
+
+                             │ /tmp/pb/data/cand1-3arm-armB-recorded.out │ /tmp/pb/data/cand1-3arm-armCFULL-recorded.out │ /tmp/pb/data/cand1-3arm-armCL1-recorded.out │
+                             │            allocated-bytes/op             │   allocated-bytes/op    vs base               │    allocated-bytes/op      vs base          │
+Garbage/benchmem-MB=4096-128                                5.933Mi ± 0%             5.933Mi ± 0%  +0.00% (p=0.010 n=15)                5.934Mi ± 0%  ~ (p=0.087 n=15)
+
+                             │ /tmp/pb/data/cand1-3arm-armB-recorded.out │ /tmp/pb/data/cand1-3arm-armCFULL-recorded.out │ /tmp/pb/data/cand1-3arm-armCL1-recorded.out │
+                             │                 allocs/op                 │          allocs/op           vs base          │         allocs/op          vs base          │
+Garbage/benchmem-MB=4096-128                                 145.2k ± 0%                   145.2k ± 0%  ~ (p=0.112 n=15)                 145.2k ± 0%  ~ (p=0.180 n=15)
+
+                             │ /tmp/pb/data/cand1-3arm-armB-recorded.out │ /tmp/pb/data/cand1-3arm-armCFULL-recorded.out │ /tmp/pb/data/cand1-3arm-armCL1-recorded.out │
+                             │             bytes-from-system             │   bytes-from-system     vs base               │     bytes-from-system      vs base          │
+Garbage/benchmem-MB=4096-128                                6.924Gi ± 0%             7.086Gi ± 2%  +2.35% (p=0.015 n=15)                6.988Gi ± 1%  ~ (p=0.187 n=15)
+
+                             │ /tmp/pb/data/cand1-3arm-armB-recorded.out │ /tmp/pb/data/cand1-3arm-armCFULL-recorded.out │ /tmp/pb/data/cand1-3arm-armCL1-recorded.out │
+                             │          heap-bytes-from-system           │ heap-bytes-from-system  vs base               │  heap-bytes-from-system    vs base          │
+Garbage/benchmem-MB=4096-128                                6.675Gi ± 1%             6.829Gi ± 2%  +2.31% (p=0.015 n=15)                6.738Gi ± 1%  ~ (p=0.187 n=15)
+
+                             │ /tmp/pb/data/cand1-3arm-armB-recorded.out │ /tmp/pb/data/cand1-3arm-armCFULL-recorded.out  │ /tmp/pb/data/cand1-3arm-armCL1-recorded.out │
+                             │          other-bytes-from-system          │ other-bytes-from-system  vs base               │  other-bytes-from-system   vs base          │
+Garbage/benchmem-MB=4096-128                                145.1Mi ± 1%              148.1Mi ± 2%  +2.07% (p=0.010 n=15)                145.6Mi ± 1%  ~ (p=0.325 n=15)
+
+                             │ /tmp/pb/data/cand1-3arm-armB-recorded.out │ /tmp/pb/data/cand1-3arm-armCFULL-recorded.out │ /tmp/pb/data/cand1-3arm-armCL1-recorded.out │
+                             │              peak-RSS-bytes               │     peak-RSS-bytes      vs base               │      peak-RSS-bytes        vs base          │
+Garbage/benchmem-MB=4096-128                                6.877Gi ± 1%             7.040Gi ± 2%  +2.37% (p=0.015 n=15)                6.938Gi ± 1%  ~ (p=0.233 n=15)
+
+                             │ /tmp/pb/data/cand1-3arm-armB-recorded.out │ /tmp/pb/data/cand1-3arm-armCFULL-recorded.out │ /tmp/pb/data/cand1-3arm-armCL1-recorded.out │
+                             │               peak-VM-bytes               │     peak-VM-bytes       vs base               │       peak-VM-bytes        vs base          │
+Garbage/benchmem-MB=4096-128                                8.094Gi ± 1%             8.289Gi ± 2%  +2.42% (p=0.016 n=15)                8.159Gi ± 1%  ~ (p=0.126 n=15)
+
+                             │ /tmp/pb/data/cand1-3arm-armB-recorded.out │ /tmp/pb/data/cand1-3arm-armCFULL-recorded.out  │  /tmp/pb/data/cand1-3arm-armCL1-recorded.out   │
+                             │          stack-bytes-from-system          │ stack-bytes-from-system  vs base               │ stack-bytes-from-system  vs base               │
+Garbage/benchmem-MB=4096-128                                8.781Mi ± 2%              8.938Mi ± 2%  +1.78% (p=0.030 n=15)              8.938Mi ± 2%  +1.78% (p=0.024 n=15)
+
+                             │ /tmp/pb/data/cand1-3arm-armB-recorded.out │ /tmp/pb/data/cand1-3arm-armCFULL-recorded.out │ /tmp/pb/data/cand1-3arm-armCL1-recorded.out │
+                             │              user+sys-sec/op              │    user+sys-sec/op      vs base               │   user+sys-sec/op     vs base               │
+Garbage/benchmem-MB=4096-128                                 161.4m ± 4%              172.2m ± 2%  +6.65% (p=0.000 n=15)            171.8m ± 4%  +6.43% (p=0.000 n=15)

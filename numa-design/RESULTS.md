@@ -2245,7 +2245,10 @@ may still cost something this sweep's resolution cannot see. **What is actually 
 whether Layer 0+1 alone regresses candidate 1's workload is unresolved** by any sweep run before
 the single-session three-arm sweep below, which is the first measurement in this investigation
 designed to answer it directly (B, C-full, and C-L1 together, same session, so no cross-session
-drift and a properly powered pairwise comparison).
+drift and a properly powered pairwise comparison). **Update: that sweep is now done — see "Single-
+session three-arm candidate 1 sweep" at the end of this file. Short answer: yes, it does regress
+(+5.24%, p=0.001, n=15), and Layer 2 is not the explanation (C-full and C-L1 are statistically
+indistinguishable from each other, p=0.838).**
 
 **Candidate 3's win, by contrast, is now on materially firmer ground than a single sweep could
 provide**: two independent sweeps, on two different builds, both show C beating B in the same
@@ -2256,3 +2259,82 @@ dual-controller advantage — is stated above as a distributional claim, not wit
 
 Neither L1-only sweep fully explains the dual-controller-bandwidth mechanism candidate 3 points at
 (that would need IMC/`perf`-level instrumentation, not run here) — flagged as follow-up work.
+
+## Single-session three-arm candidate 1 sweep (2026-08-20)
+
+The measurement the previous section's candidate 1 verdict pointed to: does the Layer 0+1
+shippable slice, on its own, regress this workload — resolved directly rather than inferred from
+two separate sweeps' significance patterns. Three arms in one session: **B** (stock, unpinned),
+**C-full** (`GOEXPERIMENT=numa` at branch HEAD, `5940a54ab0` — Layer 0+1+2), **C-L1** (a fresh
+scratch build from the same `l1-only.patch` used in the previous section, rebuilt for this sweep
+so both experiment builds could be produced independently — Layer 0+1 only). All unpinned,
+GOMAXPROCS=128, `-benchmem=4096 -benchnum=1`, n=15 per arm (raised from the previous n=10 sweeps
+for more power), one warmup round, rotating BCL/CLB/LBC order, vmstat snap per run, idle checks
+before every run.
+
+**Build process:** applied the L1-only patch (identical diff to `l1-only.patch`, archived
+separately since it was a fresh `git checkout` + re-edit, not a saved file re-applied) on the
+remote tree only, rebuilt via `./src/make.bash`, installed a new `garbage` binary with
+`GOEXPERIMENT=numa` into `/tmp/pb/l1v2/` (same resolved `x/benchmarks` version,
+`v0.0.0-20260819172200-70693762b6a0`, confirmed via `go version -m`), sanity-checked 0/0 vmstat on
+a pilot run, then restored the tree (`git checkout -f src/runtime/numa_linux.go`) and rebuilt back
+to stock — verified clean (`git diff --stat` empty, `numaPreferredCalls.Add(1)` back in source,
+`go version -m` on the restored `bin/go` matching `5940a54ab0`) before running the sweep. Arms B
+and C-full reused the existing stock binaries from earlier in this session
+(`/tmp/pb/base/garbage`, `/tmp/pb/numa/garbage`), unaffected by the patch/restore cycle.
+
+**Mechanism validity (n=15 recorded rounds each):** arm B hint faults min=70,357 max=420,684
+mean=206,399; pages migrated min=920,953 max=1,629,134 mean=1,352,394 — consistent with every
+prior candidate-1 B measurement. **Arm C-full: 0/0 in 14 of 15 rounds, negligible noise (2/0) in
+the other. Arm C-L1: 0/0 in all 15 rounds.** Both experiment arms confirm BIND-all suppression,
+with or without Layer 2.
+
+**benchstat, pre-declared PRIMARY metric (ns/op, `Garbage/benchmem-MB=4096-128`), all three
+pre-declared pairs, full table archived at `cand1-3arm-benchstat-full.txt`:**
+
+- **B vs C-L1:** B = 3.018ms, C-L1 = 3.176ms → **+5.24% (p=0.001, n=15) — C-L1 significantly
+  SLOWER than B.**
+- **C-full vs C-L1:** C-full = 3.174ms, C-L1 = 3.176ms → **~ (p=0.838, n=15) — not significantly
+  different from each other.**
+- **B vs C-full** (this session, for internal consistency with the original candidate 1 sweep):
+  B = 3.018ms, C-full = 3.174ms → **+5.17% (p=0.001, n=15).**
+
+**benchstat, pre-declared SECONDARY metric (user+sys-sec/op — the persistent CPU-time penalty
+flagged in the previous section):**
+
+- **B vs C-L1:** 161.4ms vs 171.8ms → **+6.43% (p=0.000, n=15).**
+- **C-full vs C-L1:** 172.2ms vs 171.8ms → **~ (p=0.512, n=15) — not significantly different.**
+- **B vs C-full:** 161.4ms vs 172.2ms → **+6.65% (p=0.000, n=15).**
+
+**Achieved noise/MDE, computed from the raw per-round ns/op values directly (not from benchstat's
+±% column, which is not a confidence interval and is not used as one here):** per-arm coefficient
+of variation B=7.20%, C-full=3.42%, C-L1=9.91%. Pooled CV for the B-vs-C-L1 pair ≈8.84%, giving a
+minimum detectable effect (α=0.05, power=0.80, n=15/arm) of **≈9.05%** — for the C-full-vs-C-L1
+pair, pooled CV ≈7.32%, MDE ≈**7.49%**. Independently cross-checked with a normal-approximation
+Mann-Whitney U on the raw data: B-vs-C-L1 p≈0.0016, C-full-vs-C-L1 p≈0.836, B-vs-C-full p≈0.0014 —
+all closely matching benchstat's own p-values, confirming the reported results directly rather
+than taking benchstat's output on faith.
+
+**Verdict: this sweep resolves what the previous sweeps could not, and the answer is not the
+"good news" one hoped for.** Both experiment arms — C-full (Layer 0+1+2) and C-L1 (Layer 0+1
+alone) — regress this workload relative to stock B, by essentially the same amount (+5.17% and
++5.24%, both p=0.001) and are statistically indistinguishable from each other (p=0.838). **The
+shippable Layer 0+1 slice, on its own, does appear to regress this specific throughput workload
+by a modest but well-powered ~5%, with a real ~6-7% CPU-time penalty alongside it — Layer 2 is
+not the explanation, because removing it changes nothing measurable.** This sweep's MDE (≈9.05%
+for the primary comparison) is honestly reported rather than glossed over: the achieved effect
+(+5.24%) is smaller than the MDE, meaning this specific sweep design would only have 80% power to
+detect an effect this size or larger on repeated sampling — but the result was significant anyway
+(p=0.001), so this is not a case of an underpowered null being over-read; it is a positive,
+significant finding at a real effect size, reported with its own honest power caveat rather than
+as an unqualified certainty. Combined with the original candidate 1 sweep's larger, cruder
+estimate (full-C +8.58% vs B, n=10, wider CI) and this sweep's cleaner +5.17% (n=15), the picture
+converges: **BIND-all measurably costs something on this workload**, whether or not Layer 2 is
+present, and the earlier "no regression on a realistic throughput workload" framing for the
+shippable slice is not supported by this data.
+
+Raw data: `numa-design/bench-data/pathology/cand1-3arm-arm{B,CFULL,CL1}-{warmup,recorded}.out{,.stderr}`,
+per-round `cand1-3arm-arm*-r*.vmstat.{before,after}`, `cand1-3arm-vmstat-summary.txt`,
+`sweep3arm.log`, `pilotL1v2.out`/`pilotL1v2.stderr`, the full benchstat table
+`cand1-3arm-benchstat-full.txt`, and the sweep driver script,
+`numa-design/bench-data/pathology/cand1-3arm-sweep.sh`.
