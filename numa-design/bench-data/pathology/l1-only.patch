@@ -1,0 +1,21 @@
+diff --git a/src/runtime/numa_linux.go b/src/runtime/numa_linux.go
+index 73909888c6..d680e03442 100644
+--- a/src/runtime/numa_linux.go
++++ b/src/runtime/numa_linux.go
+@@ -318,13 +318,7 @@ func numaBindArena(addr unsafe.Pointer, size uintptr) {
+ 	var mask numaNodemask
+ 	mask[0] = w0
+ 	linux.Syscall6(linux.SYS_MBIND, uintptr(addr), size, uintptr(_MPOL_BIND), uintptr(unsafe.Pointer(&mask[0])), numaMaxNode, 0)
+-
+-	node, ok := numaGetCPUNode()
+-	if !ok || node >= 64 {
+-		return
+-	}
+-	var pmask numaNodemask
+-	pmask[uintptr(node)/numaNodemaskBits] = 1 << (uintptr(node) % numaNodemaskBits)
+-	linux.Syscall6(linux.SYS_MBIND, uintptr(addr), size, uintptr(_MPOL_PREFERRED), uintptr(unsafe.Pointer(&pmask[0])), numaMaxNode, 0)
+-	numaPreferredCalls.Add(1)
++	// L1-ONLY SCRATCH PATCH (not committed): Layer 2's MPOL_PREFERRED
++	// refinement removed for the audit's decisive re-run. BIND-all above
++	// is the only policy applied per arena.
+ }

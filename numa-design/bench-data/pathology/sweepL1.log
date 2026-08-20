@@ -1,0 +1,233 @@
+[2026-08-20T08:22:33-04:00] === warmup round (unrecorded, discarded) ===
+[2026-08-20T08:22:33-04:00] idle check
+USER         PID %CPU %MEM    VSZ   RSS TTY      STAT START   TIME COMMAND
+deparker 3511122  8.3  0.0 229056  4212 ?        Ss   08:22   0:00 bash -c cd /tmp/pb/data && rm -f sweepL1.log l1only-vmstat-summary.txt && nohup /tmp/pb/cand1-l1-sweep.sh > /tmp/pb/data/cand1-l1-sweep.stdout 2>&1 < /dev/null & disown; sleep 2; echo LAUNCHED
+root     3511117  2.5  0.0  15768 10896 ?        Ss   08:22   0:00 sshd-session: deparker [priv]
+deparker 3511021  1.7  0.0  22576 13976 ?        Ss   08:22   0:00 /usr/lib/systemd/systemd --user
+root        4490  0.2  0.0  81112  4336 ?        Ssl  May27 316:18 /usr/sbin/irqbalance
+root     3447669  0.1  0.0      0     0 ?        I    08:20   0:00 [kworker/u1026:6-kvfree_rcu_reclaim]
+root     3511023  0.1  0.0  16672  7348 ?        S    08:22   0:00 systemd-userwork: waiting...
+root     3478041  0.0  0.0      0     0 ?        I    08:20   0:00 [kworker/u1026:7-kvfree_rcu_reclaim]
+[2026-08-20T08:23:24-04:00] arm=B round=0(tag=warmup) hint_faults_delta=196729 pages_migrated_delta=1303596
+[2026-08-20T08:23:24-04:00] idle check
+USER         PID %CPU %MEM    VSZ   RSS TTY      STAT START   TIME COMMAND
+deparker 3511021  0.2  0.0  22576 13976 ?        Ss   08:22   0:00 /usr/lib/systemd/systemd --user
+root        4490  0.2  0.0  81112  4336 ?        Ssl  May27 316:18 /usr/sbin/irqbalance
+root     3447669  0.0  0.0      0     0 ?        I    08:20   0:00 [kworker/u1026:6-flush-253:0]
+root     3511117  0.0  0.0  15768 10896 ?        Ss   08:22   0:00 sshd-session: deparker [priv]
+root     3478041  0.0  0.0      0     0 ?        I    08:20   0:00 [kworker/u1026:7-kvfree_rcu_reclaim]
+root        4591  0.0  0.0 490316 28292 ?        Ssl  May27  29:39 /usr/bin/python3 -Es /usr/sbin/tuned -l -P
+root     3318729  0.0  0.0      0     0 ?        I    08:12   0:00 [kworker/u1026:3-events_unbound]
+[2026-08-20T08:24:22-04:00] arm=CL1 round=0(tag=warmup) hint_faults_delta=0 pages_migrated_delta=0
+[2026-08-20T08:24:22-04:00] === recorded sweep: 10 rounds ===
+[2026-08-20T08:24:22-04:00] --- round 1, arm order B CL1 ---
+[2026-08-20T08:24:22-04:00] idle check
+USER         PID %CPU %MEM    VSZ   RSS TTY      STAT START   TIME COMMAND
+root        4490  0.2  0.0  81112  4336 ?        Ssl  May27 316:18 /usr/sbin/irqbalance
+deparker 3511021  0.1  0.0  22576 13976 ?        Ss   08:22   0:00 /usr/lib/systemd/systemd --user
+root     3447669  0.0  0.0      0     0 ?        I    08:20   0:00 [kworker/u1026:6-events_unbound]
+root     3511117  0.0  0.0  15768 10896 ?        Ss   08:22   0:00 sshd-session: deparker [priv]
+root     3478041  0.0  0.0      0     0 ?        I    08:20   0:00 [kworker/u1026:7-events_unbound]
+root        4591  0.0  0.0 490316 28292 ?        Ssl  May27  29:39 /usr/bin/python3 -Es /usr/sbin/tuned -l -P
+root     3318729  0.0  0.0      0     0 ?        I    08:12   0:00 [kworker/u1026:3-events_unbound]
+[2026-08-20T08:25:18-04:00] arm=B round=1(tag=recorded) hint_faults_delta=163522 pages_migrated_delta=1436098
+[2026-08-20T08:25:18-04:00] idle check
+USER         PID %CPU %MEM    VSZ   RSS TTY      STAT START   TIME COMMAND
+root        4490  0.2  0.0  81112  4336 ?        Ssl  May27 316:18 /usr/sbin/irqbalance
+deparker 3511021  0.0  0.0  22576 13976 ?        Ss   08:22   0:00 /usr/lib/systemd/systemd --user
+root     3447669  0.0  0.0      0     0 ?        I    08:20   0:00 [kworker/u1026:6-kvfree_rcu_reclaim]
+root        4591  0.0  0.0 490316 28292 ?        Ssl  May27  29:39 /usr/bin/python3 -Es /usr/sbin/tuned -l -P
+root     3511117  0.0  0.0  15768 10896 ?        Ss   08:22   0:00 sshd-session: deparker [priv]
+root     3478041  0.0  0.0      0     0 ?        I    08:20   0:00 [kworker/u1026:7-kvfree_rcu_reclaim]
+root     3318729  0.0  0.0      0     0 ?        I    08:12   0:00 [kworker/u1026:3-kvfree_rcu_reclaim]
+[2026-08-20T08:26:14-04:00] arm=CL1 round=1(tag=recorded) hint_faults_delta=0 pages_migrated_delta=0
+[2026-08-20T08:26:14-04:00] --- round 2, arm order CL1 B ---
+[2026-08-20T08:26:14-04:00] idle check
+USER         PID %CPU %MEM    VSZ   RSS TTY      STAT START   TIME COMMAND
+root        4490  0.2  0.0  81112  4336 ?        Ssl  May27 316:19 /usr/sbin/irqbalance
+deparker 3511021  0.0  0.0  22576 13976 ?        Ss   08:22   0:00 /usr/lib/systemd/systemd --user
+root     3447669  0.0  0.0      0     0 ?        I    08:20   0:00 [kworker/u1026:6-events_unbound]
+root        4591  0.0  0.0 490316 28292 ?        Ssl  May27  29:39 /usr/bin/python3 -Es /usr/sbin/tuned -l -P
+root     3318729  0.0  0.0      0     0 ?        I    08:12   0:00 [kworker/u1026:3-kvfree_rcu_reclaim]
+root     3478041  0.0  0.0      0     0 ?        I    08:20   0:00 [kworker/u1026:7-kvfree_rcu_reclaim]
+root     3318730  0.0  0.0      0     0 ?        I    08:12   0:00 [kworker/u1025:2-writeback]
+[2026-08-20T08:27:12-04:00] arm=CL1 round=2(tag=recorded) hint_faults_delta=0 pages_migrated_delta=0
+[2026-08-20T08:27:12-04:00] idle check
+USER         PID %CPU %MEM    VSZ   RSS TTY      STAT START   TIME COMMAND
+deparker 3513940  900  0.0 232528  6000 ?        R    08:27   0:00 ps aux --sort=-%cpu
+root        4490  0.2  0.0  81112  4336 ?        Ssl  May27 316:19 /usr/sbin/irqbalance
+deparker 3511021  0.0  0.0  22576 13976 ?        Ss   08:22   0:00 /usr/lib/systemd/systemd --user
+root     3447669  0.0  0.0      0     0 ?        I    08:20   0:00 [kworker/u1026:6-events_unbound]
+root        4591  0.0  0.0 490316 28292 ?        Ssl  May27  29:39 /usr/bin/python3 -Es /usr/sbin/tuned -l -P
+root     3318729  0.0  0.0      0     0 ?        I    08:12   0:00 [kworker/u1026:3-kvfree_rcu_reclaim]
+root     3318730  0.0  0.0      0     0 ?        I    08:12   0:00 [kworker/u1025:2-events_unbound]
+[2026-08-20T08:27:52-04:00] arm=B round=2(tag=recorded) hint_faults_delta=149300 pages_migrated_delta=1261266
+[2026-08-20T08:27:52-04:00] --- round 3, arm order B CL1 ---
+[2026-08-20T08:27:52-04:00] idle check
+USER         PID %CPU %MEM    VSZ   RSS TTY      STAT START   TIME COMMAND
+root        4490  0.2  0.0  81112  4336 ?        Ssl  May27 316:19 /usr/sbin/irqbalance
+deparker 3511021  0.0  0.0  22576 13976 ?        Ss   08:22   0:00 /usr/lib/systemd/systemd --user
+root     3447669  0.0  0.0      0     0 ?        I    08:20   0:00 [kworker/u1026:6-kvfree_rcu_reclaim]
+root        4591  0.0  0.0 490316 28292 ?        Ssl  May27  29:39 /usr/bin/python3 -Es /usr/sbin/tuned -l -P
+root     3318729  0.0  0.0      0     0 ?        I    08:12   0:00 [kworker/u1026:3-kvfree_rcu_reclaim]
+root     3318730  0.0  0.0      0     0 ?        I    08:12   0:00 [kworker/u1025:2-flush-253:0]
+deparker 3511152  0.0  0.0 228540  3616 ?        S    08:22   0:00 bash /tmp/pb/cand1-l1-sweep.sh
+[2026-08-20T08:28:43-04:00] arm=B round=3(tag=recorded) hint_faults_delta=301262 pages_migrated_delta=1264818
+[2026-08-20T08:28:43-04:00] idle check
+USER         PID %CPU %MEM    VSZ   RSS TTY      STAT START   TIME COMMAND
+deparker 3515091 1000  0.0 232528  6024 ?        R    08:28   0:00 ps aux --sort=-%cpu
+root        4490  0.2  0.0  81112  4336 ?        Ssl  May27 316:19 /usr/sbin/irqbalance
+deparker 3511021  0.0  0.0  22576 13976 ?        Ss   08:22   0:00 /usr/lib/systemd/systemd --user
+root     3447669  0.0  0.0      0     0 ?        I    08:20   0:00 [kworker/u1026:6-kvfree_rcu_reclaim]
+root        4591  0.0  0.0 490316 28292 ?        Ssl  May27  29:39 /usr/bin/python3 -Es /usr/sbin/tuned -l -P
+root     3514258  0.0  0.0  16668  7360 ?        S    08:27   0:00 systemd-userwork: waiting...
+root     3318729  0.0  0.0      0     0 ?        I    08:12   0:00 [kworker/u1026:3-kvfree_rcu_reclaim]
+[2026-08-20T08:29:41-04:00] arm=CL1 round=3(tag=recorded) hint_faults_delta=0 pages_migrated_delta=0
+[2026-08-20T08:29:41-04:00] --- round 4, arm order CL1 B ---
+[2026-08-20T08:29:41-04:00] idle check
+USER         PID %CPU %MEM    VSZ   RSS TTY      STAT START   TIME COMMAND
+deparker 3515714 1000  0.0 232528  6060 ?        R    08:29   0:00 ps aux --sort=-%cpu
+root        4490  0.2  0.0  81112  4336 ?        Ssl  May27 316:19 /usr/sbin/irqbalance
+deparker 3511021  0.0  0.0  22576 13976 ?        Ss   08:22   0:00 /usr/lib/systemd/systemd --user
+root     3447669  0.0  0.0      0     0 ?        I    08:20   0:00 [kworker/u1026:6-kvfree_rcu_reclaim]
+root     3515283  0.0  0.0      0     0 ?        I    08:29   0:00 [kworker/u1025:0-events_unbound]
+root        4591  0.0  0.0 490316 28292 ?        Ssl  May27  29:39 /usr/bin/python3 -Es /usr/sbin/tuned -l -P
+root     3318729  0.0  0.0      0     0 ?        I    08:12   0:00 [kworker/u1026:3-kvfree_rcu_reclaim]
+[2026-08-20T08:30:39-04:00] arm=CL1 round=4(tag=recorded) hint_faults_delta=0 pages_migrated_delta=0
+[2026-08-20T08:30:39-04:00] idle check
+USER         PID %CPU %MEM    VSZ   RSS TTY      STAT START   TIME COMMAND
+root        4490  0.2  0.0  81112  4336 ?        Ssl  May27 316:19 /usr/sbin/irqbalance
+root     3447669  0.0  0.0      0     0 ?        I    08:20   0:00 [kworker/u1026:6-events_unbound]
+deparker 3511021  0.0  0.0  22576 13976 ?        Ss   08:22   0:00 /usr/lib/systemd/systemd --user
+root     3515311  0.0  0.0  16668  7360 ?        S    08:29   0:00 systemd-userwork: waiting...
+root        4591  0.0  0.0 490316 28292 ?        Ssl  May27  29:39 /usr/bin/python3 -Es /usr/sbin/tuned -l -P
+root     3515283  0.0  0.0      0     0 ?        I    08:29   0:00 [kworker/u1025:0-events_unbound]
+root     3514258  0.0  0.0  16668  7372 ?        S    08:27   0:00 systemd-userwork: waiting...
+[2026-08-20T08:31:33-04:00] arm=B round=4(tag=recorded) hint_faults_delta=349828 pages_migrated_delta=1673693
+[2026-08-20T08:31:33-04:00] --- round 5, arm order B CL1 ---
+[2026-08-20T08:31:33-04:00] idle check
+USER         PID %CPU %MEM    VSZ   RSS TTY      STAT START   TIME COMMAND
+root        4490  0.2  0.0  81112  4336 ?        Ssl  May27 316:20 /usr/sbin/irqbalance
+root     3447669  0.0  0.0      0     0 ?        I    08:20   0:00 [kworker/u1026:6-events_unbound]
+deparker 3511021  0.0  0.0  22576 13976 ?        Ss   08:22   0:00 /usr/lib/systemd/systemd --user
+root        4591  0.0  0.0 490316 28292 ?        Ssl  May27  29:39 /usr/bin/python3 -Es /usr/sbin/tuned -l -P
+root     3318729  0.0  0.0      0     0 ?        I    08:12   0:00 [kworker/u1026:3-events_unbound]
+root     3318730  0.0  0.0      0     0 ?        I    08:12   0:00 [kworker/u1025:2-events_unbound]
+root     3515311  0.0  0.0  16668  7360 ?        S    08:29   0:00 systemd-userwork: waiting...
+[2026-08-20T08:32:14-04:00] arm=B round=5(tag=recorded) hint_faults_delta=174060 pages_migrated_delta=1056157
+[2026-08-20T08:32:14-04:00] idle check
+USER         PID %CPU %MEM    VSZ   RSS TTY      STAT START   TIME COMMAND
+root        4490  0.2  0.0  81112  4336 ?        Ssl  May27 316:20 /usr/sbin/irqbalance
+root     3447669  0.0  0.0      0     0 ?        I    08:20   0:00 [kworker/u1026:6-kvfree_rcu_reclaim]
+deparker 3511021  0.0  0.0  22576 13976 ?        Ss   08:22   0:00 /usr/lib/systemd/systemd --user
+root        4591  0.0  0.0 490316 28292 ?        Ssl  May27  29:39 /usr/bin/python3 -Es /usr/sbin/tuned -l -P
+root     3318729  0.0  0.0      0     0 ?        I    08:12   0:00 [kworker/u1026:3-flush-253:0]
+root     3318730  0.0  0.0      0     0 ?        I    08:12   0:00 [kworker/u1025:2-events_unbound]
+deparker 3511152  0.0  0.0 228540  3620 ?        S    08:22   0:00 bash /tmp/pb/cand1-l1-sweep.sh
+[2026-08-20T08:33:00-04:00] arm=CL1 round=5(tag=recorded) hint_faults_delta=0 pages_migrated_delta=0
+[2026-08-20T08:33:00-04:00] --- round 6, arm order CL1 B ---
+[2026-08-20T08:33:00-04:00] idle check
+USER         PID %CPU %MEM    VSZ   RSS TTY      STAT START   TIME COMMAND
+root        4490  0.2  0.0  81112  4336 ?        Ssl  May27 316:20 /usr/sbin/irqbalance
+root     3447669  0.0  0.0      0     0 ?        I    08:20   0:00 [kworker/u1026:6-events_unbound]
+deparker 3511021  0.0  0.0  22576 13976 ?        Ss   08:22   0:00 /usr/lib/systemd/systemd --user
+root        4591  0.0  0.0 490316 28292 ?        Ssl  May27  29:39 /usr/bin/python3 -Es /usr/sbin/tuned -l -P
+root     3318729  0.0  0.0      0     0 ?        I    08:12   0:00 [kworker/u1026:3-kvfree_rcu_reclaim]
+deparker 3511152  0.0  0.0 228540  3620 ?        S    08:22   0:00 bash /tmp/pb/cand1-l1-sweep.sh
+root     3318730  0.0  0.0      0     0 ?        I    08:12   0:00 [kworker/u1025:2-kvfree_rcu_reclaim]
+[2026-08-20T08:33:53-04:00] arm=CL1 round=6(tag=recorded) hint_faults_delta=0 pages_migrated_delta=0
+[2026-08-20T08:33:53-04:00] idle check
+USER         PID %CPU %MEM    VSZ   RSS TTY      STAT START   TIME COMMAND
+root        4490  0.2  0.0  81112  4336 ?        Ssl  May27 316:20 /usr/sbin/irqbalance
+root     3447669  0.0  0.0      0     0 ?        I    08:20   0:00 [kworker/u1026:6-events_unbound]
+deparker 3511021  0.0  0.0  22576 13976 ?        Ss   08:22   0:00 /usr/lib/systemd/systemd --user
+root        4591  0.0  0.0 490316 28292 ?        Ssl  May27  29:39 /usr/bin/python3 -Es /usr/sbin/tuned -l -P
+root     3518195  0.0  0.0  16668  7356 ?        S    08:33   0:00 systemd-userwork: waiting...
+root     3318729  0.0  0.0      0     0 ?        I    08:12   0:00 [kworker/u1026:3-events_unbound]
+deparker 3511152  0.0  0.0 228540  3620 ?        S    08:22   0:00 bash /tmp/pb/cand1-l1-sweep.sh
+[2026-08-20T08:34:48-04:00] arm=B round=6(tag=recorded) hint_faults_delta=180986 pages_migrated_delta=1381390
+[2026-08-20T08:34:48-04:00] --- round 7, arm order B CL1 ---
+[2026-08-20T08:34:48-04:00] idle check
+USER         PID %CPU %MEM    VSZ   RSS TTY      STAT START   TIME COMMAND
+root        4490  0.2  0.0  81112  4336 ?        Ssl  May27 316:20 /usr/sbin/irqbalance
+root     3518865  0.1  0.0  16668  7352 ?        S    08:34   0:00 systemd-userwork: waiting...
+root     3447669  0.0  0.0      0     0 ?        I    08:20   0:00 [kworker/u1026:6-kvfree_rcu_reclaim]
+deparker 3511021  0.0  0.0  22576 13976 ?        Ss   08:22   0:00 /usr/lib/systemd/systemd --user
+root        4591  0.0  0.0 490316 28292 ?        Ssl  May27  29:39 /usr/bin/python3 -Es /usr/sbin/tuned -l -P
+deparker 3511152  0.0  0.0 228540  3620 ?        S    08:22   0:00 bash /tmp/pb/cand1-l1-sweep.sh
+root     3318729  0.0  0.0      0     0 ?        I    08:12   0:00 [kworker/u1026:3-kvfree_rcu_reclaim]
+[2026-08-20T08:35:38-04:00] arm=B round=7(tag=recorded) hint_faults_delta=229246 pages_migrated_delta=1387654
+[2026-08-20T08:35:38-04:00] idle check
+USER         PID %CPU %MEM    VSZ   RSS TTY      STAT START   TIME COMMAND
+deparker 3519848 1000  0.0 232676  6108 ?        R    08:35   0:00 ps aux --sort=-%cpu
+root        4490  0.2  0.0  81112  4336 ?        Ssl  May27 316:20 /usr/sbin/irqbalance
+root     3447669  0.0  0.0      0     0 ?        I    08:20   0:00 [kworker/u1026:6-events_unbound]
+root        4591  0.0  0.0 490316 28292 ?        Ssl  May27  29:39 /usr/bin/python3 -Es /usr/sbin/tuned -l -P
+deparker 3511021  0.0  0.0  22576 13976 ?        Ss   08:22   0:00 /usr/lib/systemd/systemd --user
+root     3518865  0.0  0.0  16668  7352 ?        S    08:34   0:00 systemd-userwork: waiting...
+root     3318730  0.0  0.0      0     0 ?        I    08:12   0:00 [kworker/u1025:2-kvfree_rcu_reclaim]
+[2026-08-20T08:36:25-04:00] arm=CL1 round=7(tag=recorded) hint_faults_delta=3 pages_migrated_delta=3
+[2026-08-20T08:36:25-04:00] --- round 8, arm order CL1 B ---
+[2026-08-20T08:36:25-04:00] idle check
+USER         PID %CPU %MEM    VSZ   RSS TTY      STAT START   TIME COMMAND
+root        4490  0.2  0.0  81112  4336 ?        Ssl  May27 316:20 /usr/sbin/irqbalance
+root     3447669  0.0  0.0      0     0 ?        I    08:20   0:00 [kworker/u1026:6-kvfree_rcu_reclaim]
+root        4591  0.0  0.0 490316 28292 ?        Ssl  May27  29:39 /usr/bin/python3 -Es /usr/sbin/tuned -l -P
+deparker 3511021  0.0  0.0  22576 13976 ?        Ss   08:22   0:00 /usr/lib/systemd/systemd --user
+root     3518865  0.0  0.0  16668  7360 ?        S    08:34   0:00 systemd-userwork: waiting...
+deparker 3511152  0.0  0.0 228540  3620 ?        S    08:22   0:00 bash /tmp/pb/cand1-l1-sweep.sh
+root     3318729  0.0  0.0      0     0 ?        I    08:12   0:00 [kworker/u1026:3-kvfree_rcu_reclaim]
+[2026-08-20T08:37:15-04:00] arm=CL1 round=8(tag=recorded) hint_faults_delta=0 pages_migrated_delta=0
+[2026-08-20T08:37:15-04:00] idle check
+USER         PID %CPU %MEM    VSZ   RSS TTY      STAT START   TIME COMMAND
+deparker 3520989 1000  0.0 232676  6108 ?        R    08:37   0:00 ps aux --sort=-%cpu
+root        4490  0.2  0.0  81112  4336 ?        Ssl  May27 316:21 /usr/sbin/irqbalance
+root     3447669  0.0  0.0      0     0 ?        I    08:20   0:00 [kworker/u1026:6-kvfree_rcu_reclaim]
+root        4591  0.0  0.0 490316 28292 ?        Ssl  May27  29:39 /usr/bin/python3 -Es /usr/sbin/tuned -l -P
+deparker 3511021  0.0  0.0  22576 13976 ?        Ss   08:22   0:00 /usr/lib/systemd/systemd --user
+root     3518865  0.0  0.0  16668  7360 ?        S    08:34   0:00 systemd-userwork: waiting...
+deparker 3511152  0.0  0.0 228540  3620 ?        S    08:22   0:00 bash /tmp/pb/cand1-l1-sweep.sh
+[2026-08-20T08:38:11-04:00] arm=B round=8(tag=recorded) hint_faults_delta=177129 pages_migrated_delta=1515761
+[2026-08-20T08:38:11-04:00] --- round 9, arm order B CL1 ---
+[2026-08-20T08:38:11-04:00] idle check
+USER         PID %CPU %MEM    VSZ   RSS TTY      STAT START   TIME COMMAND
+root        4490  0.2  0.0  81112  4336 ?        Ssl  May27 316:21 /usr/sbin/irqbalance
+root     3447669  0.0  0.0      0     0 ?        I    08:20   0:00 [kworker/u1026:6-kvfree_rcu_reclaim]
+root        4591  0.0  0.0 490316 28292 ?        Ssl  May27  29:39 /usr/bin/python3 -Es /usr/sbin/tuned -l -P
+deparker 3511021  0.0  0.0  22576 13976 ?        Ss   08:22   0:00 /usr/lib/systemd/systemd --user
+root     3318730  0.0  0.0      0     0 ?        I    08:12   0:00 [kworker/u1025:2-kvfree_rcu_reclaim]
+deparker 3511152  0.0  0.0 228540  3620 ?        S    08:22   0:00 bash /tmp/pb/cand1-l1-sweep.sh
+root     3318729  0.0  0.0      0     0 ?        I    08:12   0:00 [kworker/u1026:3-events_unbound]
+[2026-08-20T08:38:52-04:00] arm=B round=9(tag=recorded) hint_faults_delta=117171 pages_migrated_delta=1041357
+[2026-08-20T08:38:52-04:00] idle check
+USER         PID %CPU %MEM    VSZ   RSS TTY      STAT START   TIME COMMAND
+root        4490  0.2  0.0  81112  4336 ?        Ssl  May27 316:21 /usr/sbin/irqbalance
+root     3447669  0.0  0.0      0     0 ?        I    08:20   0:00 [kworker/u1026:6-events_unbound]
+root        4591  0.0  0.0 490316 28292 ?        Ssl  May27  29:39 /usr/bin/python3 -Es /usr/sbin/tuned -l -P
+deparker 3511021  0.0  0.0  22576 13976 ?        Ss   08:22   0:00 /usr/lib/systemd/systemd --user
+deparker 3511152  0.0  0.0 228540  3620 ?        S    08:22   0:00 bash /tmp/pb/cand1-l1-sweep.sh
+root     3318729  0.0  0.0      0     0 ?        I    08:12   0:00 [kworker/u1026:3-events_unbound]
+root     3318730  0.0  0.0      0     0 ?        I    08:12   0:00 [kworker/u1025:2-kvfree_rcu_reclaim]
+[2026-08-20T08:39:51-04:00] arm=CL1 round=9(tag=recorded) hint_faults_delta=0 pages_migrated_delta=0
+[2026-08-20T08:39:51-04:00] --- round 10, arm order CL1 B ---
+[2026-08-20T08:39:51-04:00] idle check
+USER         PID %CPU %MEM    VSZ   RSS TTY      STAT START   TIME COMMAND
+deparker 3522704 1000  0.0 232528  6040 ?        R    08:39   0:00 ps aux --sort=-%cpu
+root        4490  0.2  0.0  81112  4336 ?        Ssl  May27 316:21 /usr/sbin/irqbalance
+root     3447669  0.0  0.0      0     0 ?        I    08:20   0:00 [kworker/u1026:6-kvfree_rcu_reclaim]
+root        4591  0.0  0.0 490316 28292 ?        Ssl  May27  29:39 /usr/bin/python3 -Es /usr/sbin/tuned -l -P
+deparker 3511021  0.0  0.0  22576 13976 ?        Ss   08:22   0:00 /usr/lib/systemd/systemd --user
+root     3521189  0.0  0.0  16668  7372 ?        S    08:37   0:00 systemd-userwork: waiting...
+deparker 3511152  0.0  0.0 228540  3620 ?        S    08:22   0:00 bash /tmp/pb/cand1-l1-sweep.sh
+[2026-08-20T08:40:48-04:00] arm=CL1 round=10(tag=recorded) hint_faults_delta=0 pages_migrated_delta=0
+[2026-08-20T08:40:48-04:00] idle check
+USER         PID %CPU %MEM    VSZ   RSS TTY      STAT START   TIME COMMAND
+deparker 3523310  900  0.0 232528  5936 ?        R    08:40   0:00 ps aux --sort=-%cpu
+root        4490  0.2  0.0  81112  4336 ?        Ssl  May27 316:21 /usr/sbin/irqbalance
+root     3447669  0.0  0.0      0     0 ?        I    08:20   0:00 [kworker/u1026:6-kvfree_rcu_reclaim]
+root        4591  0.0  0.0 490316 28292 ?        Ssl  May27  29:39 /usr/bin/python3 -Es /usr/sbin/tuned -l -P
+root     3522801  0.0  0.0      0     0 ?        I    08:39   0:00 [kworker/u1025:3-kvfree_rcu_reclaim]
+deparker 3511021  0.0  0.0  22576 13976 ?        Ss   08:22   0:00 /usr/lib/systemd/systemd --user
+root     3521189  0.0  0.0  16668  7372 ?        S    08:37   0:00 systemd-userwork: waiting...
+[2026-08-20T08:41:45-04:00] arm=B round=10(tag=recorded) hint_faults_delta=434579 pages_migrated_delta=1664218
+[2026-08-20T08:41:45-04:00] === sweepL1 complete ===

@@ -2018,3 +2018,179 @@ withdrawn pending the L1-only re-run, since arm C's advantage where it appeared 
 better attributed to Layer 2's memory homing than to balancer suppression, and that distinction
 matters directly for what Layer 0+1 alone will do when shipped without Layer 2. See the "L1-only
 re-run" subsection below for the corrected measurement.
+
+## L1-only pathology re-run (2026-08-20)
+
+Answers the question the CRITICAL correction above raised: every "arm C" result in the sections
+above was measured against Layer 0+1+**2** (BIND-all task mempolicy plus per-4 MiB-chunk
+`MPOL_PREFERRED` heap-growth homing), not the Layer 0+1 (BIND-all-only) slice actually proposed for
+shipping. This re-run builds a scratch, uncommitted patch that removes Layer 2's `MPOL_PREFERRED`
+refinement from `numaBindArena`, keeping only the BIND-all `MPOL_BIND` call, and re-measures
+candidate 1 (and, since remote time permitted, candidate 3) with a new arm **C-L1** in place of the
+original arm C.
+
+**Scratch patch** (built with, never committed to the branch; full text archived at
+`numa-design/bench-data/pathology/l1-only.patch`):
+
+```diff
+diff --git a/src/runtime/numa_linux.go b/src/runtime/numa_linux.go
+index 73909888c6..d680e03442 100644
+--- a/src/runtime/numa_linux.go
++++ b/src/runtime/numa_linux.go
+@@ -318,13 +318,7 @@ func numaBindArena(addr unsafe.Pointer, size uintptr) {
+ 	var mask numaNodemask
+ 	mask[0] = w0
+ 	linux.Syscall6(linux.SYS_MBIND, uintptr(addr), size, uintptr(_MPOL_BIND), uintptr(unsafe.Pointer(&mask[0])), numaMaxNode, 0)
+-
+-	node, ok := numaGetCPUNode()
+-	if !ok || node >= 64 {
+-		return
+-	}
+-	var pmask numaNodemask
+-	pmask[uintptr(node)/numaNodemaskBits] = 1 << (uintptr(node) % numaNodemaskBits)
+-	linux.Syscall6(linux.SYS_MBIND, uintptr(addr), size, uintptr(_MPOL_PREFERRED), uintptr(unsafe.Pointer(&pmask[0])), numaMaxNode, 0)
+-	numaPreferredCalls.Add(1)
++	// L1-ONLY SCRATCH PATCH (not committed): Layer 2's MPOL_PREFERRED
++	// refinement removed for the audit's decisive re-run. BIND-all above
++	// is the only policy applied per arena.
+ }
+```
+
+Applied on top of `8b8a71f4eb` on the remote (`numa-dell`) tree only, never on the local worktree
+and never committed. Built with `GOROOT_FINAL=/home/deparker/go-numa ./src/make.bash` (clean
+build, no errors). Sanity-checked before the sweeps: `garbage` built against this toolchain with
+`GOEXPERIMENT=numa` shows 0/0 vmstat on a pilot run (BIND-all still fully suppresses the balancer)
+and peak-RSS in the same ~7.4 GiB range as every other arm-B/C build this session. After both
+sweeps below completed, the remote tree was restored with `git checkout -f src/runtime/numa_linux.go`
+and rebuilt via `./src/make.bash` back to stock — confirmed clean (`git diff --stat` empty,
+`bin/go version` reports the same `8b8a71f4eb` build timestamp as before the patch, and
+`numaPreferredCalls.Add(1)` is back in the source) before ending the session. Arm B in both sweeps
+below reuses the existing stock binaries built earlier in this session (`/tmp/pb/base/garbage`,
+`/tmp/pb/phaseshift-base`) — those never depended on this patch, so no re-build was needed for
+them.
+
+### Candidate 1 L1-only: `x/benchmarks garbage`, B vs C-L1, GOMAXPROCS=128, n=10
+
+Same config as the original candidate 1 sweep (`-benchmem=4096 -benchnum=1`, rotating BC/CB order,
+one warmup round, vmstat snap per run). Two arms only (B, C-L1) — no arm A this time (item 2 of the
+audit did not ask for one, and B-vs-A/C-vs-A were already established as pinning comparisons, not
+balancer comparisons, in the correction above).
+
+**Mechanism validity (arm B, n=10 recorded rounds):** hint faults min=117,171 max=434,579
+mean=227,708; pages migrated min=1,041,357 max=1,673,693 mean=1,368,241 — consistent with every
+prior candidate-1 B measurement this session. **Arm C-L1: 0/0 in 9 of 10 rounds, negligible noise
+(3/3) in the other** — confirms BIND-all alone still fully suppresses the balancer with Layer 2
+removed, exactly as it did with Layer 2 present.
+
+**benchstat, primary metric (ns/op, `Garbage/benchmem-MB=4096-128`):**
+
+- **B vs C-L1 (primary for this re-run):** B = 3.003ms ± 3%, C-L1 = 3.209ms ± 28% → **~ (p=0.315,
+  n=10) — not significant.**
+- Exploratory: user+sys-sec/op C-L1 higher than B by +11.13% (p=0.029) — the one metric that
+  differs significantly; everything else (GC-bytes, STW, allocs, RSS, VM) is a clean null.
+
+**Verdict: the shippable Layer 0+1 slice does NOT reproduce the original full-C (Layer 0+1+2)
+regression on this workload.** Original arm C (Layer 0+1+2) was significantly *slower* than B by
++8.58% (p=0.003, a clean, well-powered reversal). C-L1 (Layer 0+1 only) shows no significant
+difference from B at all (p=0.315) — night-and-day different from the full-C result, and the C-L1
+point estimate (+6.9% slower, not significant) sits well inside C-L1's own very wide ±28% CI. **This
+directly answers the question item 2 posed: Layer 2 (the per-chunk `MPOL_PREFERRED` homing), not
+BIND-all, was the culprit behind candidate 1's original regression.** BIND-all alone is
+statistically indistinguishable from stock Go on this workload, at n=10 — no regression, but also
+no measured recovery; consistent with, and now directly supporting, the mechanism-suppression +
+no-regression story this design set out to establish for the actual shippable slice.
+
+Raw data: `numa-design/bench-data/pathology/l1only-arm{B,CL1}-{warmup,recorded}.out{,.stderr}`,
+per-round `l1only-arm*-r*.vmstat.{before,after}`, `l1only-vmstat-summary.txt`, `sweepL1.log`,
+`pilotL1.out`/`pilotL1.stderr`, and the sweep driver script,
+`numa-design/bench-data/pathology/cand1-l1-sweep.sh`.
+
+### Candidate 3 L1-only: phase-shift, B vs C-L1, GOMAXPROCS=128, n=10
+
+Remote time permitted a second re-run (item 2.3, "optional but valuable"): candidate 3 (the
+"suggestive, not robust" phase-inversion migration storm) against C-L1, using the already-built
+`/tmp/pb/l1/phaseshift-l1` and the existing stock `/tmp/pb/phaseshift-base`. Same config as the
+original candidate 3 sweep (`-heap=6144 -readers=64 -phase=30 -phases=4`, rotating BC/CB order,
+one warmup round, vmstat snap per run). Two arms only (B, C-L1); no arm A (per the same reasoning
+as candidate 1's L1-only re-run above — arm A's original role here was already established as
+uninterpretable/informational, not worth repeating).
+
+**Mechanism validity (arm B, n=10 recorded rounds):** hint faults min=24,246 max=36,091
+mean=28,079; pages migrated min=3,314,918 max=5,162,399 mean=4,373,203 — consistent with every
+prior candidate-3 B measurement. **Arm C-L1: exactly 0/0 in all 10 recorded rounds** (cleaner even
+than the original full-C's 9/10-clean result) — BIND-all alone fully suppresses the balancer here
+too.
+
+**benchstat, primary metric (ns per pointer-read, `BenchmarkPhaseChase`, n=10):**
+
+- **B vs C-L1:** B = 1.551ns ± 7%, C-L1 = 1.174ns ± 48% → **-24.31% (p=0.023, n=10) — C-L1
+  significantly FASTER than B.** The effect is *larger* than the original full-C result (-16.82%,
+  p=0.029), not smaller.
+
+**Robustness checks, independently computed the same way as for the original candidate 3 result
+(paired by round index, exact enumeration where feasible):**
+
+- **Paired sign test:** 8 of 10 rounds have C-L1 < B (same count as the original run) — exact
+  two-sided p=**0.109**, unchanged (the sign test only sees direction, not magnitude, so an 8/10
+  split caps its power at this n regardless of effect size).
+- **Wilcoxon signed-rank test:** exact two-sided p=**0.0137** — **significant**, and substantially
+  stronger than the original run's p=0.084. The two reversed-sign rounds are smaller in magnitude
+  relative to the seven-plus in-direction rounds than they were in the original run.
+- **Leave-one-out (exact Mann-Whitney U, 9 vs 9, each round dropped in turn):** p range
+  **0.0040-0.0503** — every one of the ten leave-one-out subsets lands at or extremely close to
+  α=0.05 (the single worst case is 0.0503, a rounding hair above the threshold), versus the
+  original run's much wider 0.006-0.077 range that included several clearly non-significant
+  subsets.
+
+**Migration-traffic-vs-bandwidth check (same method as the original candidate 3 writeup):** arm B's
+mean migration traffic here is ≈0.30 GB/s two-way (4,373,203 pages/run × 4096 B × 2 ÷ 120 s),
+≈0.7% of B's own ~41 GB/s mean demand — again far too small to explain a 24% throughput swing via
+fault/copy cost alone.
+
+**Verdict: the L1-only re-run does NOT explain away candidate 3's effect — if anything, it
+strengthens it.** This directly contradicts the hypothesis offered in the original candidate 3
+correction above (that the win was "more consistent with avoiding single-controller consolidation
+... a byproduct of Layer 2's per-chunk homing than of balancer suppression"): C-L1 has **no** Layer
+2 homing at all, yet shows a larger, more statistically robust win than the Layer 0+1+2 build did.
+The dual-memory-controller-bandwidth *mechanism* proposed earlier likely still holds (arm B's own
+bandwidth figures here, 37.5-45.9 GB/s, again exceed the single-controller ~31 GB/s ceiling
+established in the original candidate 3 pilot, and C-L1 reaches even higher, 33.0-57.9 GB/s) — but
+the *cause* of C reaching that bandwidth is evidently BIND-all's suppression of the balancer's
+churn (which otherwise presumably disrupts steady dual-controller access patterns via its own
+periodic PROT_NONE-then-fault-then-possibly-migrate cycling), not Layer 2's explicit per-chunk
+placement. **Revised candidate 3 verdict: still not fully robust by the sign test alone, but now
+supported by a significant Wilcoxon result and a leave-one-out range that is essentially uniformly
+at or below α=0.05 — meaningfully more solid evidence for a genuine BIND-all-attributable recovery
+on this specific synthetic workload than the original (Layer 0+1+2) measurement provided.**
+
+Raw data: `numa-design/bench-data/pathology/l1only-cand3-arm{B,CL1}-{warmup,recorded}.out{,.stderr}`,
+per-round `l1only-cand3-arm*-r*.vmstat.{before,after}`, `l1only-cand3-vmstat-summary.txt`,
+`sweep3L1.log`, and the sweep driver script,
+`numa-design/bench-data/pathology/cand3-l1-sweep.sh`.
+
+### L1-only re-run: overall
+
+This re-run splits the two candidates' original findings apart along the axis that actually
+matters for the upstream submission — what does Layer 0+1 (the shippable slice) do, as opposed to
+what did this session's build (Layer 0+1+2) do:
+
+| Candidate | Original (Layer 0+1+2) C vs B | L1-only (Layer 0+1) C-L1 vs B | Layer 2's apparent contribution |
+|---|---|---|---|
+| 1 — garbage | Significant regression, +8.58% (p=0.003) | **Null, ~ (p=0.315)** | Layer 2 caused the regression; BIND-all alone does not reproduce it |
+| 3 — phase-shift | Suggestive win, -16.82% (p=0.029), fragile on robustness checks | **Larger, more robust win, -24.31% (p=0.023), Wilcoxon-significant (p=0.014), LOO range 0.004-0.050** | Layer 2 was not needed for the effect and may even have been diluting it |
+
+**This is good news for the Layer 0+1 shippable slice, on both fronts.** Candidate 1's original
+regression — the most damaging single result in this whole investigation — does not reproduce
+without Layer 2; BIND-all alone is statistically indistinguishable from stock Go on that workload.
+Candidate 3's suggestive-but-fragile win turns out not to depend on Layer 2 either, and is if
+anything cleaner without it. Neither result proves BIND-all delivers a *general* performance
+recovery (candidate 1 is a clean null, not a win), but together they support a materially better
+story for Layer 0+1 alone than the original (Layer 0+1+2) measurements did: **no regression on a
+realistic throughput workload, and a real, reasonably robust, if narrow (one synthetic workload)
+recovery on the specific "perpetual migration storm" pathology the original #14406 issue and this
+whole design were built around.**
+
+Neither L1-only sweep independently re-derives *why* Layer 2 caused candidate 1's regression (that
+would need a further isolation sweep, not run here) or fully explains the dual-controller-bandwidth
+mechanism candidate 3 points at (that would need IMC/`perf`-level instrumentation, also not run
+here) — both are natural next steps flagged for a future session, not resolved by this re-run.
