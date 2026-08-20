@@ -590,3 +590,68 @@ All hard gates (1P json off-vs-on, 1P alloc micro, parent-commit comparison) pas
 1. **Machine noise at `GOMAXPROCS=1` on `numa-dell` is large** (±29–86% relative stdev observed across gates), consistent with HWP/Turbo P-state transitions when only 1 of 256 CPUs is active. The plan's hand-rolled median comparator (`gate-json.sh`'s embedded Python) produced one false FAIL (Gate 1, `BENCHNUM=10`) purely from bimodal-noise median placement; `benchstat` correctly showed no significant difference on the same data. Recommend `gate-json.sh` itself be changed (in a follow-up task, not this one — no `src/` or script changes were made here) to run `benchstat` as the primary decision path rather than only "near the band," since "near the band" undersells how noisy this box is even for supposedly-clear results.
 2. No `BenchmarkMallocTypes` exists in this runtime tree, so Gate 2 only covers `Malloc8`/`Malloc16`; the brief's regex `Malloc(8|16|Types)` was written to also match a benchmark that doesn't exist here.
 3. **Gate 4's literal pass bar ("differ only in build IDs") was not met and cannot be at this layer** — adding any `debug.<name>` dbgvar shifts RIP-relative addresses of subsequent globals in every function that references them, off-binary or not. Gate 4 passed on the substantive criterion (zero function-level/opcode/branch-target changes) instead; see the Gate 4 entry above for the full explanation. Future layers that add dbgvars will hit the same structural limit.
+
+## Layer 1 implementation notes (Task 6: BIND-all task mempolicy + arena mbind)
+
+Added after Layer 0's gates above; not a re-run of the performance gates (Layer 1 is
+correctness-scoped, not perf-scoped, per its task brief). Two implementation notes the Task 6
+brief requires recording here:
+
+**(a) Catch-up mbind of pre-`numaSchedinit` `curArena` ranges was skipped.** `mheap.grow` can
+run before `numaSchedinit` (the `goargs`/`goenvs` allocations that happen before
+`finishDebugVarsSetup`, which precedes `numaSchedinit`, in `schedinit`). Heap chunks grown in
+that early window get no VMA policy from `numaBindArena` (it's a guarded no-op until
+`numaSetProcessBindAll` publishes a non-empty mask), and this implementation does not walk
+`h.curArena`/`h.arenas` from `numaSchedinit` afterward to retroactively `mbind` them. Per the
+brief's own fallback: those ranges are not unprotected in practice, because
+`numaSetProcessBindAll`'s task-wide `set_mempolicy(MPOL_BIND, ...)` (called moments later, in
+the same `schedinit`, before any other goroutine runs) governs page placement for any VMA
+without its own policy. The gap is real but small (bounded to early-startup allocation volume)
+and covered by the task policy, not left to the kernel's default first-touch/interleave
+behavior. See `task-6-report.md`'s "Design choices" section for the full reasoning.
+
+**(b) Kernel-version dependence of multi-node `MPOL_BIND` fill order (CONCERN, unresolved).**
+The brief flags that old kernels fill the lowest-numbered allowed node first under `MPOL_BIND`
+(silent capacity/locality skew toward node 0), while recent kernels prefer the local node.
+`numa-dell`, the only multi-node machine this was tested on, runs
+`6.12.0-211.7.1.el10_2.x86_64` — a recent kernel, on which local-node preference is expected,
+not the older lowest-node-first behavior. This was **not independently verified** (would
+require a node-placement micro-benchmark measuring which node pages actually land on under
+load, which is out of scope for Task 6); anyone shipping this to a fleet with materially older
+kernels should treat the fill-order behavior as unverified on that fleet.
+
+### Fix: task review findings (2026-08-19, post-implementation review)
+
+Task 6's initial implementation was reviewed and returned 1 Critical + 3 Important findings,
+all fixed in the amended implementation commit; full detail in `task-6-report.md`'s "Fix:
+review findings" section. Summary:
+
+- **Critical — 32-bit `get_mempolicy`/`set_mempolicy`/`mbind` out-of-bounds kernel write.**
+  `maxnode` was computed as `numaNodemaskBits+1`, which is 33 on 32-bit platforms (386, arm,
+  mips, mipsle) because `numaNodemaskBits` is `8*sizeof(uintptr)` = 32 there. The kernel sizes
+  its nodemask read/write as `BITS_TO_LONGS(maxnode-1)` kernel ulongs, which is 8 bytes for
+  `maxnode=65` on every architecture (2 32-bit ulongs or 1 64-bit ulong) — but our destination
+  was a single 4-byte `uintptr`, a 4-byte out-of-bounds kernel write on 32-bit hosts. Fixed:
+  `maxnode` is now a fixed `65` on every architecture (`numaMaxNode`), and the nodemask buffer
+  is a `numaNodemaskWords`-word array (`numaNodemask`, 1 word on 64-bit, 2 on 32-bit) sized to
+  match the kernel's 8-byte requirement exactly. Verified via `go tool compile -S` on
+  `GOARCH=386` and `GOARCH=arm` that all three syscall sites now load `$65`, not `$33`.
+- **Important — single-node exemption.** `numaSetProcessBindAll` now returns before any
+  syscall when `numaTopology.NumNodes < 2`, matching the plan's "experiment off or single-node:
+  behavior identical to stock Go" constraint. Verified on this (single-node) laptop with the
+  experiment on: task mempolicy mode stays `0` (`MPOL_DEFAULT`).
+- **Important — fallback footgun.** If `get_mempolicy(MPOL_F_MEMS_ALLOWED)` fails and topology
+  discovery had itself failed (installing the synthesized single-node fallback topology), the
+  rebuilt mask would have been exactly `{node0}`, silently BIND-ing a genuinely multi-node host
+  down to one node. Fixed by a combined rule: if the final mask (from either the syscall or the
+  topology-fallback path) has fewer than 2 bits set, `set_mempolicy` is never called and the
+  mask is never published.
+- **Important — publish only on `set_mempolicy` success.** `numaAllowedNodemask` is now stored
+  only after `set_mempolicy` itself returns success; previously a failing `set_mempolicy` still
+  published the mask, meaning every subsequent `mheap.grow` would pay a guaranteed-failing
+  `mbind`.
+
+Also applied two optional/trivial reviewer minors: dropped the write-only
+`numaBindArenaFailures` counter (never read anywhere), and the test's `get_mempolicy` mode
+export hook now masks `MPOL_MODE_FLAGS` out of the returned mode and distinguishes a syscall
+failure (`-1`) from a genuine `MPOL_DEFAULT` (`0`) result.
