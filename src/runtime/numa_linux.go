@@ -246,7 +246,15 @@ func numaSetProcessBindAll() {
 // mbind call (BIND or PREFERRED) never sets MPOL_F_MOF on the VMA, so the
 // balancer skips it regardless of mode, and every VMA this function never
 // reaches (or where PREFERRED is skipped) is still covered by the
-// task-wide policy numaSetProcessBindAll installed.
+// task-wide policy numaSetProcessBindAll installed. Note that a successful
+// PREFERRED call also drops the BIND-all call's allowed-nodes restriction
+// for that one chunk -- MPOL_PREFERRED lets the kernel fall back to any
+// node if the preferred one is out of memory, whereas MPOL_BIND would not.
+// This is intentional (matching Linux's usual MPOL_PREFERRED semantics)
+// and not a containment gap: the process's cpuset (cpuset.mems, if any)
+// still bounds every allocation regardless of which mbind mode a given
+// chunk carries, exactly as it already bounds numaSetProcessBindAll's
+// task-wide policy.
 //
 // numaBindArena is called from mheap.grow, with h.lock held, immediately
 // after each sysMap of newly-backed heap memory (mmap with MAP_FIXED

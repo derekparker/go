@@ -9,13 +9,18 @@
 // referencing them would break every non-Linux build of the runtime test
 // archive, so this file carries its own //go:build linux tag.
 //
-// numaCurrentNode calls getcpu, which only has an assembly implementation
-// for amd64 and arm64 (see sys_linux_amd64.s, sys_linux_arm64.s); other
-// Linux architectures are out of scope for this layer. Without the
-// (amd64 || arm64) restriction, `GOEXPERIMENT=numa go test runtime` fails
-// to link on those architectures with "relocation target runtime.getcpu
-// not defined", even though ordinary (non-test) binaries are unaffected
-// because nothing outside this file calls numaCurrentNode.
+// numaCurrentNode itself links on every Linux architecture: it goes
+// through the numaGetCPUNode wrapper (see numa_linux_getcpu.go,
+// numa_linux_getcpu_other.go), which only calls the asm-only getcpu(2) on
+// amd64 and arm64 and always reports failure elsewhere. So the
+// (amd64 || arm64) restriction on this file is not a link-safety
+// requirement -- it is a test-scoping one: on every other Linux
+// architecture, numaGetCPUNode's stub always returns ok=false, so
+// NumaCurrentNodeForTest() would always report -1 there, making a
+// getcpu-based test either always-skip or always-fail rather than
+// exercise real behavior. This file (and numa_linux_test.go, which
+// carries the same restriction) is kept scoped to the architectures
+// getcpu actually works on -- the ones CI/this task's hardware exercise.
 
 //go:build linux && (amd64 || arm64)
 
