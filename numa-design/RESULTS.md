@@ -1674,6 +1674,25 @@ Design: `numa-design/pathology-bench-design.md` (mechanism analysis, candidate r
 command lines, controls, kill criteria, statistical plan — followed as written; deviations noted
 inline below). Commits: gc-pause-bench heavy-profile flags `ff47d48b2d`, phase-shift candidate 3
 `6b535e2ca9` (fixed for a primary-metric truncation bug in `fb90222b76` — see candidate 3 below).
+The design document itself was committed to the branch only after this section's data was
+collected (not before, as pre-registration would require) — its stated "decided before any run"
+status is not independently git-verifiable from this repository's history alone.
+
+**CRITICAL correction (post-hoc audit, 2026-08-20): arm C in every candidate below is not the
+Layer 0+1 (BIND-all-only) slice.** `GOEXPERIMENT=numa` at the HEAD commit these binaries were
+built from (`7ec36777f3`) still compiles Layer 2's per-arena `MPOL_PREFERRED` heap-growth homing:
+`numaBindArena` in `src/runtime/numa_linux.go` (~line 313) issues the Layer-2 `mbind(..,
+MPOL_PREFERRED, ..)` call unconditionally on every `mheap.grow`, gated only by
+`goexperiment.Numa` — the same code path the Layer 2 gate battery measured earlier in this file
+(the `wc -l /proc/PID/maps` 34→1172 VMA-count evidence under "Gate 6 — IMC locality" above is that
+homing actually taking effect). Layer 2 was **not reverted** when its IMC gate failed; only
+Layers 3-4 were cancelled. **No number in this section measures the proposed Layer 0+1
+(BIND-all-only) shippable slice as it will actually ship** — every arm-C result below is Layer
+0+1+2 combined. Every "this repo's `GOEXPERIMENT=numa` is Layer 0+1 only" / "BIND-all ... freezes
+whatever node each page's first-touching thread landed on" claim in the original version of this
+section was **wrong** and has been removed below. The "L1-only re-run" subsection at the end of
+this file re-measures candidate 1 (and, if time permitted, candidate 3) against a scratch build
+with Layer 2's `MPOL_PREFERRED` call removed, to actually answer what the shippable slice does.
 
 **Environment:** `numa-dell`, 256 logical CPUs / 2 nodes (even=node0, odd=node1), ~15 GiB/node,
 kernel `6.12.0-211.7.1.el10_2.x86_64`, `kernel.numa_balancing=1` (unchanged throughout),
@@ -1700,8 +1719,17 @@ outputs, per-round vmstat snaps, and vmstat-delta summaries for all three candid
 
 ### Candidate 1 — `x/benchmarks garbage`, GOMAXPROCS=128, `-benchmem=4096 -benchnum=1`, n=10
 
-Pilot (untimed, arm A): peak-RSS-bytes = 7.92 GiB, under the 10 GiB abort threshold (design
-§3 candidate 1) — proceeded with the full sweep.
+Pilot (untimed, arm A): peak-RSS-bytes = 7,920,259,072 B = **7.38 GiB** (7.92 GB decimal — the
+original writeup mislabeled the decimal-GB figure as GiB; corrected here), under the 10 GiB abort
+threshold (design §3 candidate 1) — proceeded with the full sweep.
+
+Protocol note: one of arm B's 10 recorded rounds (round 6) completed with `b.N=5000` instead of
+the `10000` every other round (all arms, all candidates) ran — visible in the raw benchmark line
+in `cand1-armB-recorded.out`. `x/benchmarks garbage`'s `-benchnum=1` does not otherwise vary `b.N`
+run-to-run; the cause was not tracked down further. That round's ns/op (2,937,193, line 48 of the
+raw file) is not a visible outlier against its neighbors (2,988,154 and 2,690,438), so it was kept
+in the benchstat inputs below, but the underlying iteration-count instability is recorded here as
+an open protocol-hygiene caveat.
 
 **Mechanism validity (arm B, n=10 recorded rounds):** hint faults min=57,446 max=308,435
 mean=171,552; pages migrated min=989,471 max=1,572,161 mean=1,309,928. Arms A and C: **exactly
@@ -1731,23 +1759,22 @@ sign of a setup failure.
 shows a significant C-vs-B win"** — it did not (C lost), so the supplement was correctly skipped.
 
 **Verdict: candidate 1's primary claim FAILS**, and fails harder than the design's plain kill rule
-anticipated (a null "~" result) — this is a *significant reversal*. Working mechanistic
-explanation, offered honestly and not as a proven claim: this repo's `GOEXPERIMENT=numa` is
-Layer 0+1 only (BIND-all task mempolicy; Layers 2-4 arena/mcentral/steal locality were killed per
-the Layer 2 verdict earlier in this file — see "Layer 2 verdict" above). BIND-all suppresses the
-balancer's fault/migration tax completely but supplies no compensating locality: it freezes
-whatever node each page's first-touching thread landed on. Arm B pays the tax but, over a
-~10,000-iteration/~30 s run, the balancer has time to *converge* memory placement toward whichever
-threads actually use it; arm C never migrates and is stuck at initial (likely mixed, since neither
-allocating nor accessing threads are pinned) placement for the whole run. If convergence's benefit
-to B outweighs the fault/migration tax it pays to get there, B beats C — consistent with what was
-measured. The secondary (B-worse-than-A) result independently confirms the tax is real and large
-relative to full single-node locality (A); it just isn't recovered by BIND-all's suppression alone
-on this workload.
+anticipated (a null "~" result) — this is a *significant reversal*. **The mechanistic explanation
+in the original version of this section (BIND-all-as-Layer-0+1-only "freezing first-touch
+placement") is wrong and has been removed** — see the CRITICAL correction at the top of this
+section: arm C here is Layer 0+1+2 (BIND-all *plus* per-4MiB-chunk `MPOL_PREFERRED` homing), not
+BIND-all alone, so this result cannot be attributed to BIND-all's suppression trading away balancer
+convergence. What actually caused C to lose to B on this workload is not established by this
+sweep; the L1-only re-run below (arm "C-L1", Layer 2's `MPOL_PREFERRED` call removed) is the
+measurement that isolates it. **Do not draw a mechanism conclusion from this candidate's C-vs-B
+result alone** — only that arm C, as actually built (Layer 0+1+2), loses to unpinned stock Go here.
+Separately: do not read the A-vs-B gap below as evidence about the balancer specifically — see the
+"A-vs-B measures pinning, not the balancer" note in the overall verdict section.
 
 Raw data: `numa-design/bench-data/pathology/cand1-arm{A,B,C}-{warmup,recorded}.out{,.stderr}`,
 per-round `cand1-arm*-r*.vmstat.{before,after}`, `cand1-vmstat-summary.txt`, `sweep.log`,
-`pilotA.out`/`pilotA.time`.
+`pilotA.out`/`pilotA.time`, and the sweep driver script itself,
+`numa-design/bench-data/pathology/cand1-sweep.sh`.
 
 ### Candidate 2 — gc-pause-bench heavy profile, GOMAXPROCS=128, n=10 (8 measured + 2 discarded cycles/round)
 
@@ -1772,28 +1799,46 @@ magnitude below B. Arm C: 0/0 in 7 of 10 rounds, negligible noise (2/2, 44/31, 1
 literal "0/0" as the design's shorthand states, but they are not remotely comparable to B's
 activity and do not indicate the balancer running on A/C.
 
-**benchstat, primary metric (median GC-cycle wall time, `BenchmarkGCCycleWall`, n=80
-samples/arm = 8 cycles × 10 rounds):**
+**benchstat, cycle-level (`BenchmarkGCCycleWall`, n=80 samples/arm = 8 cycles × 10 rounds):**
 
 - **Primary (C vs B):** B = 3.952s ± 2%, C = 3.970s ± 0% → **~ (p=0.179, n=80) — not
   significant.**
-- **Secondary (A vs B):** A = 3.163s ± 3%, B = 3.952s ± 2% → **+24.96% (p=0.000, n=80) — B
-  significantly slower than A.** Per design §4, this is "the candidate expected to show B worse
-  than A most cleanly" (only ~32 mark workers run during the measured window, CPU count barely
-  matters) — confirmed.
+- **Secondary (A vs B):** A = 3.163s ± 3%, B = 3.952s ± 2% → **+24.96% (p=0.000, n=80).**
 - **Exploratory (A vs C):** A = 3.163s ± 3%, C = 3.970s ± 0% → +25.53% (p=0.000, n=80).
 
-**Verdict: candidate 2's primary claim FAILS** — this is exactly the design's plain kill condition
-(§6): p≥0.05 on the primary metric AND the balancer mechanism confirmed active in B while A/C are
-clean. BIND-all suppresses B's real, substantial fault/migration tax, but at n=80 that tax is not
-large enough, relative to this metric's own ~2-3% run-to-run noise, to move the median. Read
-together with candidate 1: the balancer's time-domain cost is real (confirmed twice, by two
-independent mechanisms) but its *recoverable* fraction — the part BIND-all's suppression alone
-converts into a measured win over B — is at or below this box's noise floor for both workloads
-tried.
+**IMPORTANT correction (post-hoc audit): the n=80 above overstates the effective sample size.**
+The 8 measured cycles within a round are not independent draws — they share one process's warm-up
+state, one heap, one balancer-marking history. Intraclass correlation (one-way random-effects
+ICC(1), computed from the 10-round × 8-cycle grouping, independently re-derived from the archived
+per-cycle data): **arm A 0.999, arm B 0.637, arm C 0.979** — i.e. within a round, cycles cluster
+strongly (B's within-round CV is only ~3%). Treating 80 correlated cycles as 80 independent
+samples inflates the apparent n and narrows the confidence interval more than the data supports.
+The design-appropriate unit is the **round** (n=10, matching every other candidate here), using
+each round's median cycle as its one sample:
+
+- **Round-level (median of 8 cycles/round, n=10 rounds/arm):** B round-medians 3.578-4.294s
+  (median of medians 3.941s), C round-medians 3.662-4.281s (median of medians 3.966s) → **+0.64%
+  (exact Mann-Whitney U on the 10 round-level values, p=0.579) — not significant, same direction
+  and same non-significance as the cycle-level test, at the sample size the data actually
+  supports.**
+- **Noise floor, quoted honestly instead of implied precision:** run-to-run CV of B's round medians
+  is **5.25%** (C: 3.78%). A two-sample-equivalent minimum detectable effect at α=0.05, power=0.80,
+  n=10 rounds/arm, using the pooled round-level CV (4.45%), is **≈5.6%** (a similar calculation
+  using slightly different assumptions, cited in the audit that prompted this correction, gives
+  ≈6.6% — both land in the same 5-7% band). **This null result excludes a large tax (order
+  ≥5-7%); it does not exclude — and was never powered to detect — a small one.**
+
+**Verdict: candidate 2's primary claim FAILS at both the cycle level and the (more honest)
+round level** — this remains the design's plain kill condition (§6): no significant difference on
+the primary metric, with the balancer mechanism confirmed active in B while A/C are clean. The
+correction narrows what can be claimed from the null: it rules out a tax on the order of the MDE
+(~5-7%) or larger, not any tax at all. As with candidate 1, **arm C here is Layer 0+1+2, not
+Layer 0+1 alone** (see the CRITICAL correction at the top of this section) — this result does not
+by itself characterize the shippable BIND-all-only slice.
 
 Raw data: `numa-design/bench-data/pathology/cand2-arm{A,B,C}-{warmup,recorded}.out{,.stderr}`,
-per-round `cand2-arm*-r*.vmstat.{before,after}`, `cand2-vmstat-summary.txt`, `sweep2.log`.
+per-round `cand2-arm*-r*.vmstat.{before,after}`, `cand2-vmstat-summary.txt`, `sweep2.log`, and the
+sweep driver script, `numa-design/bench-data/pathology/cand2-sweep.sh`.
 
 ### Candidate 3 — phase-shift (exploratory; ran because both 1 and 2 failed C-vs-B with valid fault floors)
 
@@ -1814,10 +1859,11 @@ all variance (`benchstat` reported "all samples are equal" for every comparison)
 n=10+1-warmup sweep was re-run from scratch on the corrected binaries — the data below is from the
 corrected run only; the truncated run's `.out` files were discarded and are not archived.
 
-Pilot (untimed, all three arms, `-phase=5 -phases=2`): peak-RSS ≈ 6.7 GiB all arms (well under the
-10 GiB gate); arm A's `noop-pin` fallback confirmed working correctly on real hardware (`allowed
-cpuset: 128 even (node0) CPUs, 0 odd (node1) CPUs` → `noop-pin=true`, no crash, no repeated
-syscall-error spam).
+Pilot (untimed, all three arms, `-phase=5 -phases=2`): peak-RSS ≈ **6.38 GiB** all arms (6,685,592
+KiB from `/usr/bin/time -v`, i.e. 6,685,592/1024² GiB — the original writeup's "≈6.7 GiB" was an
+imprecise eyeball conversion; corrected here), well under the 10 GiB gate; arm A's `noop-pin`
+fallback confirmed working correctly on real hardware (`allowed cpuset: 128 even (node0) CPUs, 0
+odd (node1) CPUs` → `noop-pin=true`, no crash, no repeated syscall-error spam).
 
 **Mechanism validity (arm B, n=10 recorded rounds):** hint faults min=25,533 max=127,488
 mean=39,021; pages migrated min=3,375,757 max=5,375,704 mean=4,736,829. This is a substantially
@@ -1840,76 +1886,135 @@ noise (17/4) in the other — consistent with the pinned cpuset making inversion
   `numa-design/bench-data/pathology/cand3-arm{B,C}-recorded.out`.
 - **Informational only (A vs B, A vs C):** A = 2.062ns ± 0%, vs B -25.80% (p=0.000), vs C -38.28%
   (p=0.000) — **A is slower than both B and C**, the opposite of what full single-node locality
-  would predict. Per design §3/§4, arm A is explicitly informational-only for this candidate: it
-  cannot express the phase-inversion mechanism at all (its cpuset has no node-1 CPUs, so the
-  odd-phase pin request is always a no-op — confirmed above), so its 64 readers just chase the
-  ring set on one socket's 64 physical cores under GOMAXPROCS=128 (2 HT threads/core) for the
-  entire run, a different and more core-constrained workload than B/C's 128-physical-core spread —
-  the same HT/core-count confound flagged generally in design §4, here large enough to dominate any
-  locality benefit for a purely memory-latency-bound pointer-chase. No claim is drawn from arm A
-  for this candidate, per the design.
+  would naively predict.
 
-**Verdict: candidate 3's primary claim SUCCEEDS.** BIND-all measurably and significantly recovers
-throughput relative to the unpinned, balancer-active baseline on the one workload built to trigger
-a *perpetual, non-converging* migration storm (locality inversion every 30 s, never enough time for
-migration to pay off before the next flip) — the scenario the design identified as "the balancer
-actively harmful" case BIND-all is specifically suited to prevent. This is consistent with, and
-helps explain, candidates 1-2's failures: those workloads let the balancer's migrations *converge*
-over a long single run (candidate 1: ~30 s of continuous allocation/access from whichever thread
-the scheduler happens to run; candidate 2: 5 s gaps between forced GCs, not a hard phase inversion),
-so BIND-all's suppression trades away a real (if unmeasured-separately) convergence benefit for a
-real (and measured) fault/migration-avoidance benefit, and those roughly cancel at this box's noise
-floor. Candidate 3 removes the possibility of convergence by design, isolating the case where
-suppression is pure upside.
+**CRITICAL correction (post-hoc audit): the original HT/core-count explanation for arm A being
+slowest is wrong, and has been replaced.** Only 64 reader goroutines ever run in this benchmark;
+during any given 30 s phase, B and C's readers are `sched_setaffinity`-confined to *one node's*
+CPUs at a time (the even or odd mask) — the same 128 logical / 64 physical cores that arm A's
+entire process is pinned to for its whole run via `numactl --cpunodebind=0`. There is no core-count
+or hyperthreading difference between A and a B/C phase; that framing does not hold up.
+
+**What the data actually shows, independently re-derived from the archived `ns/read` samples as
+aggregate memory bandwidth** (64 B/node × reads/s, since each pointer hop is one 64 B cache-line
+fetch and `nsPerRead` is already the aggregate rate across all 64 readers): **arm A is flat at
+31.0 GB/s in all 10 rounds** (30.9-31.1 GB/s) — a single-memory-controller ceiling, reached despite
+perfect locality (every access local to node 0's controller, zero cross-node traffic) because all
+64 readers *and* the memory they read are confined to that one controller for the entire run. **Arm
+B ranges 36.6-48.7 GB/s, arm C ranges 33.5-57.8 GB/s** — both above A's ceiling in every round,
+because B/C's memory (allocated without `--membind`, so likely spread across both nodes'
+controllers via first-touch) can be served by *two* memory controllers concurrently even though the
+64 readers are confined to one node's cores at any instant: local-node fetches use that
+controller, remote-node fetches cross the interconnect to the other controller, and both paths can
+be in flight at once. **B's migration-copy traffic is far too small to explain a 17% throughput
+swing this way**: mean 4,736,829 pages migrated/run × 4096 B × 2 (read source + write dest) ÷ 120 s
+≈ **0.32 GB/s ≈ 0.8% of B's own ~42 GB/s mean demand** — two orders of magnitude short of moving a
+17% needle. **The likely mechanism is therefore dual-controller bandwidth availability, not
+fault/migration-tax avoidance**: C's advantage over B is consistent with C spending less of its
+run pinned into single-controller-equivalent access patterns (via `MPOL_PREFERRED` steering
+individual 4 MiB chunks to specific nodes — recall arm C here is Layer 0+1+**2**, not BIND-all
+alone, per the CRITICAL correction at the top of this section), not with avoiding the balancer's
+hint-fault/migration costs, which this candidate's own vmstat numbers show are financially
+negligible relative to the bandwidth swing observed. No claim is drawn from arm A for this
+candidate's primary comparison, per the design (§3/§4) — but for a different, verified reason than
+originally stated.
+
+**IMPORTANT correction (post-hoc audit): relabel the verdict as suggestive, not robust.** The
+primary Mann-Whitney U result (p=0.029, n=10) clears α=0.05, but three independent robustness
+checks on the same 10 round-paired B/C values (paired by round index; differences recomputed
+directly from the archived data) show the result is fragile at this sample size:
+
+- **Paired sign test** (8 of 10 rounds have C < B): exact two-sided p=**0.109** — not significant
+  on its own.
+- **Wilcoxon signed-rank test** (exact, accounting for the two reversed-sign rounds and the
+  magnitude of every difference): exact two-sided p=**0.084** — also not significant on its own.
+- **Leave-one-out**: recomputing the exact Mann-Whitney U p-value with each of the 10 rounds
+  dropped in turn (9 vs 9) gives a range of p=**0.006-0.077** — the result crosses α=0.05 in
+  several of the ten leave-one-out subsets (independently reproduced here; a prior estimate of
+  this range from the audit that prompted this correction, 0.004-0.077, is consistent with the
+  present recomputation).
+
+**Revised verdict: candidate 3's primary result is SUGGESTIVE, not robust.** The Mann-Whitney U
+test that clears the pre-declared α=0.05 threshold is the least conservative of four reasonable
+tests run on the same data, and the effect does not survive removing single rounds in several
+leave-one-out cases. Combined with the CRITICAL corrections above (arm C is Layer 0+1+2, and the
+mechanism is more plausibly bandwidth/controller-consolidation than fault-tax avoidance), this
+candidate should not be read as a confirmed BIND-all recovery win — it motivates the L1-only
+re-run below (which, if time permits, also re-runs this candidate) far more than it independently
+supports the design's pathology-recovery claim.
 
 Raw data: `numa-design/bench-data/pathology/cand3-arm{A,B,C}-{warmup,recorded}.out{,.stderr}`,
 per-round `cand3-arm*-r*.vmstat.{before,after}`, `cand3-vmstat-summary.txt`, `sweep3.log`,
-`pilotB.out`/`pilotB.time`, `pilotC.out`/`pilotC.time`, `pilotA3.out`/`pilotA3.time`.
+`pilotB.out`/`pilotB.time`, `pilotC.out`/`pilotC.time`, `pilotA3.out`/`pilotA3.time`, and the
+sweep driver script, `numa-design/bench-data/pathology/cand3-sweep.sh`.
 
-### Overall pathology-benchmark verdict
+### Overall pathology-benchmark verdict (superseded in part — see corrections below and the
+L1-only re-run subsection)
+
+**Post-hoc audit correction, read this before the table:** every "arm C" result in this section
+(and the narrative below) was collected against `GOEXPERIMENT=numa` as built from HEAD
+(`7ec36777f3`), which still compiles Layer 2's per-4 MiB-chunk `MPOL_PREFERRED` heap-growth homing
+(`numaBindArena`, `src/runtime/numa_linux.go` ~line 313 — unconditional on `goexperiment.Numa`,
+never gated off after the Layer 2 IMC gate failed; only Layers 3-4 were cancelled). **None of the
+three candidates below measure the proposed Layer 0+1 (BIND-all-only) shippable slice** — they
+measure Layer 0+1+2 combined. The "L1-only re-run" subsection at the end of this file is the
+measurement that actually isolates the shippable slice for candidate 1 (and, if time permitted,
+candidate 3); treat this section's C-vs-B numbers as characterizing *this specific build*, not the
+patch series intended for submission.
+
+**Also correct here:** the secondary A-vs-B comparisons in candidates 1-2 do **not** independently
+confirm "the balancer's tax is real," as originally claimed. Arm C — which the vmstat data confirms
+has essentially zero balancer activity in every round of every candidate — is penalized against
+arm A by *at least as much* as arm B is (candidate 1: A-vs-C +73.77% vs. A-vs-B +60.04%; candidate
+2: A-vs-C +25.53% vs. A-vs-B +24.96%, nearly identical). If the balancer's fault/migration tax were
+the driver of the A-vs-B gap, a balancer-inactive arm (C) should not be penalized by *more* than
+arm B is — yet it consistently is (candidate 1) or matches it almost exactly (candidate 2). **The
+A-vs-B gap in both candidates is better explained by arm A's exclusive `numactl
+--cpunodebind=0 --membind=0` full single-node locality/pinning benefit — a benefit neither B nor C
+gets, balancer or no balancer — than by the balancer specifically.** `C-vs-B` (both arms unpinned,
+differing only in balancer/mempolicy behavior) is the only comparison in this design that cleanly
+isolates the balancer's effect; `A-vs-B`/`A-vs-C` are pinning-vs-unpinned comparisons and are
+retained below as informational context, not as balancer evidence.
 
 This is **not** the design's full honest-kill scenario (§6) — that requires all three candidates
-to die on C-vs-B, and candidate 3 did not. The outcome is the partial-recovery case the design
-explicitly anticipated and pre-authorized reporting "as-is" (§6, final paragraph): the mechanism is
-confirmed active everywhere (millions of hint faults and page migrations per run on stock Go,
-reproduced across all three independent workloads) and BIND-all's suppression is confirmed total
-everywhere (0/0 in arm C in essentially every round of all three candidates — the rare single-digit
-counts in candidates 2-3 are 4+ orders of magnitude below arm B and are noise, not balancer
-activity), but a **measured time-domain recovery from BIND-all alone is workload-dependent**:
+to die on C-vs-B, and candidate 3's primary comparison did not (though see its "suggestive, not
+robust" relabeling above). The mechanism (balancer hint faults + page migrations) is confirmed
+active in arm B and confirmed suppressed in arm C across all three candidates — 0/0 in arm C in
+essentially every round (the rare single-digit counts in candidates 2-3 are 4+ orders of magnitude
+below arm B and are noise). What is **not** established, after correction, is a robust time-domain
+recovery attributable specifically to the balancer:
 
-| Candidate | Workload | B worse than A? | C better than B (primary)? | C ≥ A (stretch)? |
-|---|---|---|---|---|
-| 1 — garbage | realistic throughput, GOMAXPROCS=128 | **YES**, dramatically (+60.0%, p=0.000) | **NO** — C significantly *worse* (+8.58%, p=0.003) | N/A (primary failed) |
-| 2 — gc-pause-bench heavy | realistic GC-cycle time | **YES**, cleanly (+24.96%, p=0.000) | **NO** — null (p=0.179) | N/A (primary failed) |
-| 3 — phase-shift | synthetic, bench-side-pinned, perpetual locality inversion | not applicable (A informational-only, cannot invert) | **YES** — C significantly better (-16.82%, p=0.029) | Numerically yes (C beats A too) but **not a meaningful comparison** — A runs a different, single-socket-HT-constrained workload for this candidate (design §3/§4) |
+| Candidate | Workload | C better than B (primary)? | Notes |
+|---|---|---|---|
+| 1 — garbage | realistic throughput, GOMAXPROCS=128 | **NO** — C significantly *worse* (+8.58%, p=0.003) | Arm C is Layer 0+1+2, not Layer 0+1; mechanism unestablished. See L1-only re-run. |
+| 2 — gc-pause-bench heavy | realistic GC-cycle time | **NO** — null at both cycle-level (p=0.179, n=80, overstated n) and the more honest round-level (p=0.579, n=10) | Noise floor ~5-7%; null excludes a large tax, not a small one. |
+| 3 — phase-shift | synthetic, bench-side-pinned, perpetual locality inversion | **Suggestive, not robust** — primary MWU p=0.029, but sign test p=0.109, Wilcoxon p=0.084, leave-one-out range 0.006-0.077 | Likely mechanism is dual-memory-controller bandwidth, not fault-tax avoidance (see candidate 3's bandwidth reading above); arm C is again Layer 0+1+2. |
 
-**Honest overall conclusion:** on this 2-node, ~15 GiB/node, THP=always, kernel-6.12 box, automatic
-NUMA balancing demonstrably operates on stock Go — millions of hint faults and page migrations per
-run, reproduced across three independent workloads and confirmed with a pre-declared statistical
-plan (not a single unclaimed sample) — and the BIND-all patch series demonstrably silences it
-completely (0/0, matching the `numactl --membind` oracle) on every one of them. The two candidates
-closest to real Go workloads (garbage-collector throughput, GC-cycle wall time) do **not** show a
-statistically defensible *net* time-domain win from BIND-all's suppression alone at n=10: candidate
-1 shows suppression measurably behind the balancer-active baseline (opposite of the design's
-prediction), and candidate 2 shows no significant difference either way. The working explanation —
-offered as a hypothesis consistent with the data, not as a proven mechanism — is that both
-candidates' access patterns let the balancer's migrations *converge* over the course of a single
-long-ish run, so BIND-all's fault/migration-avoidance benefit is offset by a forgone
-convergence benefit that the balancer would otherwise have delivered. The third, most synthetic
-candidate — engineered specifically to deny the balancer any chance to converge (a hard locality
-inversion every 30 s, forever) — does show a significant, correctly-directed, pre-declared win for
-BIND-all (16.82%, p=0.029, n=10, no extension needed), isolating the "balancer actively harmful,
-never converges" case the design identified as BIND-all's best-suited scenario.
+The `A-vs-B`-worse-than-A and `C ≥ A` columns from the original table are removed here: per the
+correction above, neither is a clean balancer signal (A-vs-B/A-vs-C reflect pinning, not the
+balancer), and candidate 3's C-vs-A gap inherits the same pinning confound plus the single-
+memory-controller-ceiling effect described in that candidate's writeup.
 
-**For the upstream submission:** this session's data supports the mechanism-suppression +
-no-regression story unconditionally (confirmed on 3/3 workloads, statistically, not just the prior
-single unclaimed sample) and additionally supports a *conditional* performance-recovery story:
-BIND-all measurably helps on workloads whose access pattern denies the balancer convergence time,
-and is a statistical wash (not a loss beyond candidate 1's single significant-but-modest reversal)
-on workloads that let it converge. It does not support an unconditional "BIND-all makes stock Go
-faster" claim on this hardware — candidate 1's result argues explicitly against that framing for
-throughput-bound, continuously-allocating workloads. Per the design's own candidate-3 caveat (§3,
-"a reviewer can object that pinned readers are not 'a Go program'"), the recovery evidence rests on
-the most contestable of the three workloads; candidates 1-2, which are closer to real programs,
-did not confirm it. A larger-node-count box (design §6, e.g. the 4-node EPYC of #78044) remains the
-suggested venue for a less equivocal time-domain demonstration on realistic workloads.
+**Honest overall conclusion (revised):** on this 2-node, ~15 GiB/node, THP=always, kernel-6.12 box,
+automatic NUMA balancing demonstrably operates on stock Go (millions of hint faults and page
+migrations per run, reproduced across three independent workloads), and this repository's current
+`GOEXPERIMENT=numa` build (Layer 0+1+2) demonstrably suppresses the balancer's own activity (0/0 in
+arm C throughout). **What this section does not establish, after correction, is that suppressing
+the balancer produces a net time-domain win** — candidate 1 shows the opposite (C significantly
+slower), candidate 2 is a clean null at the sample size the data supports, and candidate 3's
+apparent win does not survive standard robustness checks and is more consistent with a
+dual-controller-bandwidth effect (itself a byproduct of Layer 2's per-chunk homing, not of
+balancer suppression) than with avoiding the balancer's fault/migration tax. **None of the three
+candidates cleanly demonstrate that BIND-all's suppression alone — the actual proposed shippable
+slice — produces a measurable performance recovery on this hardware.** The L1-only re-run below
+is the first measurement in this session that actually targets that question.
+
+**For the upstream submission (revised):** this session's data continues to support the
+mechanism-suppression + no-regression story for the *current build* (Layer 0+1+2): the balancer's
+activity is confirmed and confirmed suppressed on 3/3 workloads. It does **not**, after correction,
+support a performance-recovery story from this section alone, and the original conditional-recovery
+framing ("BIND-all measurably helps on workloads that deny the balancer convergence time") is
+withdrawn pending the L1-only re-run, since arm C's advantage where it appeared (candidate 3) is
+better attributed to Layer 2's memory homing than to balancer suppression, and that distinction
+matters directly for what Layer 0+1 alone will do when shipped without Layer 2. See the "L1-only
+re-run" subsection below for the corrected measurement.
