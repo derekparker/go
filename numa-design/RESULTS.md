@@ -1330,7 +1330,8 @@ ran (including inside the full suite's other invocations across the session).
 
 ### Gate 1 — 1P json (hard gate), `BENCHNUM=10`, two replicates
 
-> **Archival-integrity correction (post-review, see "Fix pass" section at the end of this file):**
+> **Archival-integrity correction (Gate 1 replicate 1 was regenerated after the original `/tmp`
+> files were overwritten; see the re-archival note immediately below in this same block):**
 > the run originally reported here as "Replicate 1" used `gate-json.sh`'s default `OUT` directory
 > (`/tmp/numa-gate-json`) with no override, and that same default path was reused — unintentionally
 > — for Gate 3's first 256P replicate later in the same session. Gate 3's run truncated and
@@ -1595,3 +1596,74 @@ never showed a second tenant.
 
 Raw data archived under `numa-design/bench-data/layer2/`. `kernel.numa_balancing` confirmed `1`
 at the end of this task.
+
+---
+
+## Layer 2 verdict (Task 10, 2026-08-19)
+
+**Decision: kill product B for this hardware.** Only Layer 0+1 (BIND-all task mempolicy +
+`#14406` balancer exemption) will be proposed to Go. Layers 3–4 (Tasks 11–12) are cancelled.
+
+### The numbers
+
+Gate 6 — IMC locality, the decision gate — is reported in full above ("Gate 6 — IMC locality (the
+decision gate)", this file). Summary: two independent triplicate `perf stat`
+(`mem_load_l3_miss_retired.local_dram`/`remote_dram`) sets on interleaved `GOMAXPROCS=256` json,
+archived at `numa-design/bench-data/layer2/gate6-imc/{baseline,numa}-run{1,2,3}.csv`:
+
+- Archival set medians: baseline remote-DRAM share **48.57%**, Layer 2 **48.62%** — **+0.10%
+  relative** (an increase).
+- Ad hoc set medians: baseline **48.40%**, Layer 2 **48.37%** — **-0.07% relative**.
+- Pass bar was **≥10% relative drop** (e.g. 0.48 → ≤0.432). Both sets land nowhere close, in a
+  tight mutually overlapping band, with no rerun needed to resolve ambiguity.
+
+All hard performance gates passed cleanly (1P json, 1P alloc micro, 256P json, vmstat 0/0, no RSS
+doubling — see "Overall verdict" table above). The VMA-count evidence (`wc -l /proc/PID/maps`:
+baseline 34 vs Layer 2 1172, ~34x) proves the PREFERRED `mbind` calls actually took effect on the
+per-chunk VMAs — this was not a no-op implementation bug. The null result on IMC is real: PREFERRED
+homing alone does not change which socket's DRAM services L3-miss loads.
+
+### Three-ingredient framing (design §12.1)
+
+Locality requires three ingredients together: (a) memory **homed** per node, (b) refill-time
+**routing** so a thread is fed spans homed where it runs, and (c) **threads that stay put** long
+enough for (b) to still hold at use time. Layer 2 implemented (a) alone — a one-shot
+`mbind(MPOL_PREFERRED, node)` on the M that happened to be running `mheap.grow`, with no
+relationship to which P (on which node) later allocates from spans carved out of that chunk, and
+no thread-stability guarantee at all. **Any proper subset of the three ingredients is expected to
+measure ~zero** (design §12.1) — v1's arena PREFERRED was the same subset and measured the same
+null (~45–49% remote, unchanged). Gate 6's FAIL is therefore the *predicted* outcome, not evidence
+that locality is unreachable on this hardware. It proves that homing without routing and thread
+stability measures ~zero, exactly as forecast — not that a properly gated three-ingredient
+mechanism would also fail.
+
+### Layers 3–4 cancelled
+
+Per the plan's Task 10 Step 2 gate, Task 9's IMC FAIL means Tasks 11–12 (Layer 3 per-node
+mcentral, Layer 4 steal/GC-mark affinity) are cancelled. Both task headings in
+`numa-design/2026-08-19-numa-v2-implementation-plan.md` are marked cancelled.
+
+### What remains shippable
+
+**Layer 0+1 is the shippable slice**: NUMA topology discovery (Task 3) plus the BIND-all task
+mempolicy that suppresses the kernel NUMA balancer for the process (`#14406`, Task 6), gated PASS
+on 1P json, 1P alloc micro, 256P json, vmstat 0/0, and the `#14406` three-way vmstat check (Layer 1
+gate, "Overall verdict: PASS" above). This is what gets proposed to Go from this plan.
+
+### Next candidates (future plan, not this one)
+
+In the plan's stated priority order (design §12.2–§12.3):
+
+1. **Fill-one-socket-first** at `GOMAXPROCS` ≤ CPUs/node (design §12.2) — near-free: one node-mask
+   affinity choice at process start, no homing/routing/per-P machinery at all, and the `#14406`
+   balancer exemption still applies. Makes *everything* local for any process that fits on one
+   socket, which is the honest story for small processes on big NUMA boxes and likely the cheapest
+   real win available.
+2. **Homing + routing + thread stability as one gated unit** (design §12.3–§12.4) — the concrete
+   address-partition sketch (per-node `arenaHints`/`curArena`, `heapArena.node`, `mheap.grow(npage,
+   node)`) combined with refill-time routing (per-node `mcentral` span sets) and node-mask soft
+   affinity with the stand-down rule, validated together behind the same gates rather than layered
+   incrementally. This is the shape every NUMA-successful allocator (TCMalloc NUMA mode, HotSpot
+   `+UseNUMA`, jemalloc/mimalloc via OS thread stability) converges on, and is the only path
+   expected to clear the IMC gate Layer 2 just failed — because it supplies all three ingredients
+   at once instead of one at a time.

@@ -964,7 +964,7 @@ Compute `remote/(local+remote)` for baseline (or Layer 1 binary) vs Layer 2. **R
 
 ### Task 10: Stop / kill decision (required)
 
-- [ ] **Step 1: Write an explicit RESULTS.md “Layer 2 verdict”**
+- [x] **Step 1: Write an explicit RESULTS.md “Layer 2 verdict”**
 
 Either:
 
@@ -976,11 +976,11 @@ Frame the verdict with the **three-ingredient rule** (design §12.1): locality =
 1. **Fill-one-socket-first** at GOMAXPROCS ≤ CPUs/node (design §12.2) — near-free; makes everything local for processes that fit on one socket.
 2. **Homing + routing + affinity as one gated unit** — per-node arena streams (design §12.3), per-node mcentral spanSets, node-mask soft affinity with the stand-down rule (design §12.4) — the shape every NUMA-successful allocator converges on.
 
-- [ ] **Step 2: If killed, skip Tasks 11–12.** Mark them cancelled in this plan’s checkboxes.
+- [x] **Step 2: If killed, skip Tasks 11–12.** Mark them cancelled in this plan’s checkboxes.
 
 ---
 
-### Task 11: Layer 3 — per-node mcentral (ONLY if Task 9 IMC passed)
+### Task 11: **CANCELLED (Task 9 IMC gate failed)** — Layer 3 — per-node mcentral (ONLY if Task 9 IMC passed)
 
 **If Task 9 IMC failed: cancel this task.**
 
@@ -996,7 +996,7 @@ Frame the verdict with the **three-ingredient rule** (design §12.1): locality =
 
 ---
 
-### Task 12: Layer 4 — steal / GC mark (ONLY if Task 11 passed)
+### Task 12: **CANCELLED (Task 9 IMC gate failed)** — Layer 4 — steal / GC mark (ONLY if Task 11 passed)
 
 **If Task 9 or 11 failed: cancel this task.**
 
