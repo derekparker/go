@@ -1919,6 +1919,13 @@ negligible relative to the bandwidth swing observed. No claim is drawn from arm 
 candidate's primary comparison, per the design (§3/§4) — but for a different, verified reason than
 originally stated.
 
+**Forward pointer (added after the L1-only re-run below): the parenthetical above attributing C's
+bandwidth advantage to Layer 2's per-chunk `MPOL_PREFERRED` steering is refuted by that re-run.**
+C-L1 (BIND-all only, no Layer 2 homing at all) shows the *same* dual-controller-bandwidth pattern,
+with a larger and more robust effect than this Layer-0+1+2 measurement. Whatever produces the
+bandwidth advantage, it does not require Layer 2 — see "Candidate 3 L1-only" below for the
+corrected reading.
+
 **IMPORTANT correction (post-hoc audit): relabel the verdict as suggestive, not robust.** The
 primary Mann-Whitney U result (p=0.029, n=10) clears α=0.05, but three independent robustness
 checks on the same 10 round-paired B/C values (paired by round index; differences recomputed
@@ -2021,6 +2028,14 @@ re-run" subsection below for the corrected measurement.
 
 ## L1-only pathology re-run (2026-08-20)
 
+**SUPERSEDED IN PART (second post-hoc audit, same day): this section's original candidate-1
+conclusion ("Layer 2, not BIND-all, caused the original regression") and the commit message of
+`3507802ec5` that states it are withdrawn — see the correction after the candidate 1 verdict below
+and the "single-session three-arm candidate 1 sweep" subsection later in this file, which is the
+measurement that actually isolates Layer 2's contribution. Candidate 3's conclusion below is
+independently confirmed and, if anything, strengthened by a second audit; see its replication
+statistics.**
+
 Answers the question the CRITICAL correction above raised: every "arm C" result in the sections
 above was measured against Layer 0+1+**2** (BIND-all task mempolicy plus per-4 MiB-chunk
 `MPOL_PREFERRED` heap-growth homing), not the Layer 0+1 (BIND-all-only) slice actually proposed for
@@ -2089,16 +2104,35 @@ removed, exactly as it did with Layer 2 present.
 - Exploratory: user+sys-sec/op C-L1 higher than B by +11.13% (p=0.029) — the one metric that
   differs significantly; everything else (GC-bytes, STW, allocs, RSS, VM) is a clean null.
 
-**Verdict: the shippable Layer 0+1 slice does NOT reproduce the original full-C (Layer 0+1+2)
-regression on this workload.** Original arm C (Layer 0+1+2) was significantly *slower* than B by
-+8.58% (p=0.003, a clean, well-powered reversal). C-L1 (Layer 0+1 only) shows no significant
-difference from B at all (p=0.315) — night-and-day different from the full-C result, and the C-L1
-point estimate (+6.9% slower, not significant) sits well inside C-L1's own very wide ±28% CI. **This
-directly answers the question item 2 posed: Layer 2 (the per-chunk `MPOL_PREFERRED` homing), not
-BIND-all, was the culprit behind candidate 1's original regression.** BIND-all alone is
-statistically indistinguishable from stock Go on this workload, at n=10 — no regression, but also
-no measured recovery; consistent with, and now directly supporting, the mechanism-suppression +
-no-regression story this design set out to establish for the actual shippable slice.
+**WITHDRAWN (second post-hoc audit): the "Layer 2 was the culprit" / "night-and-day different" /
+"good news for the slice" conclusion originally written here — and repeated in the commit message
+of `3507802ec5` — is a difference-of-significance fallacy and is withdrawn.** The original
+reasoning ("full-C vs B is significant, C-L1 vs B is not, therefore Layer 2 caused the difference")
+never directly compared full-C to C-L1. Doing that comparison, independently, on the archived data:
+**C-full vs C-L1 (exact Mann-Whitney U on the two arms' raw ns/op) is itself null, p=0.631** —
+there is no statistical evidence the two builds differ from each other at all. Three further facts
+undercut the original claim:
+
+- **This sweep is underpowered to detect the original effect.** B vs C-L1's pooled run-to-run CV
+  is ≈9.9%, giving a minimum detectable effect (α=0.05, power=0.80, n=10/arm) of **≈12.4%** — larger
+  than the +8.58% originally measured for full-C. A null at this MDE does not exonerate BIND-all;
+  it means the sweep cannot resolve an effect the size of the one being asked about.
+- **The stock control (arm B) itself drifted between sessions**: median ns/op was 2,917,487 in the
+  original candidate 1 sweep vs. 3,003,192 in this L1-only sweep, a **+2.94%** shift attributable to
+  ordinary session-to-session noise (different day/time, unrelated system state) rather than to
+  anything about C-L1. Comparing "B-vs-full-C from session 1" against "B-vs-C-L1 from session 2" as
+  if the B baseline were constant compounds the fallacy above.
+- **C-L1 still shows the same ~11% user+sys-per-op penalty full-C showed** (+11.13%, p=0.029,
+  identical to the original full-C measurement) — the one metric that *is* significant here. If
+  Layer 2 alone caused the regression, removing it should plausibly have relieved this CPU-time
+  penalty too; it did not. This is exploratory, not primary, but it is a concrete reason to suspect
+  **the Layer 0+1 slice may still carry a real penalty that this sweep's ≈12.4% MDE cannot resolve
+  on the primary wall-clock metric**, not evidence the slice is clean.
+
+**Correct verdict: this sweep does not establish whether Layer 0+1 alone regresses this workload.**
+It rules out an effect at or above its own ≈12.4% MDE, and no more. Isolating Layer 2's actual
+contribution requires directly comparing B, C-full, and C-L1 in a single session — see "Single-
+session three-arm candidate 1 sweep" below, which is the measurement that resolves this.
 
 Raw data: `numa-design/bench-data/pathology/l1only-arm{B,CL1}-{warmup,recorded}.out{,.stderr}`,
 per-round `l1only-arm*-r*.vmstat.{before,after}`, `l1only-vmstat-summary.txt`, `sweepL1.log`,
@@ -2142,6 +2176,28 @@ too.
   original run's much wider 0.006-0.077 range that included several clearly non-significant
   subsets.
 
+**Independent-replication statistics (a third, scoped audit; independently recomputed here from
+the archived data of both sweeps and confirmed to match):** treating the original candidate 3
+sweep and this L1-only re-run as two independent replications of the same B-vs-C(-L1) comparison
+strengthens the result beyond what either sweep shows alone —
+
+- **Combined paired sign test across both sweeps**, pooling all 20 round-pairs (10 original + 10
+  L1-only; 16 of 20 favor C/C-L1 over B): exact two-sided p=**0.0118** — now significant, where
+  neither sweep's own 8/10 sign test was on its own (each capped at p=0.109 by its small n).
+- **Fisher's method** combining the two sweeps' independent exact Mann-Whitney U p-values
+  (original p=0.0288, L1-only p=0.0232) into one combined significance test:
+  χ²(df=4) = 14.62, combined p=**0.0056**. Two independently-run sweeps, on two different
+  `GOEXPERIMENT=numa` builds (one with Layer 2, one without), both landing in the same direction
+  with this combined significance is meaningfully stronger evidence for a real effect than either
+  sweep's p=0.02-0.03 alone.
+
+**Honest caveat, stated as a distributional claim, not an absolute one:** in 2 of 10 rounds in
+*each* sweep, C (or C-L1) lands at close to single-controller speed (~33-37 GB/s, near arm A's
+31.0 GB/s ceiling) rather than its usual 45-58 GB/s — visible directly in the per-round bandwidth
+figures above. The claim this section supports is therefore "C is *usually* faster than B, by a
+margin that replicates across two independent sweeps," not "C is always faster than B" — some
+rounds, plausibly by first-touch placement luck, do not get the dual-controller benefit at all.
+
 **Migration-traffic-vs-bandwidth check (same method as the original candidate 3 writeup):** arm B's
 mean migration traffic here is ≈0.30 GB/s two-way (4,373,203 pages/run × 4096 B × 2 ÷ 120 s),
 ≈0.7% of B's own ~41 GB/s mean demand — again far too small to explain a 24% throughput swing via
@@ -2158,39 +2214,45 @@ established in the original candidate 3 pilot, and C-L1 reaches even higher, 33.
 the *cause* of C reaching that bandwidth is evidently BIND-all's suppression of the balancer's
 churn (which otherwise presumably disrupts steady dual-controller access patterns via its own
 periodic PROT_NONE-then-fault-then-possibly-migrate cycling), not Layer 2's explicit per-chunk
-placement. **Revised candidate 3 verdict: still not fully robust by the sign test alone, but now
-supported by a significant Wilcoxon result and a leave-one-out range that is essentially uniformly
-at or below α=0.05 — meaningfully more solid evidence for a genuine BIND-all-attributable recovery
-on this specific synthetic workload than the original (Layer 0+1+2) measurement provided.**
+placement. **Revised candidate 3 verdict: independently replicated.** Not fully robust by the
+single-sweep sign test alone, but now supported by a significant single-sweep Wilcoxon result, a
+leave-one-out range essentially uniformly at or below α=0.05, and — most importantly — a combined
+sign test (p=0.0118) and Fisher's-method-combined significance test (p=0.0056) across two
+independent sweeps on two different builds. This is meaningfully more solid evidence for a genuine
+BIND-all-attributable recovery on this specific synthetic workload than either sweep alone
+provided, tempered by the honest caveat above that the effect is a usual-case, not universal-case,
+claim.
 
 Raw data: `numa-design/bench-data/pathology/l1only-cand3-arm{B,CL1}-{warmup,recorded}.out{,.stderr}`,
 per-round `l1only-cand3-arm*-r*.vmstat.{before,after}`, `l1only-cand3-vmstat-summary.txt`,
 `sweep3L1.log`, and the sweep driver script,
 `numa-design/bench-data/pathology/cand3-l1-sweep.sh`.
 
-### L1-only re-run: overall
+### L1-only re-run: overall (candidate 1 conclusion withdrawn — see below and the three-arm sweep)
 
-This re-run splits the two candidates' original findings apart along the axis that actually
-matters for the upstream submission — what does Layer 0+1 (the shippable slice) do, as opposed to
-what did this session's build (Layer 0+1+2) do:
-
-| Candidate | Original (Layer 0+1+2) C vs B | L1-only (Layer 0+1) C-L1 vs B | Layer 2's apparent contribution |
+| Candidate | Original (Layer 0+1+2) C vs B | L1-only (Layer 0+1) C-L1 vs B | What this pair of sweeps actually establishes |
 |---|---|---|---|
-| 1 — garbage | Significant regression, +8.58% (p=0.003) | **Null, ~ (p=0.315)** | Layer 2 caused the regression; BIND-all alone does not reproduce it |
-| 3 — phase-shift | Suggestive win, -16.82% (p=0.029), fragile on robustness checks | **Larger, more robust win, -24.31% (p=0.023), Wilcoxon-significant (p=0.014), LOO range 0.004-0.050** | Layer 2 was not needed for the effect and may even have been diluting it |
+| 1 — garbage | Significant regression, +8.58% (p=0.003) | Null, ~ (p=0.315), MDE≈12.4% | **Nothing conclusive about Layer 2's contribution.** C-full vs C-L1 compared directly is itself null (p=0.631) — the difference-in-significance between the two rows is not evidence the rows differ from each other. See the single-session three-arm sweep below. |
+| 3 — phase-shift | Suggestive win, -16.82% (p=0.029), fragile on robustness checks | Larger, more robust win, -24.31% (p=0.023), Wilcoxon p=0.014, LOO range 0.004-0.0503 | **Independently replicated**: combined sign test across both sweeps p=0.0118, Fisher's-method-combined p=0.0056. Layer 2 was not needed for this effect. |
 
-**This is good news for the Layer 0+1 shippable slice, on both fronts.** Candidate 1's original
-regression — the most damaging single result in this whole investigation — does not reproduce
-without Layer 2; BIND-all alone is statistically indistinguishable from stock Go on that workload.
-Candidate 3's suggestive-but-fragile win turns out not to depend on Layer 2 either, and is if
-anything cleaner without it. Neither result proves BIND-all delivers a *general* performance
-recovery (candidate 1 is a clean null, not a win), but together they support a materially better
-story for Layer 0+1 alone than the original (Layer 0+1+2) measurements did: **no regression on a
-realistic throughput workload, and a real, reasonably robust, if narrow (one synthetic workload)
-recovery on the specific "perpetual migration storm" pathology the original #14406 issue and this
-whole design were built around.**
+**Candidate 1's "Layer 2 caused it" conclusion, and the identical claim in the commit message of
+`3507802ec5`, are withdrawn as a difference-of-significance fallacy** (full reasoning in the
+candidate 1 verdict above): the direct C-full-vs-C-L1 comparison this sweep never ran is null
+(p=0.631), the sweep's own MDE (≈12.4%) is larger than the effect it would need to rule out
+(+8.58%), the stock control drifted +2.9% between the two sessions being implicitly compared, and
+C-L1 still carries the same ~11% user+sys-per-op penalty full-C did — a concrete signal the slice
+may still cost something this sweep's resolution cannot see. **What is actually established:
+whether Layer 0+1 alone regresses candidate 1's workload is unresolved** by any sweep run before
+the single-session three-arm sweep below, which is the first measurement in this investigation
+designed to answer it directly (B, C-full, and C-L1 together, same session, so no cross-session
+drift and a properly powered pairwise comparison).
 
-Neither L1-only sweep independently re-derives *why* Layer 2 caused candidate 1's regression (that
-would need a further isolation sweep, not run here) or fully explains the dual-controller-bandwidth
-mechanism candidate 3 points at (that would need IMC/`perf`-level instrumentation, also not run
-here) — both are natural next steps flagged for a future session, not resolved by this re-run.
+**Candidate 3's win, by contrast, is now on materially firmer ground than a single sweep could
+provide**: two independent sweeps, on two different builds, both show C beating B in the same
+direction with a combined significance (Fisher's method p=0.0056) well past the two sweeps'
+individual p=0.02-0.03 results, and Layer 2 was demonstrably not required for it. The honest
+caveat — 2 of 10 rounds per sweep land at near-single-controller bandwidth rather than the usual
+dual-controller advantage — is stated above as a distributional claim, not withdrawn.
+
+Neither L1-only sweep fully explains the dual-controller-bandwidth mechanism candidate 3 points at
+(that would need IMC/`perf`-level instrumentation, not run here) — flagged as follow-up work.
