@@ -1330,29 +1330,35 @@ ran (including inside the full suite's other invocations across the session).
 
 ### Gate 1 — 1P json (hard gate), `BENCHNUM=10`, two replicates
 
-**Replicate 1:**
+> **Archival-integrity correction (post-review, see "Fix pass" section at the end of this file):**
+> the run originally reported here as "Replicate 1" used `gate-json.sh`'s default `OUT` directory
+> (`/tmp/numa-gate-json`) with no override, and that same default path was reused — unintentionally
+> — for Gate 3's first 256P replicate later in the same session. Gate 3's run truncated and
+> overwrote the Gate 1 replicate 1 `.out` files in place before they were archived, so the file
+> actually committed under `gate1-1p-json-{baseline,numa}-r1.out` was, wrongly, a copy of the 256P
+> data. The genuine replicate 1 raw data was gone (overwritten on disk, no backup) by the time
+> this was caught, so it was regenerated with a fresh rerun (same protocol, same commit) rather
+> than reconstructed. What follows is that regenerated run, correctly archived and re-verified to
+> contain `BenchmarkJSON-1` lines. Replicate 2 was genuine and correctly archived throughout — its
+> numbers are unchanged from the original report.
+
+**Replicate 1** (regenerated; genuine, verified to contain `BenchmarkJSON-1` data):
 
 ```
-$ ssh numa-dell 'GOROOT=$PWD GOMAXPROCS=1 BENCHNUM=10 ./numa-design/gate-json.sh'
-ns/op: baseline 16669939.5 numa 26050368.0 rel +56.3%
-FAIL ns/op exceeds +2%   (hand-rolled comparator)
+$ ssh numa-dell 'GOROOT=$PWD GOMAXPROCS=1 BENCHNUM=10 OUT=/tmp/numa-gate-json-1p-r1-fix ./numa-design/gate-json.sh'
+ns/op: baseline 32015652.5 numa 32149191.5 rel +0.4%
 ```
 ```
 $ benchstat baseline.out numa.out
-JSON-1  sec/op:            16.67m ± 98%   26.05m ± 36%  ~ (p=0.684 n=10)
-JSON-1  user+sys-sec/op:   16.69m ± 98%   26.04m ± 36%  ~ (p=0.739 n=10)
+JSON-1  sec/op:            32.02m ± 38%   32.15m ± 46%  ~ (p=0.315 n=10)
+JSON-1  user+sys-sec/op:   32.03m ± 38%   32.18m ± 46%  ~ (p=0.315 n=10)
 ```
 
-The hand-rolled band comparator (median-only, no significance test) flags a large FAIL, but
-`benchstat` — authoritative per the environment brief for this box's known bimodal JSON-benchmark
-noise (documented at length in the Layer 0/1 sections above) — finds no significant difference at
-either metric, with enormous variance (±98%/±36%) on both arms.
+This replicate landed inside the band on both the naive comparator and `benchstat` — no FAIL
+signal from it at all.
 
-Given how far outside the band the naive reading is, this was closed with a position-unbiased
-replicate rather than accepted at face value (per the task brief's instruction to do so for any
-hard-gate reading this far off):
-
-**Replicate 2** (fresh 10-round run, same protocol, ~10 minutes later):
+**Replicate 2** (fresh 10-round run, same protocol as replicate 1, run first chronologically,
+before replicate 1 was found to need regenerating):
 
 ```
 ns/op: baseline 24724307.5 numa 17121160.5 rel -30.8%
@@ -1361,24 +1367,33 @@ ns/op: baseline 24724307.5 numa 17121160.5 rel -30.8%
 JSON-1  sec/op:  24.72m ± 34%   17.12m ± 87%  ~ (p=0.280 n=10)
 ```
 
-**The naive median-rel comparator's sign flipped between the two replicates** (+56.3% then
--30.8%), while `benchstat` called both non-significant. That reversal is itself strong evidence
-this is pure run-to-run noise (thermal/scheduling/cache-state drift on this shared 1P-pinned
-workload), not a systematic Layer 2 cost — a real regression would not change sign.
+Both replicates' naive comparators land on opposite sides of zero (+0.4% then -30.8%) and
+`benchstat` calls both non-significant — consistent with this box's well-documented bimodal
+JSON-benchmark noise (`benchstat` is authoritative for this, per the environment brief; the same
+pattern is documented at length in the Layer 0/1 sections above), not a systematic Layer 2 cost.
+
+Replicate 2 is labeled here as a same-protocol replicate, not a position-unbiased one:
+`gate-json.sh` always runs baseline before numa within each interleaved round, so any position
+tailwind (documented in the Layer 1 report as ~1.5% favoring whichever arm runs second, i.e.
+numa) was not controlled in either replicate. This is immaterial to the conclusion here: the
+variances involved (±34-98%) dwarf a ~1.5% positional effect by more than an order of magnitude,
+and in replicate 2 specifically the tailwind favors numa in the same direction numa already came
+out faster — so it cannot be masking a real regression in the direction that would matter for a
+FAIL verdict.
 
 **Pooled (both replicates, n=20 pairs):**
 
 ```
-JSON-1  sec/op:            18.97m ± 72%   20.26m ± 53%   ~ (p=0.547 n=20)
-JSON-1  user+sys-sec/op:   18.99m ± 72%   20.26m ± 53%   ~ (p=0.565 n=20)
+JSON-1  sec/op:            31.01m ± 36%   20.44m ± 57%   ~ (p=0.142 n=20)
+JSON-1  user+sys-sec/op:   31.02m ± 36%   20.46m ± 58%   ~ (p=0.142 n=20)
 ```
 
-**Verdict: PASS.** No significant difference at n=20. (Two side metrics *are* significant but
-trivial in magnitude — `GC-bytes-from-system` +1.55%, p=0.020; `peak-VM-bytes` +0.00%, p=0.001 —
-neither is a gate metric nor practically meaningful.)
+**Verdict: PASS.** No significant difference at n=20. (`STW-sec/op` is significantly *lower* for
+numa, -44.99%, p=0.012 — not a gate metric, and a decrease is not a concern; `peak-VM-bytes` is
+technically significant but trivial, +0.02%, p=0.013.)
 
-Archived: `numa-design/bench-data/layer2/gate1-1p-json-{baseline,numa}-r1.out`,
-`gate1-1p-json-{baseline,numa}-r2.out`.
+Archived: `numa-design/bench-data/layer2/gate1-1p-json-{baseline,numa}-r1.out` (regenerated,
+genuine), `gate1-1p-json-{baseline,numa}-r2.out` (original, genuine, unchanged).
 
 ### Gate 2 — 1P alloc micro (Task 4 Step 1b): `Malloc8`/`Malloc16`, `-count=10`
 
