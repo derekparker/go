@@ -32,6 +32,12 @@ import (
 // 32-bit).
 const numaMaxNode = 65
 
+// numaCPUMaskBytes is the byte length of the CPU affinity mask passed to
+// sched_setaffinity(2) (via numaSetThreadAffinity) and sched_getaffinity.
+// 8192 CPUs / 8 bits per byte, matching numa.Topology's CPUToNode
+// capacity so any CPU id Topology can represent also fits this mask.
+const numaCPUMaskBytes = 8192 / 8
+
 const (
 	_MPOL_PREFERRED      = 1
 	_MPOL_BIND           = 2

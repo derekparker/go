@@ -71,3 +71,10 @@ func TestNUMAPreferredBindOnGrow(t *testing.T) {
 		t.Fatal("expected mbind PREFERRED on heap growth")
 	}
 }
+
+func TestNUMASetThreadAffinitySelf(t *testing.T) {
+	// Read the current mask and set it back unchanged: must succeed.
+	if !runtime.NumaSetThreadAffinitySelfForTest() {
+		t.Fatal("sched_setaffinity(self, current mask) failed")
+	}
+}

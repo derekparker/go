@@ -21,8 +21,18 @@
 // exercise real behavior. This file (and numa_linux_test.go, which
 // carries the same restriction) is kept scoped to the architectures
 // getcpu actually works on -- the ones CI/this task's hardware exercise.
+//
+// The additional goexperiment.numa tag matters independently of the
+// above: this file is package runtime (not runtime_test), so it is
+// compiled into the runtime test archive even with the experiment off.
+// Without this tag, an export like NumaSetThreadAffinitySelfForTest below
+// would give the experiment-off test binary a reachable call path into
+// confinement code, defeating the dead-code elimination Gate 8's census
+// checks for. Every export in this file is only ever referenced from
+// numa_linux_test.go, which already carries this same tag, so gating the
+// whole file this way costs nothing.
 
-//go:build linux && (amd64 || arm64)
+//go:build linux && (amd64 || arm64) && goexperiment.numa
 
 package runtime
 
@@ -61,4 +71,15 @@ func NumaTaskMemPolicyModeForTest() int32 {
 		return -1
 	}
 	return mode &^ _MPOL_MODE_FLAGS
+}
+
+// NumaSetThreadAffinitySelfForTest re-applies the calling thread's own
+// affinity mask.
+func NumaSetThreadAffinitySelfForTest() bool {
+	var buf [numaCPUMaskBytes]byte
+	r := sched_getaffinity(0, uintptr(len(buf)), &buf[0])
+	if r <= 0 {
+		return false
+	}
+	return numaSetThreadAffinity(0, &buf)
 }
