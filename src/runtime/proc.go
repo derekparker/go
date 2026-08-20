@@ -952,6 +952,14 @@ func schedinit() {
 	}
 	unlock(&sched.lock)
 
+	if goexperiment.Numa {
+		// Fill-one-socket-first needs the startup GOMAXPROCS value; no
+		// other runtime thread exists yet, so affinity/mempolicy set
+		// here is inherited by every future M. Layer 1 BIND-all already
+		// ran in numaSchedinit above and stays the fallback.
+		numaConfineIfSmall(procs)
+	}
+
 	// World is effectively started now, as P's can run.
 	worldStarted()
 

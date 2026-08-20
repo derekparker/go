@@ -247,6 +247,172 @@ func numaSetProcessBindAll() {
 	numaAllowedNodemask.Store(mask[0])
 }
 
+// numaConfined is true while fill-one-socket-first confinement is
+// active. Set once in numaConfineIfSmall (m0 is the only runtime
+// thread); cleared only by numaStandDownIfNeeded.
+var numaConfined atomic.Bool
+
+// numaStoodDown latches the one-way stand-down: once true, the
+// process never re-confines, and every M converges its own
+// affinity + task mempolicy at its next park
+// (numaFixThreadPlacement, Task 3).
+var numaStoodDown atomic.Bool
+
+var (
+	numaConfinedNode     int32
+	numaConfinedNodeCPUs int32
+
+	// numaSavedAffinity is the process's startup affinity mask, saved
+	// by numaShouldConfine before any narrowing, and restored per
+	// thread at/after stand-down.
+	numaSavedAffinity    [numaCPUMaskBytes]byte
+	numaSavedAffinityLen int32
+)
+
+// numaConfineIfSmall applies fill-one-socket-first confinement (design
+// §12.2) when the decision conditions hold. Called from schedinit after
+// procresize, before any other runtime thread exists. Layer 1
+// (numaSetProcessBindAll) has ALREADY run by this point and stays in
+// force: confinement only narrows CPU affinity and replaces the task
+// mempolicy; numaAllowedNodemask remains published and numaBindArena
+// keeps stamping heap chunks with uniform BIND-all (locked decision 5).
+// Experiment off: caller never invokes it (goexperiment.Numa-guarded
+// call site).
+func numaConfineIfSmall(procs int32) {
+	if node, ok := numaShouldConfine(procs); ok && numaConfine(node) {
+		if debug.numa > 0 {
+			println("numa: confined to node", node, "cpus", numaConfinedNodeCPUs)
+		}
+	}
+}
+
+// numaShouldConfine reports whether fill-one-socket-first should engage
+// (design §12.2): multi-node machine, representable topology, Layer 1
+// actually engaged (published nodemask), an EXPLICITLY chosen GOMAXPROCS
+// (locked decision 6 — without sched.customGOMAXPROCS, sysmon's ~1/sec
+// defaultGOMAXPROCS recompute reads the narrowed mask and freezes procs
+// at the node size, a real feedback loop), no pre-existing narrowed CPU
+// affinity (operator placement always wins), a usable getcpu, and
+// procs <= the boot node's CPU count.
+// As a side effect it saves the startup affinity mask for stand-down.
+// Every declined reason prints under GODEBUG=numa=1 (diagnosability).
+func numaShouldConfine(procs int32) (int32, bool) {
+	if numaTopology.NumNodes < 2 || numaTopology.TruncatedNodes || !numaHasSetAffinity {
+		return 0, false
+	}
+	if numaAllowedNodemask.Load() == 0 {
+		// Layer 1 declined or failed; do not build confinement on top.
+		numaConfineDeclined("layer1 inactive")
+		return 0, false
+	}
+	if !sched.customGOMAXPROCS {
+		// Default GOMAXPROCS auto-updates from the affinity mask we are
+		// about to narrow (locked decision 6): only confine a process
+		// whose P count was chosen explicitly.
+		numaConfineDeclined("GOMAXPROCS not explicitly set")
+		return 0, false
+	}
+	r := sched_getaffinity(0, uintptr(numaCPUMaskBytes), &numaSavedAffinity[0])
+	if r <= 0 {
+		numaConfineDeclined("sched_getaffinity failed")
+		return 0, false
+	}
+	numaSavedAffinityLen = int32(r)
+	online := int32(0)
+	for i := int32(0); i < numaTopology.NumNodes; i++ {
+		online += numaTopology.Nodes[i].NumCPUs
+	}
+	pop := int32(0)
+	for _, b := range numaSavedAffinity[:r] {
+		for b != 0 {
+			b &= b - 1
+			pop++
+		}
+	}
+	if pop != online {
+		// taskset / narrowed cpuset: operator placement wins. NOTE:
+		// offline CPUs can also make sysfs-online and the affinity
+		// popcount disagree; the check then declines — conservative
+		// (offline-CPU hosts simply do not confine). Record if seen.
+		numaConfineDeclined("affinity narrower than online CPUs")
+		return 0, false
+	}
+	node := numaCurrentNode() // boot CPU's node (locked decision 2)
+	if node < 0 || node >= 64 {
+		numaConfineDeclined("getcpu failed")
+		return 0, false
+	}
+	ncpus := numaNodeCPUCount(node)
+	if ncpus <= 0 || procs > ncpus {
+		numaConfineDeclined("GOMAXPROCS exceeds node")
+		return 0, false
+	}
+	return node, true
+}
+
+// numaConfineDeclined prints the decline reason under GODEBUG=numa=1.
+func numaConfineDeclined(reason string) {
+	if debug.numa > 0 {
+		println("numa: confinement declined:", reason)
+	}
+}
+
+// numaNodeCPUCount returns node's CPU count from the topology. It is
+// the single source for both the <= decision in numaShouldConfine and
+// the numaConfinedNodeCPUs threshold the stand-down trigger compares
+// against.
+func numaNodeCPUCount(node int32) int32 {
+	for i := int32(0); i < numaTopology.NumNodes; i++ {
+		if numaTopology.Nodes[i].ID == node {
+			return numaTopology.Nodes[i].NumCPUs
+		}
+	}
+	return 0
+}
+
+// numaConfine confines the process to node: CPU affinity to that node's
+// CPUs plus a task MPOL_PREFERRED policy for its memory (locked
+// decision 1: PREFERRED, never single-node BIND — the OOM footgun).
+// The PREFERRED set_mempolicy REPLACES the Layer-1 BIND-all task policy
+// for this thread and, by clone inheritance, every later M. Runs while
+// m0 is the only runtime thread.
+//
+// Heap-VMA exemption does not depend on this task policy: numaBindArena
+// keeps stamping every chunk with uniform BIND-all (numaAllowedNodemask
+// stays published) — the VMA-own policy is what holds against threads
+// the task policy never reached (pre-runtime cgo threads; locked
+// decision 1), and uniform policies VMA-merge, so there is no Layer-2-
+// style map blowup.
+func numaConfine(node int32) bool {
+	var cpumask [numaCPUMaskBytes]byte
+	n := 0
+	for cpu := 0; cpu < 8192; cpu++ {
+		if numaTopology.NodeOfCPU(cpu) == node {
+			cpumask[cpu/8] |= 1 << (uint(cpu) % 8)
+			n++
+		}
+	}
+	if n == 0 {
+		return false
+	}
+	if !numaSetThreadAffinity(0, &cpumask) {
+		return false
+	}
+	var pmask numaNodemask
+	pmask[uintptr(node)/numaNodemaskBits] = 1 << (uintptr(node) % numaNodemaskBits)
+	if _, _, errno := linux.Syscall6(linux.SYS_SET_MEMPOLICY,
+		uintptr(_MPOL_PREFERRED), uintptr(unsafe.Pointer(&pmask[0])), numaMaxNode, 0, 0, 0); errno != 0 {
+		// Policy failed: undo the affinity narrowing and stay on the
+		// Layer-1 BIND-all policy that is already in force.
+		numaSetThreadAffinity(0, &numaSavedAffinity)
+		return false
+	}
+	numaConfined.Store(true)
+	numaConfinedNode = node
+	numaConfinedNodeCPUs = numaNodeCPUCount(node) // same source as the decision
+	return true
+}
+
 // numaBindArena sets MPOL_BIND, over the same allowed-node mask
 // numaSetProcessBindAll computed, as the VMA policy for the heap arena
 // range [addr, addr+size), then -- Layer 2 -- attempts to refine that to

@@ -27,3 +27,11 @@ func numaSchedinit() {
 //go:nosplit
 func numaBindArena(addr unsafe.Pointer, size uintptr) {
 }
+
+// numaConfineIfSmall is a no-op on non-Linux platforms: fill-one-socket-
+// first confinement is Linux-only (see numa_linux.go). Its call site in
+// schedinit is also gated on goexperiment.Numa, so this body never runs
+// with the experiment off; it exists purely so proc.go, which is not
+// Linux-specific, has something to call on every GOOS.
+func numaConfineIfSmall(procs int32) {
+}
