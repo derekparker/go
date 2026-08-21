@@ -26,6 +26,18 @@ type mNUMAState struct {
 	// schedule() pass for any M always applies affinity, regardless of
 	// which node it happens to observe first.
 	lastNode int8
+
+	// nextCheck is the nanotime() deadline before which numaNoteSchedule
+	// skips its getcpu(2) syscall entirely (see
+	// numaSoftAffinityCheckInterval, numa_linux.go). A real-hardware
+	// PingPongHog benchmark showed firing getcpu on literally every
+	// schedule() pass costs ~+56% on a tight goroutine-switching
+	// workload -- nanotime() (vDSO-backed, not a syscall trap) is the
+	// cheap per-pass read that replaces it; getcpu itself only runs once
+	// per interval per M. Zero-value-safe: 0 is always <= any real
+	// nanotime() reading taken after process start, so the first
+	// eligible pass on any M is always due.
+	nextCheck int64
 }
 
 // placementDone reports whether this M's placement has already converged
@@ -57,3 +69,16 @@ func (s *mNUMAState) setSoftAffinityNode(node int8) { s.lastNode = node + 1 }
 // too, or the next numaNoteSchedule pass would see no change and skip
 // re-narrowing, silently leaving the M's actual affinity wide forever.
 func (s *mNUMAState) clearSoftAffinityNode() { s.lastNode = 0 }
+
+// softAffinityCheckDue reports whether now has reached this M's next
+// getcpu-check deadline.
+func (s *mNUMAState) softAffinityCheckDue(now int64) bool { return now >= s.nextCheck }
+
+// armSoftAffinityCheck schedules this M's next getcpu check for
+// numaSoftAffinityCheckInterval after now. Called every time
+// numaNoteSchedule actually pays the getcpu syscall -- both when it
+// finds a node change and when it doesn't -- so a busy M that stays on
+// the same node also stays throttled, not just one that migrates.
+func (s *mNUMAState) armSoftAffinityCheck(now int64) {
+	s.nextCheck = now + numaSoftAffinityCheckInterval
+}

@@ -23,3 +23,6 @@ func (s *mNUMAState) setPlacementDone()   {}
 func (s *mNUMAState) softAffinityNode() (node int8, ok bool) { return 0, false }
 func (s *mNUMAState) setSoftAffinityNode(node int8)          {}
 func (s *mNUMAState) clearSoftAffinityNode()                 {}
+
+func (s *mNUMAState) softAffinityCheckDue(now int64) bool { return false }
+func (s *mNUMAState) armSoftAffinityCheck(now int64)      {}

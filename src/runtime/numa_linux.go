@@ -944,19 +944,46 @@ func numaSoftAffinityEligible() bool {
 	return goexperiment.Numa && numaHasSetAffinity && numaTopology.NumNodes >= 2 && numaStartupFullAffinity
 }
 
+// numaSoftAffinityCheckInterval bounds how often numaNoteSchedule pays
+// its getcpu(2) syscall, per M, via a nanotime()-gated throttle.
+//
+// The plan's Forbidden list allows getcpu at "scheduler-pass frequency"
+// (the same class as Task 8/9's grow/refill-frequency calls), and an
+// early version of this function took that literally -- one getcpu call
+// on every schedule() pass. A real-2-node-hardware run of the existing
+// BenchmarkPingPongHog (runtime, a tight goroutine ping-pong that calls
+// schedule() on every hand-off) showed that costs +56.02% (p=0.000,
+// n=10) on numa-dell: schedule() is called far more often than acquirep
+// ever is (every blocking channel op, every GC assist yield, ...), so
+// "same order as acquirep" and "every schedule() call" are not actually
+// the same frequency, and a raw (non-vDSO; Task 14 is the profile-gated
+// vDSO/rseq follow-up) getcpu syscall's few-hundred-ns cost, paid that
+// often, is a real regression -- not the "cheap compare, no syscall"
+// steady state the design requires.
+//
+// nanotime() is the fix: vDSO-backed on amd64/arm64 linux (not a
+// syscall trap), so reading it every schedule() pass to decide whether
+// getcpu is even due is itself cheap. getcpu only actually runs once
+// per interval per M, regardless of how often schedule() is called in
+// between -- in the PingPongHog benchmark's regime, that collapses the
+// syscall rate by orders of magnitude. 4ms is not load-bearing (no gate
+// pins it): it is short enough that a real cross-node migration is
+// re-narrowed promptly relative to typical scheduling quanta, and long
+// enough that even a schedule()-call rate in the millions/sec keeps the
+// syscall rate in the hundreds/sec.
+const numaSoftAffinityCheckInterval = 4 * 1e6 // 4ms in nanotime() units
+
 // numaNoteSchedule applies node-mask soft affinity to the current M
-// (design §12.4, ingredient c): reads the M's current NUMA node via
-// getcpu (numaCurrentNode -- scheduler-pass frequency, the same
-// established class as Task 8/9's grow/refill-frequency getcpu calls;
-// see the plan's Forbidden list, "no getcpu on a malloc fast path,
-// refill/grow/scheduler-pass frequency only") and, ONLY if it differs
-// from the node this M's affinity was last narrowed to
-// (mp.numa.softAffinityNode), sched_setaffinity's the M to that node's
-// CPU mask -- narrowing which CPUs the M may run on without pinning to a
-// single CPU, so the kernel keeps full scheduling freedom within the
-// node. Node CHANGE is the only trigger for that second syscall: once a
-// node is established, every later steady-state call pays the getcpu
-// syscall plus a handful of loads and one compare, nothing else.
+// (design §12.4, ingredient c): at most once every
+// numaSoftAffinityCheckInterval per M (see that constant's doc comment
+// for why), reads the M's current NUMA node via getcpu (numaCurrentNode)
+// and, ONLY if it differs from the node this M's affinity was last
+// narrowed to (mp.numa.softAffinityNode), sched_setaffinity's the M to
+// that node's CPU mask -- narrowing which CPUs the M may run on without
+// pinning to a single CPU, so the kernel keeps full scheduling freedom
+// within the node. Steady state -- interval not yet elapsed, the
+// overwhelmingly common case -- costs one nanotime() read plus a
+// handful of loads and compares: no syscall at all.
 //
 // Called from schedule(), after findRunnable returns and before execute,
 // where mp.locks == 0 is a scheduler invariant (findRunnable never
@@ -968,7 +995,8 @@ func numaSoftAffinityEligible() bool {
 // the M is about to run user code with no locks held, which is exactly
 // why the hook lives here instead.
 //
-// Never engages (returns before any syscall) when: the machine is
+// Never engages (returns before any syscall, including nanotime, since
+// the cheaper checks are ordered first) when: the machine is
 // single-node; this arch cannot set thread affinity; the process itself
 // started with narrowed CPU affinity (operator placement wins --
 // numaSoftAffinityEligible's numaStartupFullAffinity check);
@@ -1000,16 +1028,21 @@ func numaNoteSchedule() {
 	if !numaSoftAffinityEligible() || numaConfined.Load() || numaStoodDown.Load() {
 		return
 	}
+	now := nanotime()
+	if !mp.numa.softAffinityCheckDue(now) {
+		return // steady state: throttled, no getcpu syscall this pass
+	}
+	mp.numa.armSoftAffinityCheck(now)
 	node := numaCurrentNode()
 	if node < 0 || node >= 64 {
 		// getcpu failed, or reported a node id beyond what this
 		// process's nodemask machinery can represent (numaMaxNode,
 		// the same bound numaShouldConfine's own getcpu check uses).
-		// Nothing to do this pass; retried at the next schedule().
+		// Nothing to do this pass; retried at the next due check.
 		return
 	}
 	if last, ok := mp.numa.softAffinityNode(); ok && int32(last) == node {
-		return // steady state: already narrowed to this node
+		return // already narrowed to this node
 	}
 	var mask [numaCPUMaskBytes]byte
 	if !numaNodeAffinityMask(node, &mask) {
