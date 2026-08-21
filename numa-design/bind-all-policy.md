@@ -11,15 +11,33 @@ After topology init (still **after** `mallocinit`), `numaSetProcessBindAll` call
 Each later heap arena, after `sysMap` replaces the VMA, gets:
 
 1. `mbind(MPOL_BIND, all allowed nodes)`
-2. `mbind(MPOL_PREFERRED, local node)`
+2. `mbind(MPOL_PREFERRED, local node)` — **superseded.** Its own IMC
+   locality gate failed (remote-DRAM share unchanged: +0.10%/-0.07% vs a
+   required ≥10% drop) and a three-arm sweep proved it behaviorally inert
+   (C-full vs C-L1, primary p=0.838, direct p=0.631): the call runs but
+   changes nothing measurable, good host or bad. Task 6 removes it from
+   `numaBindArena`, keeping only the `MPOL_BIND` call above. See
+   "Fill-one-socket-first (v3)" below for what actually narrows placement
+   for small processes now.
 
 `MPOL_BIND` here is **not** “pin this process to one node.” The nodemask is
 every node `cpuset.mems` allows, so allocation can still land on any allowed
 node. The point is the kernel NUMA balancer skips VMAs whose policy has no
 `MPOL_F_MOF` — the same reason `numactl --membind=<all-nodes>` fixes #14406.
 
-`maxnode` is the width of one nodemask word (64), not `MaxNodes+1`. A larger
-`maxnode` made the kernel read past our stack slot.
+`maxnode` is a fixed **65** (`numaMaxNode` in `numa_linux.go`) on every
+architecture — never derived from the nodemask word width (32 bits on the
+32-bit arches, 64 on the rest) and never `numa.MaxNodes` (64) or
+`MaxNodes+1`. The kernel's `get_nodes()`/`copy_nodes_to_user()` decrements
+`maxnode` and sizes its destination write as `BITS_TO_LONGS(maxnode-1)`
+kernel `ulong`s; for 65 that's `BITS_TO_LONGS(64)` = 8 bytes, regardless of
+the calling process's own word size. Passing `numaNodemaskBits+1` (33, not
+65) on a 32-bit arch would still make the kernel round its copy up to that
+same 8-byte length while our destination buffer was a single 4-byte
+`uintptr` — a 4-byte out-of-bounds kernel write. `numaNodemask`'s buffer
+(`numaNodemaskWords`: 1 native-uintptr word on 64-bit, 2 on 32-bit) is
+sized to match that 8-byte requirement on every arch; see `numaMaxNode`'s
+doc comment for the full derivation.
 
 Single-node machines and `GOEXPERIMENT` off never call this.
 
@@ -41,6 +59,14 @@ We still keep **process/task** BIND-all because arena `MPOL_PREFERRED` alone
 did **not** zero hint faults on this host (2026-08-13: ~12k hint faults, ~4k
 migrations). BIND-all task policy + BIND-then-PREFERRED arenas did (2026-08-14:
 0 / 0, matching membind). See `RESULTS.md`.
+
+Re-reading this with the Layer 2 finding above: this 2-point comparison never
+isolated "task BIND-all + arena BIND-only" as its own arm, so it cannot by
+itself distinguish which half did the work. Task 4's later three-arm sweep
+did isolate them and found arena `MPOL_PREFERRED` behaviorally inert on its
+own (C-full ≈ C-L1) — consistent with the zero here tracking to the
+task-level policy, not the arena refinement. This entry does not contradict
+Task 6's removal; it just predates the isolation that justified it.
 
 ## Inheritance
 
@@ -84,6 +110,64 @@ That is the product question: the experiment currently behaves like wrapping
 the process in `numactl --membind=<allowed-nodes>` for **new** mappings after
 runtime init, plus extra PREFERRED on Go heap arenas.
 
+## Fill-one-socket-first (v3)
+
+Confinement (design §12.2, `numaConfineIfSmall`/`numaShouldConfine`/
+`numaConfine` in `numa_linux.go`) narrows a small, explicitly-sized process
+to one NUMA node's CPUs and its task mempolicy, decided once from
+`schedinit` while m0 is still the only runtime thread — strictly *after*
+Layer 1 (`numaSetProcessBindAll`) has already run and published the
+allowed-node mask. It narrows on top of Layer 1; nothing here replaces it.
+
+| Mapping | Effect while confined |
+|---------|------------------------|
+| Task-default policy (new allocations on the confined M with no explicit `mbind`) | `MPOL_PREFERRED` to the confined node, **replacing** the Layer-1 BIND-all task policy on that thread (`numaConfine`'s `set_mempolicy` call). Locked decision 1: PREFERRED, never single-node `MPOL_BIND` — BIND has no fallback node, so pinning the whole process to one node is exactly the OOM footgun this doc's Recommendation section below forbids. |
+| Heap arenas | Unchanged and still running: `numaBindArena` keeps stamping every new chunk `MPOL_BIND` over the **full** allowed-node mask, not narrowed to the confined node (locked decision 5). Confinement changes where the task-default policy points; it does not touch the arena VMA policy. |
+
+Gate 4's confined-1P strace confirms this empirically: `mbind`=22 (11
+heap-chunk grows, each still issuing the BIND-then-PREFERRED pair that was
+active in that gate run, predating Task 6's removal above), distinct from
+confinement's own setup calls — `sched_setaffinity`=1,
+`set_mempolicy`=2 in order `MPOL_BIND` (Layer 1, from `numaSchedinit`) then
+`MPOL_PREFERRED` (confinement, from `numaConfineIfSmall`).
+
+**Inheritance.** `numaConfine`'s `set_mempolicy(MPOL_PREFERRED)` call is
+per-thread, exactly like Layer 1's. It runs while m0 is the only runtime
+thread, so `clone` copies it to every M created afterward, which inherit
+PREFERRED-to-node until stand-down; a thread that sets its own policy
+overrides the runtime, same gap as Layer 1's inheritance section above.
+
+**The until-first-park residual after stand-down.** Stand-down detection
+(`numaStandDownIfNeeded`) runs under `sched.lock`/`mp.locks != 0` and must
+not make syscalls there, so it only flips a one-way latch (`numaStoodDown`).
+The actual widening is two-part: `numaStandDownWiden`'s best-effort eager
+walk over `allm` (a latency optimization only — it can miss an M mid-exit,
+or, rarely, hit a tid the kernel already recycled for something unrelated),
+and `numaFixThreadPlacement`, called from every M's own next `stopm` park,
+which restores that M's saved affinity and Layer-1 BIND-all task policy.
+The second path is where correctness actually lives: an M cloned in the
+window between the eager walk being dispatched and every live M having
+converged, or one `allocm` creates after stand-down, inherits confined
+placement from its creating M and keeps it until it first parks (locked
+decision 4). This is documented, accepted residual behavior (`numaStandDownWiden`'s
+doc comment; RESULTS.md's N1 note), not a bug — such an M stays
+balancer-exempt throughout via its explicit task policy, just delayed in
+reaching the fully-stood-down state, never incorrectly or unsafely placed.
+
+**Why the arena `mbind` still runs while confined.** The confined task
+policy is per-thread and reaches only Ms the runtime itself `clone`s after
+confinement takes effect. It never reaches threads that already existed
+before `numaSchedinit` ran, or cgo threads a C library spawns via
+`pthread_create` outside Go's clone path — locked decision 1's
+"pre-runtime cgo threads." `numaBindArena`'s VMA-level `MPOL_BIND` is what
+still holds against those: a VMA policy governs whichever thread touches
+its pages, task policy or not. Keeping that arena policy uniform BIND-all,
+rather than narrowing it to the confined node, also lets adjacent chunks
+VMA-merge — Gate 4 measured a 32-line `/proc/PID/maps` for the confined
+arm, matching the Layer-1 baseline character, not the ~1172 VMAs Layer 2's
+per-chunk different-node `MPOL_PREFERRED` calls produced (the same
+fragmentation Task 6 cites as one reason to remove that call).
+
 ## Recommendation
 
 - **Do not add a STW-only `set_mempolicy` toggle.** It is the wrong window and
@@ -102,6 +186,8 @@ runtime init, plus extra PREFERRED on Go heap arenas.
 
 ## Checks we already have
 
-- `TestNUMAProcessBindAll`: `get_mempolicy` mode is `MPOL_BIND` (2) on
-  multi-node.
+- `TestNUMABindAllTaskPolicy`: `get_mempolicy` mode is `MPOL_BIND` (2) on
+  multi-node, unconfined path. The test skips when fill-one-socket
+  confinement is active, since confined mode is `MPOL_PREFERRED`, not
+  `MPOL_BIND` — see "Fill-one-socket-first (v3)" above.
 - Evidence pack: 5× gc-pause + `/proc/vmstat` vs `numactl --membind=0,1`.
