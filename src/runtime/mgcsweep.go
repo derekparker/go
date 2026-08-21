@@ -93,16 +93,27 @@ func (s sweepClass) split() (spc spanClass, full bool) {
 // nextSpanForSweep finds and pops the next span for sweeping from the
 // central sweep buffers. It returns ownership of the span to the caller.
 // Returns nil if no such span exists.
+//
+// The background sweeper doesn't route by node the way cacheSpan does
+// (design §12.4) -- it just needs to drain every unswept span
+// eventually, so it tries every node's set for a given span class
+// before moving on. With the experiment off, numaMaxHeapNodes == 1
+// (I5) and this inner loop always runs exactly once.
 func (h *mheap) nextSpanForSweep() *mspan {
 	sg := h.sweepgen
 	for sc := sweep.centralIndex.load(); sc < numSweepClasses; sc++ {
 		spc, full := sc.split()
 		c := &h.central[spc].mcentral
 		var s *mspan
-		if full {
-			s = c.fullUnswept(sg).pop()
-		} else {
-			s = c.partialUnswept(sg).pop()
+		for node := int32(0); node < numaMaxHeapNodes; node++ {
+			if full {
+				s = c.fullUnswept(sg, node).pop()
+			} else {
+				s = c.partialUnswept(sg, node).pop()
+			}
+			if s != nil {
+				break
+			}
 		}
 		if s != nil {
 			// Write down that we found something so future sweepers
@@ -255,8 +266,10 @@ func finishsweep_m() {
 	sg := mheap_.sweepgen
 	for i := range mheap_.central {
 		c := &mheap_.central[i].mcentral
-		c.partialUnswept(sg).reset()
-		c.fullUnswept(sg).reset()
+		for node := int32(0); node < numaMaxHeapNodes; node++ {
+			c.partialUnswept(sg, node).reset()
+			c.fullUnswept(sg, node).reset()
+		}
 	}
 
 	// Sweeping is done, so there won't be any new memory to
@@ -736,8 +749,11 @@ func (sl *sweepLocked) sweep(preserve bool) bool {
 		if nalloc > 0 {
 			// There still exist pointers into the span or the span hasn't been
 			// freed yet. It's not ready to be reused. Put it back on the
-			// full swept list for the next cycle.
-			mheap_.central[spc].mcentral.fullSwept(sweepgen).push(s)
+			// full swept list for the next cycle, routed to its home
+			// node (design §12.4; user arena chunks are node 0's
+			// "grower unknown" case per the task 8 review -- advisory
+			// placement only).
+			mheap_.central[spc].mcentral.fullSwept(sweepgen, numaArenaNode(s.base())).push(s)
 			return false
 		}
 
@@ -788,11 +804,13 @@ func (sl *sweepLocked) sweep(preserve bool) bool {
 				mheap_.freeSpan(s)
 				return true
 			}
-			// Return span back to the right mcentral list.
+			// Return span back to the right mcentral list, routed to
+			// its home node (design §12.4).
+			node := numaArenaNode(s.base())
 			if nalloc == s.nelems {
-				mheap_.central[spc].mcentral.fullSwept(sweepgen).push(s)
+				mheap_.central[spc].mcentral.fullSwept(sweepgen, node).push(s)
 			} else {
-				mheap_.central[spc].mcentral.partialSwept(sweepgen).push(s)
+				mheap_.central[spc].mcentral.partialSwept(sweepgen, node).push(s)
 			}
 		}
 	} else if !preserve {
@@ -836,8 +854,9 @@ func (sl *sweepLocked) sweep(preserve bool) bool {
 			return true
 		}
 
-		// Add a large span directly onto the full+swept list.
-		mheap_.central[spc].mcentral.fullSwept(sweepgen).push(s)
+		// Add a large span directly onto the full+swept list, routed
+		// to its home node (design §12.4).
+		mheap_.central[spc].mcentral.fullSwept(sweepgen, numaArenaNode(s.base())).push(s)
 	}
 	return false
 }

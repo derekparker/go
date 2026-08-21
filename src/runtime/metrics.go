@@ -459,6 +459,18 @@ func initMetrics() {
 					in.sysStats.gcMiscSys + in.sysStats.otherSys
 			},
 		},
+		"/numa/span-refills:local": {
+			compute: func(_ *statAggregate, out *metricValue) {
+				out.kind = metricKindUint64
+				out.scalar = numaSpanRefillLocal.Load()
+			},
+		},
+		"/numa/span-refills:remote": {
+			compute: func(_ *statAggregate, out *metricValue) {
+				out.kind = metricKindUint64
+				out.scalar = numaSpanRefillRemote.Load()
+			},
+		},
 		"/sched/gomaxprocs:threads": {
 			compute: func(_ *statAggregate, out *metricValue) {
 				out.kind = metricKindUint64

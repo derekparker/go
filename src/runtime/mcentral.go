@@ -13,6 +13,7 @@
 package runtime
 
 import (
+	"internal/goexperiment"
 	"internal/runtime/atomic"
 	"internal/runtime/gc"
 	"internal/runtime/sys"
@@ -23,11 +24,16 @@ type mcentral struct {
 	_         sys.NotInHeap
 	spanclass spanClass
 
-	// partial and full contain two mspan sets: one of swept in-use
-	// spans, and one of unswept in-use spans. These two trade
-	// roles on each GC cycle. The unswept set is drained either by
-	// allocation or by the background sweeper in every GC cycle,
-	// so only two roles are necessary.
+	// partial and full contain two mspan sets each, per NUMA heap
+	// arena stream (design §12.3/§12.4, task 9): one of swept in-use
+	// spans, and one of unswept in-use spans, exactly as before
+	// per-node routing existed -- now also indexed by the node a
+	// span's home arena was grown for (heapArena.node, task 8), so
+	// that a refill can search its own node's spans before any other
+	// node's (see cacheSpan). These two roles still trade on each GC
+	// cycle. The unswept set is drained either by allocation or by
+	// the background sweeper in every GC cycle, so only two roles are
+	// necessary.
 	//
 	// sweepgen is increased by 2 on each GC cycle, so the swept
 	// spans are in partial[sweepgen/2%2] and the unswept spans are in
@@ -41,44 +47,129 @@ type mcentral struct {
 	// to the appropriate swept list. As a result, the parts of the
 	// sweeper and mcentral that do consume from the unswept list may
 	// encounter swept spans, and these should be ignored.
-	partial [2]spanSet // list of spans with a free object
-	full    [2]spanSet // list of spans with no free objects
+	//
+	// With the experiment off, numaMaxHeapNodes == 1 (I5) and every
+	// indexed access below (via the accessor functions' node/idx
+	// redirection, matching mheap.grow's own pattern) collapses to
+	// the single unindexed set these fields held before task 9, both
+	// in layout (a [1]spanSet array has the same size/alignment as a
+	// bare spanSet) and in the literal-constant-0 indexing the
+	// compiler generates for it.
+	partial [2][numaMaxHeapNodes]spanSet // list of spans with a free object, per node
+	full    [2][numaMaxHeapNodes]spanSet // list of spans with no free objects, per node
 }
 
 // Initialize a single central free list.
+//
+// Lock-rank note (I5): every per-node spanSet spine lock must be
+// lockInit'd here -- 2 partial + 2 full sets x numaMaxHeapNodes, not
+// just the four locks the pre-task-9 shape had -- or a
+// staticlockranking build throws on the first uninitialized lock it
+// sees. With the experiment off numaMaxHeapNodes == 1 and this is
+// exactly the original four lockInit calls.
 func (c *mcentral) init(spc spanClass) {
 	c.spanclass = spc
-	lockInit(&c.partial[0].spineLock, lockRankSpanSetSpine)
-	lockInit(&c.partial[1].spineLock, lockRankSpanSetSpine)
-	lockInit(&c.full[0].spineLock, lockRankSpanSetSpine)
-	lockInit(&c.full[1].spineLock, lockRankSpanSetSpine)
+	for i := range c.partial {
+		for node := range c.partial[i] {
+			lockInit(&c.partial[i][node].spineLock, lockRankSpanSetSpine)
+		}
+	}
+	for i := range c.full {
+		for node := range c.full[i] {
+			lockInit(&c.full[i][node].spineLock, lockRankSpanSetSpine)
+		}
+	}
 }
 
 // partialUnswept returns the spanSet which holds partially-filled
-// unswept spans for this sweepgen.
-func (c *mcentral) partialUnswept(sweepgen uint32) *spanSet {
-	return &c.partial[1-sweepgen/2%2]
+// unswept spans for this sweepgen and NUMA node.
+func (c *mcentral) partialUnswept(sweepgen uint32, node int32) *spanSet {
+	idx := int32(0)
+	if goexperiment.Numa {
+		idx = node
+	}
+	return &c.partial[1-sweepgen/2%2][idx]
 }
 
 // partialSwept returns the spanSet which holds partially-filled
-// swept spans for this sweepgen.
-func (c *mcentral) partialSwept(sweepgen uint32) *spanSet {
-	return &c.partial[sweepgen/2%2]
+// swept spans for this sweepgen and NUMA node.
+func (c *mcentral) partialSwept(sweepgen uint32, node int32) *spanSet {
+	idx := int32(0)
+	if goexperiment.Numa {
+		idx = node
+	}
+	return &c.partial[sweepgen/2%2][idx]
 }
 
 // fullUnswept returns the spanSet which holds unswept spans without any
-// free slots for this sweepgen.
-func (c *mcentral) fullUnswept(sweepgen uint32) *spanSet {
-	return &c.full[1-sweepgen/2%2]
+// free slots for this sweepgen and NUMA node.
+func (c *mcentral) fullUnswept(sweepgen uint32, node int32) *spanSet {
+	idx := int32(0)
+	if goexperiment.Numa {
+		idx = node
+	}
+	return &c.full[1-sweepgen/2%2][idx]
 }
 
 // fullSwept returns the spanSet which holds swept spans without any
-// free slots for this sweepgen.
-func (c *mcentral) fullSwept(sweepgen uint32) *spanSet {
-	return &c.full[sweepgen/2%2]
+// free slots for this sweepgen and NUMA node.
+func (c *mcentral) fullSwept(sweepgen uint32, node int32) *spanSet {
+	idx := int32(0)
+	if goexperiment.Numa {
+		idx = node
+	}
+	return &c.full[sweepgen/2%2][idx]
+}
+
+// numaSpanRefillLocal and numaSpanRefillRemote back the
+// /numa/span-refills:local and /numa/span-refills:remote
+// runtime/metrics counters (design §12.4's in-vivo locality proxy).
+// Incremented only in cacheSpan, at refill frequency -- never on a
+// malloc fast path. Declared unconditionally (metrics.go registers
+// their names on every build, like every other runtime/metrics
+// counter -- none are goexperiment-gated), but only ever written to
+// when goexperiment.Numa; see cacheSpan.
+var (
+	numaSpanRefillLocal  atomic.Uint64
+	numaSpanRefillRemote atomic.Uint64
+)
+
+// numaRefillNode returns the NUMA node mcentral.cacheSpan should route
+// this span refill to, and whether that is a genuine per-node reading
+// (design §12.4's routing ingredient) -- forwards directly to
+// numaGrowNode (task 8), which already has exactly the contract
+// routing needs: node is always a valid index into the per-node
+// spanSet arrays above, even when genuine is false (streams disabled,
+// a failed getcpu, or node >= numaMaxHeapNodes -- see numaGrowNode's
+// doc comment for the full enumeration). Routing and growth homing
+// read the node the same way; they differ only in call frequency
+// (refill here, heap growth there) and in what they do with a
+// non-genuine reading (routing still searches node 0's sets; growth
+// declines to home -- see mcentral.grow).
+//
+// Called ONCE per mcentral.cacheSpan call, i.e. once per refill --
+// never from getMCache or a malloc fast path (v2/v3 forbidden list).
+func numaRefillNode() (node int32, genuine bool) {
+	return numaGrowNode()
 }
 
 // Allocate a span to use in an mcache.
+//
+// Routes the refill by NUMA node (design §12.4): the current node is
+// read ONCE per call via numaRefillNode (getcpu, at refill frequency
+// only -- never from getMCache or a malloc fast path, v2/v3 forbidden
+// list). The local node's sets are searched first, exactly the way
+// this function's single set was always searched before per-node
+// routing existed (see cacheSpanFromNode); only if the local node has
+// nothing usable are the remaining nodes tried, in index order; only
+// if no node has anything does this fall through to mheap growth,
+// homed to the local node when the reading is genuine (see grow).
+//
+// A span found on a node other than the current one counts as a
+// "remote" refill; everything else -- found locally, or freshly grown
+// for the local node -- counts as "local"
+// (/numa/span-refills:{local,remote}, design §12.4's in-vivo locality
+// proxy).
 func (c *mcentral) cacheSpan() *mspan {
 	// Deduct credit for this span allocation and sweep if necessary.
 	spanBytes := uintptr(gc.SizeClassToNPages[c.spanclass.sizeclass()]) * pageSize
@@ -91,12 +182,20 @@ func (c *mcentral) cacheSpan() *mspan {
 		traceRelease(trace)
 	}
 
+	node, genuine := numaRefillNode()
+
 	// If we sweep spanBudget spans without finding any free
 	// space, just allocate a fresh span. This limits the amount
 	// of time we can spend trying to find free space and
 	// amortizes the cost of small object sweeping over the
 	// benefit of having a full free span to allocate from. By
 	// setting this to 100, we limit the space overhead to 1%.
+	//
+	// This budget is shared across every node searched below (I5-style
+	// off-build collapse aside, this is the same global bound the
+	// pre-task-9 single-set search always had -- routing spreads the
+	// same amount of sweep work across nodes rather than multiplying
+	// it per node).
 	//
 	// TODO(austin,mknyszek): This still has bad worst-case
 	// throughput. For example, this could find just one free slot
@@ -106,75 +205,48 @@ func (c *mcentral) cacheSpan() *mspan {
 	// allocation if the budget runs low.
 	spanBudget := 100
 
-	var s *mspan
-	var sl sweepLocker
-
-	// Try partial swept spans first.
-	sg := mheap_.sweepgen
-	if s = c.partialSwept(sg).pop(); s != nil {
-		goto havespan
-	}
-
-	sl = sweep.active.begin()
-	if sl.valid {
-		// Now try partial unswept spans.
-		for ; spanBudget >= 0; spanBudget-- {
-			s = c.partialUnswept(sg).pop()
-			if s == nil {
+	s := c.cacheSpanFromNode(node, &spanBudget)
+	local := s != nil
+	if s == nil && goexperiment.Numa {
+		for other := int32(0); other < numaMaxHeapNodes && spanBudget >= 0; other++ {
+			if other == node {
+				continue
+			}
+			if s = c.cacheSpanFromNode(other, &spanBudget); s != nil {
 				break
 			}
-			if s, ok := sl.tryAcquire(s); ok {
-				// We got ownership of the span, so let's sweep it and use it.
-				s.sweep(true)
-				sweep.active.end(sl)
-				goto havespan
-			}
-			// We failed to get ownership of the span, which means it's being or
-			// has been swept by an asynchronous sweeper that just couldn't remove it
-			// from the unswept list. That sweeper took ownership of the span and
-			// responsibility for either freeing it to the heap or putting it on the
-			// right swept list. Either way, we should just ignore it (and it's unsafe
-			// for us to do anything else).
 		}
-		// Now try full unswept spans, sweeping them and putting them into the
-		// right list if we fail to get a span.
-		for ; spanBudget >= 0; spanBudget-- {
-			s = c.fullUnswept(sg).pop()
-			if s == nil {
-				break
-			}
-			if s, ok := sl.tryAcquire(s); ok {
-				// We got ownership of the span, so let's sweep it.
-				s.sweep(true)
-				// Check if there's any free space.
-				freeIndex := s.nextFreeIndex()
-				if freeIndex != s.nelems {
-					s.freeindex = freeIndex
-					sweep.active.end(sl)
-					goto havespan
-				}
-				// Add it to the swept list, because sweeping didn't give us any free space.
-				c.fullSwept(sg).push(s.mspan)
-			}
-			// See comment for partial unswept spans.
-		}
-		sweep.active.end(sl)
-	}
-	trace = traceAcquire()
-	if trace.ok() {
-		trace.GCSweepDone()
-		traceDone = true
-		traceRelease(trace)
 	}
 
-	// We failed to get a span from the mcentral so get one from mheap.
-	s = c.grow()
 	if s == nil {
-		return nil
+		trace = traceAcquire()
+		if trace.ok() {
+			trace.GCSweepDone()
+			traceDone = true
+			traceRelease(trace)
+		}
+
+		// We failed to get a span from the mcentral so get one from
+		// mheap, homed to the node this refill is routing for (ties
+		// task 8's per-node growth streams to this routing decision,
+		// and reuses the numaRefillNode reading above instead of a
+		// second getcpu call at grow time).
+		s = c.grow(node, genuine)
+		if s == nil {
+			return nil
+		}
+		local = true
+	}
+
+	if goexperiment.Numa {
+		if local {
+			numaSpanRefillLocal.Add(1)
+		} else {
+			numaSpanRefillRemote.Add(1)
+		}
 	}
 
 	// At this point s is a span that should have free slots.
-havespan:
 	if !traceDone {
 		trace := traceAcquire()
 		if trace.ok() {
@@ -198,14 +270,98 @@ havespan:
 	return s
 }
 
+// cacheSpanFromNode searches node's partial/full spanSets for a span
+// with free objects, sweeping unswept spans as needed, spending at
+// most *budget span-sweep attempts (decremented as it goes -- shared
+// across every node cacheSpan tries, see there). Returns nil if node
+// has nothing usable within the remaining budget.
+//
+// This is exactly the pre-task-9 (single, unindexed) cacheSpan search
+// body, parameterized by which node's sets to search; see cacheSpan
+// for the local-then-remote-then-grow routing order this is composed
+// into.
+func (c *mcentral) cacheSpanFromNode(node int32, budget *int) *mspan {
+	sg := mheap_.sweepgen
+
+	// Try partial swept spans first.
+	if s := c.partialSwept(sg, node).pop(); s != nil {
+		return s
+	}
+
+	sl := sweep.active.begin()
+	if !sl.valid {
+		return nil
+	}
+
+	// Now try partial unswept spans.
+	for ; *budget >= 0; *budget-- {
+		s := c.partialUnswept(sg, node).pop()
+		if s == nil {
+			break
+		}
+		if sl2, ok := sl.tryAcquire(s); ok {
+			// We got ownership of the span, so let's sweep it and use it.
+			sl2.sweep(true)
+			sweep.active.end(sl)
+			return s
+		}
+		// We failed to get ownership of the span, which means it's being or
+		// has been swept by an asynchronous sweeper that just couldn't remove it
+		// from the unswept list. That sweeper took ownership of the span and
+		// responsibility for either freeing it to the heap or putting it on the
+		// right swept list. Either way, we should just ignore it (and it's unsafe
+		// for us to do anything else).
+	}
+	// Now try full unswept spans, sweeping them and putting them into the
+	// right list if we fail to get a span.
+	for ; *budget >= 0; *budget-- {
+		s := c.fullUnswept(sg, node).pop()
+		if s == nil {
+			break
+		}
+		if sl2, ok := sl.tryAcquire(s); ok {
+			// We got ownership of the span, so let's sweep it.
+			sl2.sweep(true)
+			// Check if there's any free space.
+			freeIndex := s.nextFreeIndex()
+			if freeIndex != s.nelems {
+				s.freeindex = freeIndex
+				sweep.active.end(sl)
+				return s
+			}
+			// Add it to the swept list, because sweeping didn't give us any free space.
+			c.fullSwept(sg, node).push(s)
+		}
+		// See comment for partial unswept spans.
+	}
+	sweep.active.end(sl)
+	return nil
+}
+
 // Return span from an mcache.
 //
 // s must have a span class corresponding to this
 // mcentral and it must not be empty.
+//
+// Returns s to its home node's spanSet (design §12.4) -- NOT the
+// freeing thread's current node. A span's home node is fixed at grow
+// time (heapArena.node, design §12.3) and never changes, so returning
+// it to its own node keeps every per-node set node-pure: a future
+// refill on that node always finds spans that are actually local to
+// it. Routing by the freeing thread's node instead would gradually
+// mix every node's memory into whichever node happens to free the
+// most, defeating the routing ingredient entirely -- and the freeing
+// thread usually isn't even the one that allocated the span in the
+// first place, so its current node says nothing about the span's
+// address range. numaArenaNode is a plain arena-metadata lookup, not a
+// getcpu call, so this has no bearing on the "getcpu only at refill"
+// rule.
 func (c *mcentral) uncacheSpan(s *mspan) {
 	if s.allocCount == 0 {
 		throw("uncaching span but s.allocCount == 0")
 	}
+
+	node := numaArenaNode(s.base())
 
 	sg := mheap_.sweepgen
 	stale := s.sweepgen == sg+1
@@ -238,19 +394,32 @@ func (c *mcentral) uncacheSpan(s *mspan) {
 	} else {
 		if int(s.nelems)-int(s.allocCount) > 0 {
 			// Put it back on the partial swept list.
-			c.partialSwept(sg).push(s)
+			c.partialSwept(sg, node).push(s)
 		} else {
 			// There's no free space and it's not stale, so put it on the
 			// full swept list.
-			c.fullSwept(sg).push(s)
+			c.fullSwept(sg, node).push(s)
 		}
 	}
 }
 
-// grow allocates a new empty span from the heap and initializes it for c's size class.
-func (c *mcentral) grow() *mspan {
+// grow allocates a new empty span from the heap and initializes it for
+// c's size class, homed to node when genuine is true (design §12.4:
+// ties task 8's per-node growth streams to this refill's routing
+// decision, reusing the numaRefillNode reading cacheSpan already made
+// rather than a second getcpu call at grow time).
+//
+// genuine mirrors numaGrowNode's own homed bool (task 8, review I1):
+// false collapses the grow-homing argument to mheap's "don't home"
+// sentinel, exactly as numaGrowNodeArg would from a fresh reading --
+// without re-reading the node.
+func (c *mcentral) grow(node int32, genuine bool) *mspan {
 	npages := uintptr(gc.SizeClassToNPages[c.spanclass.sizeclass()])
-	s := mheap_.alloc(npages, c.spanclass)
+	growNode := int32(numaAllocNodeNoHome)
+	if genuine {
+		growNode = node
+	}
+	s := mheap_.alloc(npages, c.spanclass, growNode)
 	if s == nil {
 		return nil
 	}

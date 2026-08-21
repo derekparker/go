@@ -433,6 +433,20 @@ var allDesc = []Description{
 		Kind:        KindUint64,
 	},
 	{
+		Name: "/numa/span-refills:local",
+		Description: "Count of mcentral span refills served from the NUMA node the requesting goroutine was running on. " +
+			"Only meaningful with GOEXPERIMENT=numa; always zero otherwise.",
+		Kind:       KindUint64,
+		Cumulative: true,
+	},
+	{
+		Name: "/numa/span-refills:remote",
+		Description: "Count of mcentral span refills served from a NUMA node other than the one the requesting goroutine was running on. " +
+			"Only meaningful with GOEXPERIMENT=numa; always zero otherwise.",
+		Kind:       KindUint64,
+		Cumulative: true,
+	},
+	{
 		Name:        "/sched/gomaxprocs:threads",
 		Description: "The current runtime.GOMAXPROCS setting, or the number of operating system threads that can execute user-level Go code simultaneously.",
 		Kind:        KindUint64,

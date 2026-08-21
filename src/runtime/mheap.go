@@ -787,8 +787,12 @@ func spanOf(p uintptr) *mspan {
 // third load into spans[] -- an mspan never crosses arenas, so a span's
 // home node is always its arena's home node.
 //
-// This is a diagnostic/test lookup only (task 8's scope is homing, not
-// routing): nothing on a malloc or refill path calls it.
+// Task 8's scope was homing only, and at the time nothing on a malloc
+// or refill path called this. Task 9's mcentral.uncacheSpan now calls
+// it on every refill's return path, to route a span back to its home
+// node's spanSet (design §12.4) -- still not a getcpu call, just an
+// arena-metadata lookup, so this has no bearing on the "getcpu only at
+// refill" rule.
 func numaArenaNode(p uintptr) int32 {
 	if !goexperiment.Numa {
 		return 0
@@ -1111,9 +1115,14 @@ func (s spanAllocType) manual() bool {
 //
 // spanclass indicates the span's size class and scannability.
 //
+// node is the NUMA node argument threaded down to allocSpan/grow
+// (design §12.4, task 9) -- pass numaAllocNodeAuto for the pre-task-9
+// behavior (allocSpan determines the grow-homing node itself, at grow
+// frequency).
+//
 // Returns a span that has been fully initialized. span.needzero indicates
 // whether the span has been zeroed. Note that it may not be.
-func (h *mheap) alloc(npages uintptr, spanclass spanClass) *mspan {
+func (h *mheap) alloc(npages uintptr, spanclass spanClass, node int32) *mspan {
 	// Don't do any operations that lock the heap on the G stack.
 	// It might trigger stack growth, and the stack growth code needs
 	// to be able to allocate heap.
@@ -1124,7 +1133,7 @@ func (h *mheap) alloc(npages uintptr, spanclass spanClass) *mspan {
 		if !isSweepDone() {
 			h.reclaim(npages)
 		}
-		s = h.allocSpan(npages, spanAllocHeap, spanclass)
+		s = h.allocSpan(npages, spanAllocHeap, spanclass, node)
 	})
 	return s
 }
@@ -1150,7 +1159,7 @@ func (h *mheap) allocManual(npages uintptr, typ spanAllocType) *mspan {
 	if !typ.manual() {
 		throw("manual span allocation called with non-manually-managed type")
 	}
-	return h.allocSpan(npages, typ, 0)
+	return h.allocSpan(npages, typ, 0, numaAllocNodeAuto)
 }
 
 // setSpans modifies the span map so [spanOf(base), spanOf(base+npage*pageSize))
@@ -1330,8 +1339,12 @@ func (h *mheap) freeMSpanLocked(s *mspan) {
 // allocSpan must be called on the system stack both because it acquires
 // the heap lock and because it must block GC transitions.
 //
+// node is the NUMA node argument for any heap growth this call
+// triggers (design §12.4, task 9) -- see resolveGrowNode and the
+// numaAllocNode* sentinels above for its meaning.
+//
 //go:systemstack
-func (h *mheap) allocSpan(npages uintptr, typ spanAllocType, spanclass spanClass) (s *mspan) {
+func (h *mheap) allocSpan(npages uintptr, typ spanAllocType, spanclass spanClass, node int32) (s *mspan) {
 	// Function-global state.
 	gp := getg()
 	base, scav := uintptr(0), uintptr(0)
@@ -1387,7 +1400,7 @@ func (h *mheap) allocSpan(npages uintptr, typ spanAllocType, spanclass spanClass
 		base, _ = h.pages.find(npages + extraPages)
 		if base == 0 {
 			var ok bool
-			growth, ok = h.grow(npages+extraPages, numaGrowNodeArg())
+			growth, ok = h.grow(npages+extraPages, resolveGrowNode(node))
 			if !ok {
 				unlock(&h.lock)
 				return nil
@@ -1406,7 +1419,7 @@ func (h *mheap) allocSpan(npages uintptr, typ spanAllocType, spanclass spanClass
 		base, scav = h.pages.alloc(npages)
 		if base == 0 {
 			var ok bool
-			growth, ok = h.grow(npages, numaGrowNodeArg())
+			growth, ok = h.grow(npages, resolveGrowNode(node))
 			if !ok {
 				unlock(&h.lock)
 				return nil
@@ -1654,6 +1667,54 @@ func (h *mheap) initSpan(s *mspan, typ spanAllocType, spanclass spanClass, base,
 	// Make sure the newly allocated span will be observed
 	// by the GC before pointers into the span are published.
 	publicationBarrier()
+}
+
+// Sentinels for the node argument threaded through mheap.alloc /
+// allocSpan (task 9, design §12.4): a level above mheap.grow's own
+// node < 0 "don't home" sentinel (see numaGrowNodeArg above grow's
+// doc comment), because allocSpan's callers fall into two different
+// cases that a single sentinel can't distinguish:
+//
+//   - numaAllocNodeAuto: the caller has no refill-routing decision to
+//     offer (allocManual, mcache.allocLarge) -- allocSpan should
+//     determine the grow-homing node itself, at grow frequency, via
+//     numaGrowNodeArg (a fresh getcpu reading), exactly the pre-task-9
+//     behavior for these callers.
+//   - numaAllocNodeNoHome: the caller (mcentral.grow) already made a
+//     genuine-vs-not determination this refill cycle via
+//     numaRefillNode, and it came back not genuine. Growth must still
+//     decline to home (matching numaGrowNodeArg's own homed=false
+//     collapse), but WITHOUT a second getcpu call -- that would
+//     violate the "getcpu once per refill" contract, and would almost
+//     always just reconfirm the same non-genuine answer anyway (the
+//     conditions that make a reading non-genuine -- disabled streams,
+//     node >= numaMaxHeapNodes -- are static for the process, not
+//     transient, except for an outright failed getcpu).
+//
+// Both are negative and distinct from mheap.grow's own node < 0
+// sentinel space (resolveGrowNode below is exactly the translation
+// from this level's sentinels to that one).
+const (
+	numaAllocNodeAuto   int32 = -1
+	numaAllocNodeNoHome int32 = -2
+)
+
+// resolveGrowNode translates an mheap.alloc/allocSpan-level node
+// argument (see the sentinels above) into the node argument
+// mheap.grow itself expects (a genuine node, or any negative value to
+// mean "don't home" -- numaGrowNodeArg's own convention). Called
+// lazily, only from within allocSpan's actual grow-call branches, so a
+// numaAllocNodeAuto caller still only pays for a getcpu reading when a
+// grow genuinely happens, exactly as before task 9.
+func resolveGrowNode(node int32) int32 {
+	switch node {
+	case numaAllocNodeAuto:
+		return numaGrowNodeArg()
+	case numaAllocNodeNoHome:
+		return -1
+	default:
+		return node
+	}
 }
 
 // numaGrowNodeArg computes mheap.grow's node argument from

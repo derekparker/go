@@ -513,6 +513,16 @@ Below is the full list of supported metrics, ordered lexicographically.
 		by code called via cgo or via the syscall package. Sum of all
 		metrics in /memory/classes.
 
+	/numa/span-refills:local
+		Count of mcentral span refills served from the NUMA node the
+		requesting goroutine was running on. Only meaningful with
+		GOEXPERIMENT=numa; always zero otherwise.
+
+	/numa/span-refills:remote
+		Count of mcentral span refills served from a NUMA node other
+		than the one the requesting goroutine was running on. Only
+		meaningful with GOEXPERIMENT=numa; always zero otherwise.
+
 	/sched/gomaxprocs:threads
 		The current runtime.GOMAXPROCS setting, or the number of
 		operating system threads that can execute user-level Go code
