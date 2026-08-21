@@ -1,0 +1,4 @@
+-rwxr-xr-x. 1 deparker deparker 5064117 2026-08-20 13:55:12.598313306 -0400 /tmp/pb/base/garbage
+-rwxr-xr-x. 1 deparker deparker 3986311 2026-08-20 17:23:34.194567414 -0400 /tmp/pb/gcpause-base
+-rwxr-xr-x. 1 deparker deparker 4005847 2026-08-20 17:23:40.745556795 -0400 /tmp/pb/gcpause-numa
+-rwxr-xr-x. 1 deparker deparker 5087909 2026-08-20 13:55:14.218309877 -0400 /tmp/pb/numa/garbage

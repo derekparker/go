@@ -2418,7 +2418,7 @@ $ ssh numa-dell 'cd /tmp/wsA-gate3-r1 && strace -f -e trace=sched_setaffinity,se
   env GOMAXPROCS=256 ./numa/json -benchmem=512 -benchnum=1 -benchtime=2s >/dev/null'
 ```
 
-`sched_setaffinity`: **0** calls. `set_mempolicy`: exactly **1**, `set_mempolicy(MPOL_BIND, [0x3], 65) = 0`. `mbind`: **1,939 calls** (re-verified directly against the archived transcript; an earlier count of "2761" in this section was wrong and is corrected here), splitting **970 `MPOL_BIND`** (mask `[0x3]`, both nodes — Layer 1's uniform arena BIND-all) and **969 `MPOL_PREFERRED`** (split **541 to node 0** `[0x1]` and **428 to node 1** `[0x2]`, tracking whichever node each growing P happened to run on — Layer 2's still-in-tree PREFERRED-at-grow, unaffected by GOMAXPROCS=256 never confining). The two mechanisms are layered, not either/or: every newly-grown arena chunk on this 256P run gets one uniform BIND-all `mbind` (Layer 1) and, independently, one node-local PREFERRED `mbind` (Layer 2) recording whichever node the growth happened on. **Matches declared shape (a)** on the pre-declared criteria (0 `sched_setaffinity`, exactly 1 task-level `set_mempolicy(BIND)`, `mbind` calls present); the count itself was never a pass/fail criterion but is corrected here for the record.
+`sched_setaffinity`: **0** calls. `set_mempolicy`: exactly **1**, `set_mempolicy(MPOL_BIND, [0x3], 65) = 0`. `mbind`: **1,938 calls** (re-verified directly against the archived transcript by counting `mbind(`-prefixed lines specifically, which excludes the separate task-level `set_mempolicy` line above; an earlier count of "2761" in this section was wrong, and a follow-up correction's "970 `MPOL_BIND`" was also wrong by one — both are corrected here), splitting **969 `MPOL_BIND`** (mask `[0x3]`, both nodes — Layer 1's uniform arena BIND-all) and **969 `MPOL_PREFERRED`** (split **541 to node 0** `[0x1]` and **428 to node 1** `[0x2]`, tracking whichever node each growing P happened to run on — Layer 2's still-in-tree PREFERRED-at-grow, unaffected by GOMAXPROCS=256 never confining) — **the two sides are equal, as they must be**: Layer 1 and Layer 2 each issue exactly one `mbind` per arena chunk grow, so every grow contributes one BIND and one PREFERRED call. The two mechanisms are layered, not either/or: every newly-grown arena chunk on this 256P run gets one uniform BIND-all `mbind` (Layer 1) and, independently, one node-local PREFERRED `mbind` (Layer 2) recording whichever node the growth happened on. **Matches declared shape (a)** on the pre-declared criteria (0 `sched_setaffinity`, exactly 1 task-level `set_mempolicy(BIND)`, `mbind` calls present); the count itself was never a pass/fail criterion but is corrected here for the record. **Origin of the original "2761" figure, traced precisely:** the raw transcript also contains 823 `mbind` calls that were interrupted by another thread's syscall under `strace -f`, each producing a matched `<unfinished ...>`/`<... mbind resumed>` pair — the `<unfinished ...>` half is already counted in the 1,938 `mbind(` lines, but the `<... mbind resumed>` half contains the substring `mbind` without the literal `mbind(` call-open text; a naive substring count (`grep -c mbind`, no parenthesis) therefore double-counts those 823 interrupted calls: 1,938 + 823 = 2,761, exactly the original figure.
 
 **(b) confined 1P:**
 
@@ -2622,15 +2622,27 @@ Raw data: `numa-design/bench-data/wsA-cand2/wsA-cand2-arm{A,B,C}-{warmup,recorde
 
 **Corrective evidence gathered after the fact (this correction pass), on the actual sweep binaries, which still exist on `numa-dell` unmodified since the sweeps ran:**
 
-`go version -m` on all four sweep binaries, confirming they are the genuine sweep artifacts (matching build SHA, `X:numa` tag where applicable, and file mtimes matching the sweep logs) — **not reconstructions**:
+`go version -m` on all four sweep binaries, confirming they are the genuine sweep artifacts (matching build SHA `c226071c35` and `X:numa` tag where applicable) — **not reconstructions**:
 
 ```
-/tmp/pb/base/garbage:    go1.28-devel_c226071c35 ...              (mtime 13:55, matches wsA-cand1-sweep.log)
-/tmp/pb/numa/garbage:    go1.28-devel_c226071c35 ... X:numa        (mtime 13:55, matches wsA-cand1-sweep.log)
-/tmp/pb/gcpause-base:    go1.28-devel_c226071c35 ...              (mtime 17:23, matches the corrected wsA-cand2-sweep.log)
-/tmp/pb/gcpause-numa:    go1.28-devel_c226071c35 ... X:numa        (mtime 17:23, matches the corrected wsA-cand2-sweep.log)
+/tmp/pb/base/garbage:    go1.28-devel_c226071c35 ...
+/tmp/pb/numa/garbage:    go1.28-devel_c226071c35 ... X:numa
+/tmp/pb/gcpause-base:    go1.28-devel_c226071c35 ...
+/tmp/pb/gcpause-numa:    go1.28-devel_c226071c35 ... X:numa
 ```
-Full transcripts archived as `wsA-cand1-govm-posthoc-verify.txt` / `wsA-cand2-govm-posthoc-verify.txt` (identical content, both candidates' directories, since all four binaries were checked together).
+Full transcripts archived as `wsA-cand1-govm-posthoc-verify.txt` / `wsA-cand2-govm-posthoc-verify.txt` (identical content, both candidates' directories, since all four binaries were checked together). **Both `gcpause-base` and `gcpause-numa` additionally report `build vcs.modified=true`** (the tree had uncommitted state at build time). Checked directly: `git status --short` on the remote `go-numa` tree shows two untracked entries, `numa-design/run-x-benchmarks.sh` and `x-benchmarks/` — pre-existing artifacts from before this task began (present in the very first status check of this session, not created by this work), not from any bench-data or scratch output of this task; `git diff --stat` (tracked-file changes) is empty. Go's VCS-dirty detection flags any non-clean `git status --porcelain` output, including untracked files, which is sufficient to explain the flag without implying any tracked source was modified at build time. Stated honestly rather than asserted with certainty: this explanation is directly checkable (and was checked) but the untracked files' *origin* — who created them and when — was not further traced.
+
+**Build-time mtimes were annotated inline in an earlier draft of this section; that was inference (from the binaries' own `ls -l` timestamps and their position in this session's command sequence), not literal `go version -m` transcript content, so it has been moved out of the fenced block above.** Verifiable timestamp evidence, captured directly and archived as `wsA-cand{1,2}-binaries-ls.txt`:
+
+```
+$ ssh numa-dell 'ls -l --time-style=full-iso /tmp/pb/base/garbage /tmp/pb/numa/garbage /tmp/pb/gcpause-base /tmp/pb/gcpause-numa'
+/tmp/pb/base/garbage     2026-08-20 13:55:12.598313306 -0400
+/tmp/pb/numa/garbage     2026-08-20 13:55:14.218309877 -0400
+/tmp/pb/gcpause-base     2026-08-20 17:23:34.194567414 -0400
+/tmp/pb/gcpause-numa     2026-08-20 17:23:40.745556795 -0400
+```
+
+Independent corroboration, checked directly rather than asserted: the sweep archive's earliest file for each candidate — `wsA-cand1-armA-r0.vmstat.before` (mtime `13:56:31`) and `wsA-cand2-armA-r0.vmstat.before` (mtime `17:25:44`) — lands within roughly one to two minutes after each candidate's respective binary build mtimes above. This is a source external to the `go version -m` transcript itself (a separately-timestamped file from the sweep driver's own vmstat snapshots), and it corroborates **both** candidates' timelines, not only candidate 1's — no timestamped stderr line from either binary's own runtime output was found to serve as an additional corroborating source, so the vmstat-file-mtime chain above is the actual evidence being cited here.
 
 **In-run confinement captures (post-hoc verification runs, NOT sweep data — labeled as such in the archive):** one run per candidate's C-arm binary, at the sweep's exact GOMAXPROCS=128 configuration, sampling `/proc/PID/status` `Cpus_allowed_list` a few seconds into the run:
 
@@ -2654,7 +2666,7 @@ All 8 pre-declared gates pass:
 | 1. 1P json (hard) | PASS — not significant, p=0.579-0.631; MDE ≈40% at n=10 (excludes only gross regressions) |
 | 2. 1P alloc micro (hard) | PASS — geomean +0.67% ≤ +2% |
 | 3. 256P json (hard) | PASS — pooled n=30, not significant, p=0.197; MDE ≈22% at n=30 (excludes only gross regressions) |
-| 4. Stand-down proof, strace (hard) | PASS — all 3 arm shapes match exactly (mbind counts corrected to 970 BIND/969 PREFERRED at 256P, 11/11 at confined 1P — see corrected Gate 4 text) |
+| 4. Stand-down proof, strace (hard) | PASS — all 3 arm shapes match exactly (mbind counts corrected to 969 BIND/969 PREFERRED at 256P, 11/11 at confined 1P — see corrected Gate 4 text) |
 | 5. vmstat 0/0 confined (hard) | PASS — 0/0 twice (Layer-1 evidence, not confinement evidence — see caveat) |
 | 6. Candidate 1 garbage (decision) | PASS — C beats B (-29.61%, p=0.000); C-vs-A non-inferiority bound PASSES (point +2.69%, CI upper +8.26%), but paired sign test (12/15 rounds C slower, p=0.035) means a small residual in A's favour cannot be excluded — a bound, not an equivalence; B worse than A (+37.93%) |
 | 7. Candidate 2 gc-pause (decision) | PASS — C beats B (-19.66%, exact p=1.1e-5); C-vs-A non-inferiority bound PASSES (point +1.51%, CI upper +5.15%); B worse than A (+25.70%) |

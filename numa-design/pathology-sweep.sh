@@ -35,11 +35,11 @@ idle_check() {
     # own self-report as evidence of contention and sleep needlessly
     # (observed firing dozens of times per sweep on an otherwise-idle box).
     local top
-    top=$(ps -eo pcpu,comm --sort=-pcpu | awk '$2 != "ps" && $2 != "awk" {print int($1); exit}')
+    top=$(ps -eo pcpu,comm --sort=-pcpu | awk 'NR>1 && $2 != "ps" && $2 != "awk" {print int($1); exit}')
     while [ "${top:-0}" -gt 50 ]; do
         echo "idle_check: top process at ${top}% CPU; sleeping 30s" >&2
         sleep 30
-        top=$(ps -eo pcpu,comm --sort=-pcpu | awk '$2 != "ps" && $2 != "awk" {print int($1); exit}')
+        top=$(ps -eo pcpu,comm --sort=-pcpu | awk 'NR>1 && $2 != "ps" && $2 != "awk" {print int($1); exit}')
     done
 }
 
