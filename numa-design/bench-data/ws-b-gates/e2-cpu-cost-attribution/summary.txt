@@ -1,0 +1,61 @@
+E2 CPU-cost attribution at 256P (Gate 2c's own config), experiment-on,
+one run each -- attribution evidence, not a statistical claim.
+
+Config: GOMAXPROCS=256, /tmp/wsB-gate3-r1/numa/json -benchmem=512
+-benchnum=1 -benchtime=10s (identical binary/command to Gate 2c's numa
+arm).
+
+=== strace -c -f (syscall counts, ptrace-inflated timing -- counts are
+    real, per-call usecs are NOT representative of native cost) ===
+  futex:             87,555 calls, 81.95% of traced time (generic Go
+                      runtime/GC synchronization, not NUMA-specific --
+                      present in stock Go, amplified by strace/256P
+                      contention, not attributable to this workstream)
+  getcpu:            479,662 calls, 14.28% of traced time
+  mbind:               2,338 calls,  0.03% of traced time
+  sched_setaffinity:     296 calls,  0.01% of traced time
+
+=== perf record -g / perf report (sampling-based, cycle-accurate, NOT
+    ptrace-inflated -- this is the real-cost view) ===
+  runtime.getcpu.abi0:        0.01%
+  runtime.numaGetCPUNode:     0.01%
+  runtime.numaNoteSchedule:   0.01%
+  runtime.numaCurrentNode:    0.00%
+  (+ numaGrowNode, numaBindGrowth, numaBindArenaHome, numaWiden*: each 0.00-0.02%)
+  ALL numa-syscall/routing-decision symbols combined: 0.050% cumulative
+
+  runtime.(*spanSet).pop:           2.28% (dominant instance) + smaller
+                                     duplicate call-site entries
+  runtime.(*mcentral).cacheSpan:    1.34% (dominant instance) + duplicates
+  runtime.(*mheap).nextSpanForSweep: 1.08% (dominant instance) + duplicates
+  runtime.(*spanSet).push:          0.37%
+  runtime.spanSetScans:             0.17%
+  (+ cacheSpanFromNode, uncacheSpan, spanSetBlockAlloc.alloc: each <=0.04%)
+  ALL spanSet/mcentral/sweep-path symbols combined: 5.290% cumulative
+
+=== Top-line finding ===
+Despite getcpu being called 479,662 times in this one run (per strace),
+its REAL cost (perf sampling, uninflated) is negligible: 0.01% of
+cycles, and the entire numa-syscall/routing-decision code path sums to
+just 0.050% of cycles. getcpu itself is a fast syscall (~50-200ns
+native); strace's per-call ptrace-trap overhead inflates its apparent
+share by roughly three orders of magnitude relative to its real cost.
+
+The CPU-time cost is NOT syscall-bound. It IS substantially in-runtime:
+spanSet/mcentral/sweep-path code (the per-node routing/storage mechanism
+itself, not the getcpu-based node-decision that feeds it) sums to 5.29%
+of total cycles -- over 100x the syscall path's share. This directly
+matches Task 9's own carried-forward ruling (4): "sweep-path 8x pop cost
+accepted (constant-factor, Task 11 measures)" -- (*spanSet).pop alone
+(2.28%) is the single largest NUMA-attributable symbol in this profile,
+consistent with the 8x-more-spanSets-to-check-per-refill mechanism that
+ruling named. This is attribution evidence from one run, not a
+statistical claim -- but it is a clean, well-quantified signal pointing
+at a specific, previously-named mechanism, not a diffuse or ambiguous
+one.
+
+Note: the 1GB raw perf.data file is not archived (repo hygiene -- too
+large for git); the full text `perf report --stdio` output is archived
+here (perf-report-full.txt) and is sufficient to reproduce every number
+above. Raw perf.data remains on numa-dell at
+/tmp/pb/wsB-e2/perf-record.data if deeper re-analysis is ever needed.

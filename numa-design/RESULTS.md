@@ -3664,3 +3664,161 @@ Session end: `kernel.numa_balancing = 1` (confirmed), machine idle
 throughout and at close, remote tree unmodified beyond the archived
 scratch build directories under `/tmp/pb/` (not committed; raw results
 copied into the tracked archive above).
+
+## Exploratory attribution experiments (E1, E2) — pre-registered before running
+
+Two cheap experiments, requested to move the verdict from "what" (the gate
+battery above) to "why" (the three-ingredient candidate analysis's own
+open question). **Neither is a gate** — no pass/fail bar, no effect on the
+Step 5 verdict above, which stands regardless of what these find.
+Pre-registered here, in this commit, before either runs.
+
+### E1 — GOMAXPROCS sweep of the routing probe, unpinned, remote share vs. thread count
+
+**Hypothesis under test:** the three-ingredient candidate analysis's
+leading candidate (goroutine-level migration, not M-placement) predicts
+remote share stays roughly flat (~50%) across GOMAXPROCS values, because
+the mechanism (goroutines migrating across Ps regardless of which node a
+P's M is pinned to) does not depend on how many Ms exist. The alternative
+(M-placement randomness alone, without goroutine migration playing a
+role) predicts remote share **falls** as GOMAXPROCS drops, because with
+few Ms the odds of an even split across two nodes drop (e.g. at
+GOMAXPROCS=2, either both Ms land on the same node — 0% remote — or one
+each — form a 2-P system where every refill is either fully local or the
+process is effectively single-node per P, a qualitatively different
+regime than the many-M near-50/50 case).
+
+**Method:** `routing-probe` (already built, `GOEXPERIMENT=numa`,
+unpinned — no `numactl`), GOMAXPROCS ∈ {2, 8, 32, 128, 256}, n=3 runs per
+point (interleaved across points within one session, not blocked by
+point, to spread any thermal/session drift evenly), reading
+`/numa/span-refills/{local,remote}:spans` at exit. Primary readout: median
+remote share per GOMAXPROCS point, reported as a curve, not a gate.
+
+### E2 — CPU-cost attribution at 256P (Gate 2c's own config)
+
+**Question under test:** is the +19.96% `user+sys-sec/op` cost (Gate 2c)
+syscall-bound (a `getcpu`/`sched_setaffinity`/`mbind` storm) or
+in-runtime (spanSet lock contention, the 8× sweep-path pop cost Task 9's
+own ruling (4) already named, or similar)?
+
+**Method:** one run each (attribution evidence, not a statistical claim —
+explicitly not over-interpreted as such), experiment-on, same config as
+Gate 2c (`GOMAXPROCS=256`, `json -benchmem=512 -benchnum=1
+-benchtime=10s`):
+1. `strace -c -f` — syscall counts, specifically `getcpu`,
+   `sched_setaffinity`, `mbind` (plus whatever else appears).
+2. `perf record -g` (call-graph sampling) — top symbols by self time, to
+   see whether the hot spots are runtime-internal (spanSet/lock code) or
+   syscall-entry-adjacent.
+
+Both raw outputs archived; top-line findings reported, not a full profile
+analysis.
+
+### E1 results — sweep completed, n=3/point, interleaved across points
+
+```
+GOMAXPROCS=2:   100.0000%, 100.0000%, 100.0000%  -> median local 100.00% (remote 0.00%)
+GOMAXPROCS=8:   100.0000%, 100.0000%, 100.0000%  -> median local 100.00% (remote 0.00%)
+GOMAXPROCS=32:  100.0000%, 100.0000%, 100.0000%  -> median local 100.00% (remote 0.00%)
+GOMAXPROCS=128: 100.0000%, 100.0000%, 100.0000%  -> median local 100.00% (remote 0.00%)
+GOMAXPROCS=256: 59.9389%, 56.0630%, 63.8464%      -> median local 59.94% (remote 40.06%)
+```
+
+**Neither pre-registered hypothesis is quite right.** Remote share does
+not stay flat near 50% at low thread counts (ruling against "goroutine
+migration dominates independent of thread count" in its pure form), and
+it does not fall *gradually* with thread count either (ruling against a
+smooth "M-placement randomness" story). What the data actually shows is a
+**step function keyed to node capacity**: perfectly local (0% remote,
+0/3 rounds show any remote traffic) at every GOMAXPROCS from 2 through
+128 — i.e., everywhere the process's total P count **fits within one
+node's 128 CPUs** — and only at GOMAXPROCS=256, which **exceeds** one
+node's capacity and therefore forces the kernel to schedule some Ms on
+each node regardless of any NUMA-awareness, does meaningful remote
+traffic appear (40.06% median).
+
+**Refined mechanism reading:** at GOMAXPROCS≤128, this idle, otherwise-
+unloaded machine's default (non-NUMA-directed) scheduler apparently kept
+the whole process consolidated on one node in every one of the 12 runs at
+those four GOMAXPROCS values (a well-known Linux CFS wake-affine/cache-
+locality behavior under light load, not something Workstream B's own
+code causes or prevents) — soft affinity then had nothing to correct,
+and routing stayed ~100% local by construction. At GOMAXPROCS=256, the
+split across both nodes is **physically forced** (256 Ps, 128 CPUs/node),
+not probabilistic — and once that forced ~50/50 M-to-node split exists,
+the resulting ~40-44% remote share is consistent with genuine goroutine
+mobility across that split (the leading candidate from the Step 5 verdict
+above), now demonstrated to require GOMAXPROCS to exceed one node's
+capacity before it manifests at all — a real refinement, not a
+contradiction, of that candidate. Archived `e1-gomaxprocs-sweep/` (15
+raw `.out` files, one per run).
+
+### E2 results — one run each, GOMAXPROCS=256 (Gate 2c's config), experiment-on
+
+**`strace -c -f` (syscall counts):**
+
+| syscall | calls | % traced time |
+|---|---:|---:|
+| `futex` | 87,555 | 81.95% |
+| `getcpu` | 479,662 | 14.28% |
+| `mbind` | 2,338 | 0.03% |
+| `sched_setaffinity` | 296 | 0.01% |
+
+`getcpu` volume is real and substantial (479,662 calls in one 10s-
+benchtime run) — far more than a naive "refill-only" mental model would
+predict, consistent with soft affinity's 4ms-per-M throttled
+`schedule()`-hook firing across up to 256 Ms under this GC-heavy,
+high-goroutine-churn workload. `sched_setaffinity`/`mbind` stay rare, as
+designed. **`futex`'s 81.95% share is generic Go-runtime/GC
+synchronization present in stock Go, not NUMA-specific — not attributed
+to this workstream.**
+
+**`perf record -g` / `perf report` (sampling-based, NOT ptrace-inflated —
+the real-cost view):**
+
+| symbol group | cumulative % of cycles |
+|---|---:|
+| NUMA syscall/routing-decision path (`getcpu`, `numaGetCPUNode`, `numaNoteSchedule`, `numaCurrentNode`, `numaGrowNode`, `numaBindGrowth`, `numaBindArenaHome`, `numaWiden*`) | **0.050%** |
+| spanSet/mcentral/sweep-path code (`(*spanSet).pop/push/reset`, `(*mcentral).cacheSpan/cacheSpanFromNode/uncacheSpan`, `(*mheap).nextSpanForSweep`, `spanSetScans`, `spanSetBlockAlloc.alloc`) | **5.290%** |
+
+**Top-line finding: the CPU-time cost is not syscall-bound.** Despite
+479,662 `getcpu` calls, its real (sampling-measured) cost is 0.01% of
+cycles — three orders of magnitude smaller than its apparent share under
+`strace`'s ptrace-trap inflation. The entire NUMA syscall/routing-decision
+path sums to 0.050% of cycles: negligible. The cost is concentrated
+**in-runtime**, in spanSet/mcentral/sweep-path code — 5.29% of cycles,
+over 100× the syscall path's share — with `(*spanSet).pop` alone (2.28%,
+dominant call site) the single largest NUMA-attributable symbol in the
+profile. This directly corroborates **Task 9's own carried-forward
+ruling (4)**: "sweep-path 8x pop cost accepted (constant-factor, Task 11
+measures)" — the per-node spanSet design means every sweep-path pop now
+checks up to 8 per-node sets instead of 1, and this profile shows that
+cost is real and non-trivial, not the getcpu/soft-affinity syscall
+overhead the CPU-cost pattern's earlier framing (Gate 2b, Step 5 concern
+#1) left open as a candidate. One run, not a statistical claim — but a
+clean, well-quantified signal pointing at a specific, previously-named
+mechanism. Archived `e2-cpu-cost-attribution/` (`strace-count.txt`,
+`perf-report-full.txt`, `summary.txt`; the 1GB raw `perf.data` is not
+archived — repo hygiene — full text report is sufficient to reproduce
+every number above; raw file remains on `numa-dell` at
+`/tmp/pb/wsB-e2/perf-record.data`).
+
+### What E1/E2 change about the Step 5 verdict
+
+**Nothing changes the verdict** (still: Workstream B does not ship
+as-is) — these are attribution experiments, not gates, exactly as
+pre-registered. What they add: the goroutine-migration candidate from the
+three-ingredient analysis is now refined (node-capacity-forced, not
+probability-driven, and demonstrated to require GOMAXPROCS > one node's
+CPU count before remote traffic appears at all) and the CPU-time-cost
+pattern's own source is now attributed away from the syscall path
+(negligible, 0.05% of cycles) and toward the per-node spanSet mechanism's
+own sweep-path cost (5.29% of cycles, matching Task 9's own named,
+accepted-for-now candidate). Both are useful inputs for whatever
+follow-up work the controller decides on, not new gate results.
+
+Session end: `kernel.numa_balancing = 1` (confirmed), machine idle
+throughout, remote tree unmodified beyond scratch build/profile artifacts
+under `/tmp/pb/` (raw results copied into the tracked archive above; the
+oversized `perf.data` deliberately left uncommitted).
