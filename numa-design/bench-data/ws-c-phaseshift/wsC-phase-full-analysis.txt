@@ -1,0 +1,136 @@
+=== Primary: ns/read, B vs C, n=20 ===
+B: median=1.6940 mean=1.6887 min=1.4367 max=1.9353
+C: median=1.1328 mean=1.2999 min=1.1040 max=2.0335
+relative (median, C vs B): -33.13%
+relative (mean, C vs B):   -23.03%
+
+Exact Mann-Whitney U: U(B)=354.0 U(C)=46.0 p=8.176e-06  SIGNIFICANT (alpha=0.05)
+Exact Wilcoxon signed-rank (paired by round): W+=9.0 W-=201.0 n(nonzero diffs)=20 p=6.294e-05  SIGNIFICANT
+Exact paired sign test: C<B in 18 rounds, C>B in 2 rounds, ties=0 p=0.0004025  SIGNIFICANT
+Leave-one-out exact MWU (n-1=19 each): p range [6.554e-07, 2.592e-05], 20/20 subsets significant at alpha=0.05
+
+Implied bandwidth (GB/s = 64/ns_per_read):
+B: min=33.1 max=44.5 mean=38.1
+C: min=31.5 max=58.0 mean=50.9
+Reference single-controller ceiling (arm A, original candidate 3 pilot): ~31.0 GB/s
+B rounds at/below 31.5 GB/s (near-ceiling): 0/20
+C rounds at/below 31.5 GB/s (near-ceiling): 1/20
+
+Arm B migration-traffic budget: mean pages_migrated/round=4802548 -> 0.328 GB/s two-way migration traffic (0.86% of B's own mean demand bandwidth)
+
+=== Mechanism: numa_maps capture rounds (/tmp/wsC-capture-pull/wsC-phase-capture) ===
+arm round  phase  tag    N0        N1        balance   
+B   1      0      end    1381084   294372    0.1757
+B   1      0      mid    734427    940515    0.4385
+B   1      0      start  220852    1454051   0.1319
+B   1      1      end    170625    1504848   0.1018
+B   1      1      mid    177277    1498193   0.1058
+B   1      1      start  1577148   98308     0.0587
+B   1      2      end    1613992   61999     0.0370
+B   1      2      mid    1607850   68140     0.0407
+B   1      2      start  169609    1505866   0.1012
+B   1      3      end    182408    1493583   0.1088
+B   1      3      mid    1323155   351300    0.2098
+B   1      3      start  1618607   57384     0.0342
+B   2      0      end    1647269   27657     0.0165
+B   2      0      mid    1390774   284152    0.1697
+B   2      0      start  853134    821752    0.4906
+B   2      1      end    182875    1492564   0.1092
+B   2      1      mid    189020    1486419   0.1128
+B   2      1      start  1647268   28170     0.0168
+B   2      2      end    614525    1060946   0.3668
+B   2      2      mid    614532    1060938   0.3668
+B   2      2      start  178777    1496678   0.1067
+B   2      3      end    182354    1493647   0.1088
+B   2      3      mid    461408    1214081   0.2754
+B   2      3      start  615544    1059942   0.3674
+B   3      0      end    1597363   78288     0.0467
+B   3      0      mid    1486767   188372    0.1125
+B   3      0      start  798089    877012    0.4764
+B   3      1      end    190326    1485842   0.1135
+B   3      1      mid    197497    1478155   0.1179
+B   3      1      start  1596851   78801     0.0470
+B   3      2      end    1631148   45533     0.0272
+B   3      2      mid    1612208   63960     0.0382
+B   3      2      start  188788    1487380   0.1126
+B   3      3      end    197486    1479195   0.1178
+B   3      3      mid    851844    824325    0.4918
+B   3      3      start  1634219   42462     0.0253
+C   1      0      end    510854    1163548   0.3051
+C   1      0      mid    510854    1163548   0.3051
+C   1      0      start  510813    1163548   0.3051
+C   1      1      end    510854    1164062   0.3050
+C   1      1      mid    510854    1164062   0.3050
+C   1      1      start  510854    1163548   0.3051
+C   1      2      end    510854    1164574   0.3049
+C   1      2      mid    510854    1164062   0.3050
+C   1      2      start  510854    1164062   0.3050
+C   1      3      end    510854    1165089   0.3048
+C   1      3      mid    510854    1165089   0.3048
+C   1      3      start  510854    1164574   0.3049
+C   2      0      end    1251422   423284    0.2528
+C   2      0      mid    1251422   423284    0.2528
+C   2      0      start  1251383   423284    0.2528
+C   2      1      end    1251424   423796    0.2530
+C   2      1      mid    1251423   423796    0.2530
+C   2      1      start  1251422   423284    0.2528
+C   2      2      end    1251938   423797    0.2529
+C   2      2      mid    1251938   423796    0.2529
+C   2      2      start  1251424   423796    0.2530
+C   2      3      end    1252451   423798    0.2528
+C   2      3      mid    1252450   423798    0.2528
+C   2      3      start  1251938   423798    0.2529
+C   3      0      end    772322    902559    0.4611
+C   3      0      mid    771810    902559    0.4610
+C   3      0      start  771772    902559    0.4609
+C   3      1      end    772322    903074    0.4610
+C   3      1      mid    772322    903074    0.4610
+C   3      1      start  772322    902560    0.4611
+C   3      2      end    772322    903074    0.4610
+C   3      2      mid    772322    903074    0.4610
+C   3      2      start  772322    903074    0.4610
+C   3      3      end    772834    903074    0.4611
+C   3      3      mid    772834    903074    0.4611
+C   3      3      start  772322    903074    0.4610
+
+--- descriptive: start-vs-end node-balance movement per arm/phase ---
+  arm=B round=1 phase=0: start=0.1319 end=0.1757 delta=+0.0438
+  arm=B round=1 phase=1: start=0.0587 end=0.1018 delta=+0.0432
+  arm=B round=1 phase=2: start=0.1012 end=0.0370 delta=-0.0642
+  arm=B round=1 phase=3: start=0.0342 end=0.1088 delta=+0.0746
+  arm=B round=2 phase=0: start=0.4906 end=0.0165 delta=-0.4741
+  arm=B round=2 phase=1: start=0.0168 end=0.1092 delta=+0.0923
+  arm=B round=2 phase=2: start=0.1067 end=0.3668 delta=+0.2601
+  arm=B round=2 phase=3: start=0.3674 end=0.1088 delta=-0.2586
+  arm=B round=3 phase=0: start=0.4764 end=0.0467 delta=-0.4297
+  arm=B round=3 phase=1: start=0.0470 end=0.1135 delta=+0.0665
+  arm=B round=3 phase=2: start=0.1126 end=0.0272 delta=-0.0855
+  arm=B round=3 phase=3: start=0.0253 end=0.1178 delta=+0.0925
+  arm=B: 5/12 phases moved toward consolidation (end < start), 7/12 moved toward spread, mean delta=-0.0533
+  arm=C round=1 phase=0: start=0.3051 end=0.3051 delta=+0.0000
+  arm=C round=1 phase=1: start=0.3051 end=0.3050 delta=-0.0001
+  arm=C round=1 phase=2: start=0.3050 end=0.3049 delta=-0.0001
+  arm=C round=1 phase=3: start=0.3049 end=0.3048 delta=-0.0001
+  arm=C round=2 phase=0: start=0.2528 end=0.2528 delta=-0.0000
+  arm=C round=2 phase=1: start=0.2528 end=0.2530 delta=+0.0002
+  arm=C round=2 phase=2: start=0.2530 end=0.2529 delta=-0.0001
+  arm=C round=2 phase=3: start=0.2529 end=0.2528 delta=-0.0001
+  arm=C round=3 phase=0: start=0.4609 end=0.4611 delta=+0.0002
+  arm=C round=3 phase=1: start=0.4611 end=0.4610 delta=-0.0001
+  arm=C round=3 phase=2: start=0.4610 end=0.4610 delta=+0.0000
+  arm=C round=3 phase=3: start=0.4610 end=0.4611 delta=+0.0002
+  arm=C: 7/12 phases moved toward consolidation (end < start), 4/12 moved toward spread, mean delta=+0.0000
+
+--- descriptive: node-balance distribution ---
+  [all phases (0-3)] arm=B: n=36 mean=0.1605 min=0.0165 max=0.4918 stdev=0.1462
+  [all phases (0-3)] arm=C: n=36 mean=0.3396 min=0.2528 max=0.4611 stdev=0.0897
+  [phases 1-3 only (pre-registered)] arm=B: n=27 mean=0.1378 min=0.0168 max=0.4918 stdev=0.1257
+  [phases 1-3 only (pre-registered)] arm=C: n=27 mean=0.3396 min=0.2528 max=0.4611 stdev=0.0901
+
+--- pre-registered primary attribution test (arm C, round-level, n=3) ---
+  round=1: mean node-balance (phases 1-3)=0.3050  ns/read=1.1556
+  round=2: mean node-balance (phases 1-3)=0.2529  ns/read=1.3035
+  round=3: mean node-balance (phases 1-3)=0.4610  ns/read=1.1310
+  Spearman(node-balance, ns/read): rho=-1.0000  exact p=0.3333  n=3
+  H-bandwidth predicts rho<0 (higher balance -> lower ns/read, i.e. faster). Observed rho=-1.0000: consistent with H-bandwidth direction.
+  Disclosed limitation (pre-registered): n=3 gives essentially no power (a two-tailed exact test at n=3 cannot reach p<0.05 even at |rho|=1); reported as pre-declared, not read as decisive on its own.

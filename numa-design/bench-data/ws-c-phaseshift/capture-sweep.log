@@ -1,0 +1,11 @@
+[2026-08-20T23:28:24-04:00] === capture sweep: 3 rounds, both arms, -numamaps enabled ===
+[2026-08-20T23:28:24-04:00] --- capture round 1, arm order BC ---
+[2026-08-20T23:30:28-04:00] arm=B round=1 hint_faults_delta=39777 pages_migrated_delta=5729733
+[2026-08-20T23:32:32-04:00] arm=C round=1 hint_faults_delta=0 pages_migrated_delta=0
+[2026-08-20T23:32:32-04:00] --- capture round 2, arm order CB ---
+[2026-08-20T23:34:36-04:00] arm=C round=2 hint_faults_delta=0 pages_migrated_delta=0
+[2026-08-20T23:36:40-04:00] arm=B round=2 hint_faults_delta=41069 pages_migrated_delta=3177177
+[2026-08-20T23:36:40-04:00] --- capture round 3, arm order BC ---
+[2026-08-20T23:38:44-04:00] arm=B round=3 hint_faults_delta=36585 pages_migrated_delta=5184827
+[2026-08-20T23:40:48-04:00] arm=C round=3 hint_faults_delta=0 pages_migrated_delta=0
+[2026-08-20T23:40:48-04:00] === capture sweep complete ===

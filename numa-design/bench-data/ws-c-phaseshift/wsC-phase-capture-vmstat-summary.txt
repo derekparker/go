@@ -1,0 +1,6 @@
+arm=B round=1 hint_faults_delta=39777 pages_migrated_delta=5729733
+arm=C round=1 hint_faults_delta=0 pages_migrated_delta=0
+arm=C round=2 hint_faults_delta=0 pages_migrated_delta=0
+arm=B round=2 hint_faults_delta=41069 pages_migrated_delta=3177177
+arm=B round=3 hint_faults_delta=36585 pages_migrated_delta=5184827
+arm=C round=3 hint_faults_delta=0 pages_migrated_delta=0

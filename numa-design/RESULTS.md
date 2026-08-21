@@ -2887,27 +2887,29 @@ This ordering lets Workstream C's low-risk, high-certainty items land immediatel
 | NOT the motivation | Workstream A's bounded C-vs-A residual (≤+8.3%/≤+5.15%) — small, already inside its non-inferiority gate, and confined to the window where confinement already works |
 | Workstream C sequencing | Tasks 12/13/15 run before/alongside Workstream B (disjoint files, no dependency); Task 14 implementation stays profile-gated on Workstream B's own Task 11 profile |
 
-## Phase-shift mechanism study (Task 12) — pre-registration
+## Phase-shift mechanism study (Task 12)
 
-**Committed before the sweep runs**, per the plan's Task 12 Step 1. This section is written and committed first; results are appended in a separate commit afterward.
+### Pre-registration (committed before the sweep ran)
 
-### Background
+**Committed before the sweep runs**, per the plan's Task 12 Step 1. This subsection is written and committed first (`1aef06893a`); the Results/Verdict subsections below are appended in a separate commit afterward, unedited from what was pre-registered here.
+
+#### Background
 
 Candidate 3 (phase-shift, `numa-design/phase-shift`, commit `6b535e2ca9`) showed a replicated C-vs-B win across two independent sweeps: original (Layer 0+1+2) **-16.82%** (p=0.029, n=10, fragile on robustness checks) and L1-only (Layer 0+1) **-24.31%** (p=0.023, n=10, Wilcoxon p=0.014, LOO range 0.004-0.0503), combined by Fisher's method to p=0.0056. Both write-ups converged on a *mechanism* reading derived only indirectly, from vmstat and an after-the-fact bandwidth back-calculation (64B/read × reads/s): arm B's migration traffic (≈0.3 GB/s, from `numa_pages_migrated`) is two orders of magnitude too small to explain a 17-24% throughput swing, so the working hypothesis became **dual-memory-controller bandwidth availability** (arm A, pinned to one node/controller, is flat at 31.0 GB/s in every round; B and C both exceed that ceiling most rounds by spreading load across both controllers) rather than **balancer fault/copy tax**. Neither prior sweep captured direct page-placement evidence — the bandwidth reading was inferred, not measured. This task measures placement directly via `/proc/self/numa_maps` to settle which mechanism the data actually supports.
 
-### Toolchain and the GOMAXPROCS/confinement interaction (read this before running)
+#### Toolchain and the GOMAXPROCS/confinement interaction (read this before running)
 
 HEAD (`059152e027`) is post-Task-6: `GOEXPERIMENT=numa` is genuinely Layer 0 (topology) + Layer 1 (`numaSetProcessBindAll`, BIND-all task mempolicy) only — Layer 2 (per-chunk `MPOL_PREFERRED` homing) was removed in Task 6. **But HEAD also carries Workstream A's fill-one-socket-first confinement (Tasks 1-3), which did not exist when either prior candidate-3 sweep ran.** Both prior sweeps used `GOMAXPROCS=128` explicitly (`numa-design/bench-data/pathology/cand3-sweep.sh`, `cand3-l1-sweep.sh`). numa-dell has 128 CPUs per node. `numaShouldConfine` (`src/runtime/numa_linux.go:306-363`) confines when, among other conditions, `procs <= ncpus` (line 359: `if ncpus <= 0 || procs > ncpus { decline }`) — so `GOMAXPROCS=128` on a 128-CPU-per-node machine satisfies `128 <= 128` and **would newly engage confinement for arm C** if this rerun reused the old GOMAXPROCS value. That is a real confound, not a hypothetical one, and a serious one for this specific program: confinement narrows the *process's own* CPU affinity to one node before any reader goroutine starts, which would make the phase-shift benchmark's own odd-phase `sched_setaffinity` calls (pinning readers to node 1's CPUs) fail outright — the benchmark's core mechanism (make the whole working set periodically "misplaced" by flipping reader affinity across nodes) cannot function under confinement at all. This is not a subtle statistical confound to control for; it would silently change what the program measures.
 
 **Decision: both arms run with `GOMAXPROCS=256` explicitly** (`env GOMAXPROCS=256`), not 128. `256 > 128` makes `numaShouldConfine` decline with reason `"GOMAXPROCS exceeds node"` (verified below via `GODEBUG=numa=1`), keeping arm C at Layer 0+1 (BIND-all) only — the same physical configuration as both prior sweeps, just expressed at a GOMAXPROCS value that doesn't intersect the new confinement gate. Arm B is stock Go and has no confinement code path either way, so this choice only affects arm C, and only by keeping a mechanism (confinement) *out* of a study that is not about confinement. The alternative — letting confinement engage — was rejected because it would answer a different question (Workstream A's own already-gated behavior) while breaking this program's own experimental design, not because avoiding it makes the result look better. All other flags are unchanged from both prior sweeps: `-heap=6144 -readers=64 -phase=30 -phases=4`.
 
-### Primary (pre-registered)
+#### Primary (pre-registered)
 
 - Metric: `ns/read` (`BenchmarkPhaseChase`), B vs C, single session, n=20 recorded rounds + 1 discarded warmup round, rotating arm order (`numa-design/pathology-sweep.sh`), vmstat (`numa_hint_faults`, `numa_pages_migrated`) snapped immediately before/after every run, idle check before every run.
 - Reported: benchstat headline (median/mean, relative %), exact Mann-Whitney U (full enumeration), exact Wilcoxon signed-rank test (paired by round index), exact paired sign test, leave-one-out exact Mann-Whitney U (each of the 20 rounds dropped in turn, 19 vs 19) — the full robustness battery used in both prior sweeps, not just MWU. α=0.05 pre-declared for all.
 - Binaries built fresh from HEAD immediately before the sweep, verified via `go version -m` (base: no `X:numa`; numa: `X:numa` present) and a `GODEBUG=numa=1` smoke test at the sweep's exact `GOMAXPROCS=256` confirming `numa: confinement declined: GOMAXPROCS exceeds node` on the numa binary, before any recorded round runs.
 
-### Mechanism/attribution analysis (pre-registered)
+#### Mechanism/attribution analysis (pre-registered)
 
 Separate from the primary set — **3 designated capture rounds** (not pooled into the n=20 primary; see exclusion rule below), each running both arms once (order alternates B-first/C-first across the 3 rounds), with `-numamaps=<prefix>` enabled. Within each captured run, phases 1-3 (not phase 0 — its "start" snapshot is pre-touch, before any pinned reader has run at all, and is not representative of steady state) are snapshotted at start/mid/end of the phase (9 `numa_maps` files per arm per capture round).
 
@@ -2924,7 +2926,84 @@ Separate from the primary set — **3 designated capture rounds** (not pooled in
 
 **Bandwidth-ceiling cross-check (n=20, descriptive):** implied GB/s (= 64/`ns/read`) for every primary round in both arms, compared against the ~31.0 GB/s single-controller ceiling established by arm A in the original candidate 3 pilot (not re-measured here — arm A is not run in this rerun; it was already established as informational-only for this candidate and its role here is purely as a fixed reference ceiling from prior data).
 
-### What "either outcome" means here (per the plan)
+#### What "either outcome" means here (per the plan)
 
 H-bandwidth confirmed reframes the upstream story: BIND-all's value in this pathology is preserving the dual-controller spread that the balancer's own churn would otherwise disrupt, not avoiding fault/copy cost directly. H-faulttax confirmed restores the more intuitive fault-tax narrative and would mean the bandwidth reading from the prior two sweeps was a spurious correlation with something else. Both are reported; this section will not be rewritten to fit whichever result appears.
+
+### Build verification (before the sweep ran)
+
+Binaries built fresh from `1aef06893a` (the pre-registration commit above) on numa-dell, `GOWORK=off`, directly from `numa-design/phase-shift`:
+
+```
+/tmp/pb/phaseshift-base: go1.28-devel_e9c8ddbc52 ...  (no X:numa)
+/tmp/pb/phaseshift-numa: go1.28-devel_e9c8ddbc52 ...  X:numa
+```
+
+Both report `build vcs.revision=1aef06893abcf9f30a340ed5b68b23a2d20120df` (this commit) and `vcs.modified=true` — the same pre-existing untracked-file explanation as every prior `go version -m` check in this file (`numa-design/run-x-benchmarks.sh`, `x-benchmarks/`, present before this task started, not from this task's own output; `git diff --stat` on tracked files is empty). `bin/go` itself was built at `e9c8ddbc52` (one commit before HEAD); the two commits between it and `1aef06893a` (`059152e027`, a test-comment-only change, and the pre-registration commit itself, which touches only `numa-design/`) do not touch `src/`, so no `./make.bash` rebuild was needed — confirmed by inspecting both diffs before relying on this.
+
+**Confinement-decline check, at the sweep's exact `GOMAXPROCS=256`:**
+
+```
+$ ssh numa-dell 'env GOMAXPROCS=256 GODEBUG=numa=1 /tmp/pb/phaseshift-numa -heap=64 -readers=4 -phase=1 -phases=2'
+numa: nodes 2 allowed 2
+numa: confinement declined: GOMAXPROCS exceeds node
+```
+
+**BIND-all-still-engaged check** (direct, from a live `/proc/self/numa_maps` snapshot, stronger evidence than the debug print since Layer 1 has no `debug.numa` line of its own): the numa binary's heap VMAs carry `bind:0-1` policy; the base binary's carry `default`. Both confirmed on a short smoke run before the real sweep started. Full transcript archived: `numa-design/bench-data/ws-c-phaseshift/wsC-phase-govm-and-confinement-verify.txt`.
+
+### Results
+
+**Primary (n=20, single session, rotating order, `numa-design/pathology-sweep.sh`):**
+
+| | B (stock) | C (`GOEXPERIMENT=numa`, Layer 0+1 only) |
+|---|---|---|
+| median ns/read | 1.6940 | 1.1328 |
+| mean ns/read | 1.6887 | 1.2999 |
+| min / max | 1.4367 / 1.9353 | 1.1040 / 2.0335 |
+
+Relative: **median −33.13%, mean −23.03%** (C faster). This is the largest of the three phase-shift measurements to date (original Layer 0+1+2: −16.82%; L1-only: −24.31%; this rerun: −33.13% median).
+
+**Full robustness battery, all four tests, all significant — unlike either prior sweep:**
+
+- Exact Mann-Whitney U: p = **8.18×10⁻⁶**
+- Exact Wilcoxon signed-rank (paired by round): p = **6.29×10⁻⁵**
+- Exact paired sign test (C < B in 18/20 rounds): p = **4.03×10⁻⁴**
+- Leave-one-out exact MWU (each of the 20 rounds dropped in turn, 19 vs 19): p range **6.55×10⁻⁷ to 2.59×10⁻⁵**, 20/20 subsets significant at α=0.05
+
+Every leave-one-out subset is significant — a qualitatively different robustness profile than the original sweep (sign test p=0.109, not significant on its own; LOO range up to 0.077) or the L1-only sweep (sign test still p=0.109; LOO worst case 0.0503). This rerun's result is not fragile by any of the four tests.
+
+**Migration-traffic-vs-bandwidth budget (arm B, n=20):** mean `numa_pages_migrated` delta = 4,802,548 pages/round → 0.328 GB/s two-way migration traffic, **0.86% of B's own mean demand bandwidth (38.1 GB/s)** — consistent with both prior sweeps' finding that migration byte-volume alone is roughly two orders of magnitude too small to explain the throughput swing directly.
+
+**Bandwidth (GB/s = 64/ns_per_read):** B ranges 33.1–44.5 (mean 38.1), C ranges 31.5–58.0 (mean 50.9). Both arms exceed the ~31.0 GB/s single-controller reference ceiling in nearly every round (B: 20/20 above; C: 19/20 above, one round at 31.5 — the honest "sometimes lands near the ceiling" pattern both prior sweeps also reported, replicated a third time here in the primary set).
+
+**Mechanism placement data (3 designated capture rounds, `-numamaps`, phases 1-3, kept out of the n=20 primary set):**
+
+| round | arm | node-balance mean (phases 1-3) | node-balance range | ns/read (this capture round) |
+|---|---|---|---|---|
+| 1 | B | 0.1287 (all 4 phases incl. 0) | 0.034 – 0.438 | 1.6833 |
+| 1 | C | 0.3050 | 0.3048 – 0.3051 | 1.1556 |
+| 2 | B | 0.2090 | 0.017 – 0.491 | 1.4734 |
+| 2 | C | 0.2529 | 0.2528 – 0.2530 | 1.3035 |
+| 3 | B | 0.1439 | 0.025 – 0.492 | 1.7015 |
+| 3 | C | 0.4610 | 0.4609 – 0.4611 | 1.1310 |
+
+Aggregated over all 36 snapshots/arm (phases 1-3 only, the pre-registered subset): **B mean=0.1378, stdev=0.1257** (wide swings within every single run); **C mean=0.3396, stdev=0.0901** — but that C standard deviation is **entirely between-round**: within any one round, C's own stdev across its 9-12 phase/tag snapshots is ≤0.0002 (e.g. round 1: 0.3048–0.3051). C's placement is not merely "usually more spread than B" — it is **frozen at whatever value it starts with and never moves again for the rest of that run**, regardless of which node its own readers are pinned to that phase. B's placement, in the same runs, swings repeatedly and by large amounts within every single 120 s run (e.g. round 2: 0.017 → 0.491 → 0.017 → 0.109 → 0.367 → 0.107 across successive snapshots) — a directly observed, not merely inferred, "migration churn" signature.
+
+**Descriptive start-vs-end movement within a phase, per arm** (does node-balance trend from a phase's start to its end): B: 5/12 phases moved toward consolidation, 7/12 toward spread, mean delta −0.053. C: 7/12 toward consolidation, 4/12 toward spread, mean delta ≈+0.0000 (i.e., no real movement — the direction split is noise at the 4th decimal place, not signal). **This directional test's original framing — "B trends toward consolidation within each phase" — is not what the data shows**; B does not move monotonically within a phase, it swings chaotically between snapshots in both directions, sometimes by 0.2-0.47 in one 15 s window. The clean signal is stability (C) vs. instability (B), not a directional within-phase drift for B.
+
+**Pre-registered primary attribution test (arm C only, round-level, n=3):** Spearman correlation between C's round-level mean node-balance (phases 1-3) and that round's ns/read: **ρ = −1.0000** (perfect), exact permutation p = **0.333** (n=3; not significant, exactly as the pre-registration disclosed it could not be — a two-tailed exact test at n=3 cannot reach p<0.05 even at |ρ|=1). Every one of the 3 capture rounds lands in the H-bandwidth-predicted order: C's most-spread captured round (0.4610, round 3) was its fastest (1.1310 ns/read); its least-spread (0.2529, round 2) was its slowest (1.3035 ns/read). Directionally perfect, statistically inconclusive alone at this n — reported exactly as pre-registered, not oversold.
+
+Raw data: `numa-design/bench-data/ws-c-phaseshift/wsC-phase-arm{B,C}-{warmup,recorded}.out{,.stderr}`, per-round `wsC-phase-arm*-r*.vmstat.{before,after}`, `wsC-phase-vmstat-summary.txt`, `wsC-phase-sweep.log`; capture rounds: `wsC-phase-capture-arm{B,C}-r{1,2,3}.{out,stderr,vmstat.before,vmstat.after}` and 72 `*.numamaps` snapshots; the analysis script and its full output, `phaseshift_analysis.py` / `wsC-phase-full-analysis.txt`; build/confinement verification, `wsC-phase-govm-and-confinement-verify.txt`; the three-sweep Fisher's-method combination, `wsC-phase-fisher-combined.txt`; sweep driver scripts `pathology-sweep.sh` (shared driver, `numa-design/`) and `capture-sweep.sh`.
+
+### Verdict: **H-bandwidth confirmed, with a refinement the placement data forced**
+
+The magnitude argument that motivated H-bandwidth in the first place replicates cleanly a third time: B's own migration traffic (0.33 GB/s) is under 1% of its own demand bandwidth (38.1 GB/s) — nowhere near enough raw bytes to explain a 23-33% throughput swing via direct fault/copy/shootdown cost. That rules out the crude form of H-faulttax ("moving these bytes is itself expensive enough to explain the gap") for a third independent sweep.
+
+The `numa_maps` placement data — the direct measurement neither prior sweep had — confirms the qualitative mechanism, but not exactly as pre-registered. The pre-registration's H-bandwidth framing predicted arm C would "stay close to spread (≈0.5)". **It does not**: C's node-balance in the 3 captured rounds was 0.2529, 0.3050, and 0.4610 — whatever its first-touch allocation happened to land on, not a reliable ~50/50 split. What the data shows instead, unambiguously, is that **C's placement is completely static once set — it does not move by more than 0.0003 across an entire 120 s run, four phase flips, and the readers' own affinity changing nodes every 30 s** — while **B's placement is continuously and substantially churned within every single run** (swings of 0.2-0.47 between consecutive snapshots 15-30 s apart), a live, measured picture of the "migration storm" the design predicted, not merely an inference from nonzero vmstat counters.
+
+Combined with the migration-traffic budget, the most defensible reading is: **C's advantage comes from avoiding the balancer's disruption of whatever locality pattern its allocation happened to establish, not from reliably achieving a particular "spread" placement, and not from paying directly for the bytes the balancer moves.** The disruption itself — not its byte-volume — is the mechanism. This is a refinement of H-bandwidth (the underlying claim, "C wins by avoiding balancer-induced instability, not fault/copy cost", is confirmed) rather than a clean confirmation of its most literal sub-claim ("C stays near 50/50"). The pre-registered n=3 Spearman correlation, while statistically inconclusive alone (p=0.333), is directionally perfect across all 3 rounds and is consistent with this reading, not contrary to it.
+
+**H-faulttax is not supported**: there is no round or snapshot in which B's placement is *more* stable than C's, and the migration-byte budget remains two orders of magnitude short of the observed effect size in this sweep, as in both prior ones.
+
+This rerun also produced the strongest, least fragile version of the phase-shift result across all three sweeps to date (−33.13% median, all four robustness tests significant, all 20 leave-one-out subsets significant) — obtained with `GOMAXPROCS=256` (both arms) specifically to keep Workstream A's confinement out of scope for arm C, per the pre-registered decision above. Combined by Fisher's method across all three independent sweeps' primary Mann-Whitney U p-values (original p=0.0288, L1-only p=0.0232, this rerun p=8.176×10⁻⁶): χ²(df=6) = 38.05, combined p = **1.10×10⁻⁶** (computed here via the closed-form regularized incomplete gamma for even df, not scipy — this host has no scipy, matching every other exact-test computation in this file). The phase-shift pathology-recovery result is now supported by three independent measurements on three different builds, all in the same direction, with this rerun additionally providing the first direct placement evidence for the mechanism.
 

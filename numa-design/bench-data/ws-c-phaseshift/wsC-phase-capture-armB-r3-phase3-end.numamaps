@@ -1,0 +1,34 @@
+00400000 default file=/tmp/pb/phaseshift-base mapped=169 active=0 N0=169 kernelpagesize_kB=4
+004a9000 default file=/tmp/pb/phaseshift-base mapped=224 active=0 N0=223 N1=1 kernelpagesize_kB=4
+00589000 default file=/tmp/pb/phaseshift-base anon=4 dirty=4 mapped=11 active=0 N0=7 N1=4 kernelpagesize_kB=4
+00594000 default anon=20 dirty=20 active=0 N0=20 kernelpagesize_kB=4
+38a3d0000000 default
+38a3d2400000 default anon=1630208 dirty=40960 active=0 N0=173056 N1=1457152 kernelpagesize_kB=4
+38a560400000 default
+7fa8723c0000 default anon=27039 dirty=24991 active=16 N0=16544 N1=10495 kernelpagesize_kB=4
+7fa87a40b000 default anon=10278 dirty=10278 active=1 N0=2399 N1=7879 kernelpagesize_kB=4
+7fa87ce5a000 default anon=4607 dirty=4607 active=2 N0=1532 N1=3075 kernelpagesize_kB=4
+7fa87e1d3000 default anon=2060 dirty=2060 active=0 N0=1800 N1=260 kernelpagesize_kB=4
+7fa87eb0a000 default anon=2195 dirty=2195 active=0 N0=1920 N1=275 kernelpagesize_kB=4
+7fa880000000 default anon=1 dirty=1 active=0 N1=1 kernelpagesize_kB=4
+7fa882000000 default
+7fa899147000 default anon=4 dirty=4 active=0 N0=2 N1=2 kernelpagesize_kB=4
+7fa89914b000 default
+7fa8b9147000 default anon=4 dirty=4 active=0 N0=2 N1=2 kernelpagesize_kB=4
+7fa8b914b000 default
+7fa8c4e28000 default anon=2 dirty=2 active=0 N0=1 N1=1 kernelpagesize_kB=4
+7fa8c4e2a000 default
+7fa8c65c5000 default anon=1 dirty=1 active=0 N1=1 kernelpagesize_kB=4
+7fa8c65c6000 default
+7fa8c6800000 default anon=120 dirty=120 active=1 N0=100 N1=20 kernelpagesize_kB=4
+7fa8c687e000 default anon=7 dirty=7 active=0 N0=7 kernelpagesize_kB=4
+7fa8c688c000 default anon=51 dirty=51 active=0 N0=27 N1=24 kernelpagesize_kB=4
+7fa8c698c000 default anon=9 dirty=9 active=0 N0=9 kernelpagesize_kB=4
+7fa8c699e000 default
+7fa8c6a56000 default anon=1 dirty=1 active=0 N1=1 kernelpagesize_kB=4
+7fa8c6a57000 default
+7fa8c6a9e000 default anon=59 dirty=59 active=0 N0=57 N1=2 kernelpagesize_kB=4
+7fa8c6afe000 default
+7fa8c6b02000 default
+7fa8c6b04000 default
+7ffcecebd000 default stack anon=4 dirty=4 active=0 N0=3 N1=1 kernelpagesize_kB=4

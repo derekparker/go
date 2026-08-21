@@ -1,0 +1,140 @@
+phase-shift GOMAXPROCS=256 heap=6144MiB readers=64 phase=30s phases=4
+allowed cpuset: 128 even (node0) CPUs, 128 odd (node1) CPUs
+Allocating 6144MiB pointer-dense working set...
+Running 4 phases x 30s (noop-pin=false numamaps="")...
+
+=== Phase Chase Results ===
+total reads=107868143616 elapsed=2m0.071836837s ns/read=1.11 noop-pin(armA)=false
+phase-shift GOMAXPROCS=256 heap=6144MiB readers=64 phase=30s phases=4
+allowed cpuset: 128 even (node0) CPUs, 128 odd (node1) CPUs
+Allocating 6144MiB pointer-dense working set...
+Running 4 phases x 30s (noop-pin=false numamaps="")...
+
+=== Phase Chase Results ===
+total reads=105949429760 elapsed=2m0.074638004s ns/read=1.13 noop-pin(armA)=false
+phase-shift GOMAXPROCS=256 heap=6144MiB readers=64 phase=30s phases=4
+allowed cpuset: 128 even (node0) CPUs, 128 odd (node1) CPUs
+Allocating 6144MiB pointer-dense working set...
+Running 4 phases x 30s (noop-pin=false numamaps="")...
+
+=== Phase Chase Results ===
+total reads=107751358464 elapsed=2m0.051763757s ns/read=1.11 noop-pin(armA)=false
+phase-shift GOMAXPROCS=256 heap=6144MiB readers=64 phase=30s phases=4
+allowed cpuset: 128 even (node0) CPUs, 128 odd (node1) CPUs
+Allocating 6144MiB pointer-dense working set...
+Running 4 phases x 30s (noop-pin=false numamaps="")...
+
+=== Phase Chase Results ===
+total reads=106024337408 elapsed=2m0.058601158s ns/read=1.13 noop-pin(armA)=false
+phase-shift GOMAXPROCS=256 heap=6144MiB readers=64 phase=30s phases=4
+allowed cpuset: 128 even (node0) CPUs, 128 odd (node1) CPUs
+Allocating 6144MiB pointer-dense working set...
+Running 4 phases x 30s (noop-pin=false numamaps="")...
+
+=== Phase Chase Results ===
+total reads=68811128832 elapsed=2m0.074139796s ns/read=1.74 noop-pin(armA)=false
+phase-shift GOMAXPROCS=256 heap=6144MiB readers=64 phase=30s phases=4
+allowed cpuset: 128 even (node0) CPUs, 128 odd (node1) CPUs
+Allocating 6144MiB pointer-dense working set...
+Running 4 phases x 30s (noop-pin=false numamaps="")...
+
+=== Phase Chase Results ===
+total reads=59038351360 elapsed=2m0.052984907s ns/read=2.03 noop-pin(armA)=false
+phase-shift GOMAXPROCS=256 heap=6144MiB readers=64 phase=30s phases=4
+allowed cpuset: 128 even (node0) CPUs, 128 odd (node1) CPUs
+Allocating 6144MiB pointer-dense working set...
+Running 4 phases x 30s (noop-pin=false numamaps="")...
+
+=== Phase Chase Results ===
+total reads=97795440640 elapsed=2m0.070604985s ns/read=1.23 noop-pin(armA)=false
+phase-shift GOMAXPROCS=256 heap=6144MiB readers=64 phase=30s phases=4
+allowed cpuset: 128 even (node0) CPUs, 128 odd (node1) CPUs
+Allocating 6144MiB pointer-dense working set...
+Running 4 phases x 30s (noop-pin=false numamaps="")...
+
+=== Phase Chase Results ===
+total reads=107710398464 elapsed=2m0.057178173s ns/read=1.11 noop-pin(armA)=false
+phase-shift GOMAXPROCS=256 heap=6144MiB readers=64 phase=30s phases=4
+allowed cpuset: 128 even (node0) CPUs, 128 odd (node1) CPUs
+Allocating 6144MiB pointer-dense working set...
+Running 4 phases x 30s (noop-pin=false numamaps="")...
+
+=== Phase Chase Results ===
+total reads=107984207872 elapsed=2m0.060153844s ns/read=1.11 noop-pin(armA)=false
+phase-shift GOMAXPROCS=256 heap=6144MiB readers=64 phase=30s phases=4
+allowed cpuset: 128 even (node0) CPUs, 128 odd (node1) CPUs
+Allocating 6144MiB pointer-dense working set...
+Running 4 phases x 30s (noop-pin=false numamaps="")...
+
+=== Phase Chase Results ===
+total reads=91769815040 elapsed=2m0.058739468s ns/read=1.31 noop-pin(armA)=false
+phase-shift GOMAXPROCS=256 heap=6144MiB readers=64 phase=30s phases=4
+allowed cpuset: 128 even (node0) CPUs, 128 odd (node1) CPUs
+Allocating 6144MiB pointer-dense working set...
+Running 4 phases x 30s (noop-pin=false numamaps="")...
+
+=== Phase Chase Results ===
+total reads=108366987264 elapsed=2m0.068316152s ns/read=1.11 noop-pin(armA)=false
+phase-shift GOMAXPROCS=256 heap=6144MiB readers=64 phase=30s phases=4
+allowed cpuset: 128 even (node0) CPUs, 128 odd (node1) CPUs
+Allocating 6144MiB pointer-dense working set...
+Running 4 phases x 30s (noop-pin=false numamaps="")...
+
+=== Phase Chase Results ===
+total reads=92918923264 elapsed=2m0.074718715s ns/read=1.29 noop-pin(armA)=false
+phase-shift GOMAXPROCS=256 heap=6144MiB readers=64 phase=30s phases=4
+allowed cpuset: 128 even (node0) CPUs, 128 odd (node1) CPUs
+Allocating 6144MiB pointer-dense working set...
+Running 4 phases x 30s (noop-pin=false numamaps="")...
+
+=== Phase Chase Results ===
+total reads=86414196736 elapsed=2m0.060418444s ns/read=1.39 noop-pin(armA)=false
+phase-shift GOMAXPROCS=256 heap=6144MiB readers=64 phase=30s phases=4
+allowed cpuset: 128 even (node0) CPUs, 128 odd (node1) CPUs
+Allocating 6144MiB pointer-dense working set...
+Running 4 phases x 30s (noop-pin=false numamaps="")...
+
+=== Phase Chase Results ===
+total reads=70408290304 elapsed=2m0.058242631s ns/read=1.71 noop-pin(armA)=false
+phase-shift GOMAXPROCS=256 heap=6144MiB readers=64 phase=30s phases=4
+allowed cpuset: 128 even (node0) CPUs, 128 odd (node1) CPUs
+Allocating 6144MiB pointer-dense working set...
+Running 4 phases x 30s (noop-pin=false numamaps="")...
+
+=== Phase Chase Results ===
+total reads=74663280640 elapsed=2m0.065830059s ns/read=1.61 noop-pin(armA)=false
+phase-shift GOMAXPROCS=256 heap=6144MiB readers=64 phase=30s phases=4
+allowed cpuset: 128 even (node0) CPUs, 128 odd (node1) CPUs
+Allocating 6144MiB pointer-dense working set...
+Running 4 phases x 30s (noop-pin=false numamaps="")...
+
+=== Phase Chase Results ===
+total reads=108759433216 elapsed=2m0.067355771s ns/read=1.10 noop-pin(armA)=false
+phase-shift GOMAXPROCS=256 heap=6144MiB readers=64 phase=30s phases=4
+allowed cpuset: 128 even (node0) CPUs, 128 odd (node1) CPUs
+Allocating 6144MiB pointer-dense working set...
+Running 4 phases x 30s (noop-pin=false numamaps="")...
+
+=== Phase Chase Results ===
+total reads=108277727232 elapsed=2m0.062175664s ns/read=1.11 noop-pin(armA)=false
+phase-shift GOMAXPROCS=256 heap=6144MiB readers=64 phase=30s phases=4
+allowed cpuset: 128 even (node0) CPUs, 128 odd (node1) CPUs
+Allocating 6144MiB pointer-dense working set...
+Running 4 phases x 30s (noop-pin=false numamaps="")...
+
+=== Phase Chase Results ===
+total reads=106205102080 elapsed=2m0.053580064s ns/read=1.13 noop-pin(armA)=false
+phase-shift GOMAXPROCS=256 heap=6144MiB readers=64 phase=30s phases=4
+allowed cpuset: 128 even (node0) CPUs, 128 odd (node1) CPUs
+Allocating 6144MiB pointer-dense working set...
+Running 4 phases x 30s (noop-pin=false numamaps="")...
+
+=== Phase Chase Results ===
+total reads=85677932544 elapsed=2m0.060101398s ns/read=1.40 noop-pin(armA)=false
+phase-shift GOMAXPROCS=256 heap=6144MiB readers=64 phase=30s phases=4
+allowed cpuset: 128 even (node0) CPUs, 128 odd (node1) CPUs
+Allocating 6144MiB pointer-dense working set...
+Running 4 phases x 30s (noop-pin=false numamaps="")...
+
+=== Phase Chase Results ===
+total reads=107595759616 elapsed=2m0.059769142s ns/read=1.12 noop-pin(armA)=false

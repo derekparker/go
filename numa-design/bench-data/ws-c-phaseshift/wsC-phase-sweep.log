@@ -1,0 +1,5 @@
+idle_check: top process at 200% CPU; sleeping 30s
+idle_check: top process at 144% CPU; sleeping 30s
+idle_check: top process at 138% CPU; sleeping 30s
+idle_check: top process at 300% CPU; sleeping 30s
+sweep complete: /tmp/pb/wsC-phase (archive under numa-design/bench-data/wsC-phase/)

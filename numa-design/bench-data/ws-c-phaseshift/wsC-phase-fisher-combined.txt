@@ -1,0 +1,6 @@
+original (Layer 0+1+2): p=0.0288
+L1-only: p=0.0232
+this rerun (wsC-phase, n=20): p=8.176e-06
+
+Fisher's method: chi2(df=6) = 38.051, combined p = 1.098e-06
+(closed-form regularized upper incomplete gamma Q(df/2, chi2/2) for integer df/2 -- exact, no scipy)

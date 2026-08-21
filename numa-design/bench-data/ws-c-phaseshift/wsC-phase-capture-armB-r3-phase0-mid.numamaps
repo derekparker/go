@@ -1,0 +1,33 @@
+00400000 default file=/tmp/pb/phaseshift-base mapped=169 active=0 N0=169 kernelpagesize_kB=4
+004a9000 default file=/tmp/pb/phaseshift-base mapped=224 active=0 N0=223 N1=1 kernelpagesize_kB=4
+00589000 default file=/tmp/pb/phaseshift-base anon=4 dirty=4 mapped=11 active=0 N0=5 N1=6 kernelpagesize_kB=4
+00594000 default anon=20 dirty=20 active=0 N0=20 kernelpagesize_kB=4
+38a3d0000000 default
+38a3d2400000 default anon=1628672 dirty=154624 active=0 N0=1462272 N1=166400 kernelpagesize_kB=4
+7fa8723d2000 default anon=27036 dirty=27036 active=1 N0=16570 N1=10466 kernelpagesize_kB=4
+7fa87a40b000 default anon=10278 dirty=10278 active=0 N0=2407 N1=7871 kernelpagesize_kB=4
+7fa87ce5a000 default anon=4606 dirty=4606 active=0 N0=1530 N1=3076 kernelpagesize_kB=4
+7fa87e1d3000 default anon=2060 dirty=2060 active=0 N0=1805 N1=255 kernelpagesize_kB=4
+7fa87eb0a000 default anon=2194 dirty=2194 active=0 N0=1939 N1=255 kernelpagesize_kB=4
+7fa880000000 default anon=1 dirty=1 active=0 N0=1 kernelpagesize_kB=4
+7fa882000000 default
+7fa899147000 default anon=4 dirty=4 active=0 N0=3 N1=1 kernelpagesize_kB=4
+7fa89914b000 default
+7fa8b9147000 default anon=4 dirty=4 active=0 N0=3 N1=1 kernelpagesize_kB=4
+7fa8b914b000 default
+7fa8c4e28000 default anon=2 dirty=2 active=0 N0=1 N1=1 kernelpagesize_kB=4
+7fa8c4e2a000 default
+7fa8c65c5000 default anon=1 dirty=1 active=0 N0=1 kernelpagesize_kB=4
+7fa8c65c6000 default
+7fa8c6800000 default anon=120 dirty=120 active=0 N0=104 N1=16 kernelpagesize_kB=4
+7fa8c687e000 default anon=7 dirty=7 active=0 N0=7 kernelpagesize_kB=4
+7fa8c688c000 default anon=50 dirty=50 active=0 N0=26 N1=24 kernelpagesize_kB=4
+7fa8c698c000 default anon=9 dirty=9 active=0 N0=9 kernelpagesize_kB=4
+7fa8c699e000 default
+7fa8c6a56000 default anon=1 dirty=1 active=0 N0=1 kernelpagesize_kB=4
+7fa8c6a57000 default
+7fa8c6a9e000 default anon=59 dirty=59 active=0 N0=59 kernelpagesize_kB=4
+7fa8c6afe000 default
+7fa8c6b02000 default
+7fa8c6b04000 default
+7ffcecebd000 default stack anon=4 dirty=4 active=0 N0=4 kernelpagesize_kB=4

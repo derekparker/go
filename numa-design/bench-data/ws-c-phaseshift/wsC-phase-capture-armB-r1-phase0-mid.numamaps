@@ -1,0 +1,32 @@
+00400000 default file=/tmp/pb/phaseshift-base mapped=169 active=0 N0=169 kernelpagesize_kB=4
+004a9000 default file=/tmp/pb/phaseshift-base mapped=224 active=0 N0=223 N1=1 kernelpagesize_kB=4
+00589000 default file=/tmp/pb/phaseshift-base anon=4 dirty=4 mapped=11 active=0 N0=4 N1=7 kernelpagesize_kB=4
+00594000 default anon=20 dirty=20 active=0 N0=4 N1=16 kernelpagesize_kB=4
+2263b0000000 default
+2263b1400000 default anon=1628672 dirty=924672 active=0 N0=726016 N1=902656 kernelpagesize_kB=4
+22653f000000 default
+7f15babd6000 default anon=26941 dirty=26941 active=0 N0=1240 N1=25701 kernelpagesize_kB=4
+7f15c2c0f000 default anon=10330 dirty=10330 active=0 N0=1531 N1=8799 kernelpagesize_kB=4
+7f15c5864000 default anon=4599 dirty=4599 active=0 N0=2607 N1=1992 kernelpagesize_kB=4
+7f15c6b91000 default anon=1961 dirty=1961 active=0 N0=1082 N1=879 kernelpagesize_kB=4
+7f15c7348000 default anon=2213 dirty=2213 active=0 N0=1818 N1=395 kernelpagesize_kB=4
+7f15c8900000 default anon=50 dirty=50 active=0 N0=9 N1=41 kernelpagesize_kB=4
+7f15c8a00000 default anon=1 dirty=1 active=0 N0=1 kernelpagesize_kB=4
+7f15caa00000 default
+7f15deec7000 default anon=4 dirty=4 active=0 N0=2 N1=2 kernelpagesize_kB=4
+7f15deecb000 default
+7f15feec7000 default anon=4 dirty=4 active=0 N0=2 N1=2 kernelpagesize_kB=4
+7f15feecb000 default
+7f160d298000 default anon=2 dirty=2 active=0 N0=2 kernelpagesize_kB=4
+7f160d29a000 default
+7f160ef13000 default anon=1 dirty=1 active=0 N0=1 kernelpagesize_kB=4
+7f160ef14000 default
+7f160f201000 default anon=69 dirty=69 active=0 N0=44 N1=25 kernelpagesize_kB=4
+7f160f251000 default
+7f160f2f3000 default anon=1 dirty=1 active=0 N0=1 kernelpagesize_kB=4
+7f160f2f4000 default
+7f160f351000 default anon=59 dirty=59 active=0 N0=59 kernelpagesize_kB=4
+7f160f3b1000 default
+7f160f3b5000 default
+7f160f3b7000 default
+7fffad336000 default stack anon=4 dirty=4 active=0 N0=4 kernelpagesize_kB=4

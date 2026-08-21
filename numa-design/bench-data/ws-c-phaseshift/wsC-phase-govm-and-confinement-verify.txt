@@ -1,0 +1,45 @@
+/tmp/pb/phaseshift-base: go1.28-devel_e9c8ddbc52 Thu Aug 20 18:32:27 2026 -0700
+	path	phase-shift
+	mod	phase-shift	(devel)	
+	build	-buildmode=exe
+	build	-compiler=gc
+	build	DefaultGODEBUG=netmarshal=0,tracebacklabels=0,x509sslcertoverrideplatform=0
+	build	CGO_ENABLED=1
+	build	CGO_CFLAGS=
+	build	CGO_CPPFLAGS=
+	build	CGO_CXXFLAGS=
+	build	CGO_LDFLAGS=
+	build	GOARCH=amd64
+	build	GOOS=linux
+	build	GOAMD64=v1
+	build	vcs=git
+	build	vcs.revision=1aef06893abcf9f30a340ed5b68b23a2d20120df
+	build	vcs.time=2026-08-21T01:57:20Z
+	build	vcs.modified=true
+===
+/tmp/pb/phaseshift-numa: go1.28-devel_e9c8ddbc52 Thu Aug 20 18:32:27 2026 -0700 X:numa
+	path	phase-shift
+	mod	phase-shift	(devel)	
+	build	-buildmode=exe
+	build	-compiler=gc
+	build	DefaultGODEBUG=netmarshal=0,tracebacklabels=0,x509sslcertoverrideplatform=0
+	build	CGO_ENABLED=1
+	build	CGO_CFLAGS=
+	build	CGO_CPPFLAGS=
+	build	CGO_CXXFLAGS=
+	build	CGO_LDFLAGS=
+	build	GOARCH=amd64
+	build	GOEXPERIMENT=numa
+	build	GOOS=linux
+	build	GOAMD64=v1
+	build	vcs=git
+	build	vcs.revision=1aef06893abcf9f30a340ed5b68b23a2d20120df
+	build	vcs.time=2026-08-21T01:57:20Z
+	build	vcs.modified=true
+===
+-rwxr-xr-x. 1 deparker deparker 2560240 2026-08-20 21:57:54.000007188 -0400 /tmp/pb/phaseshift-base
+-rwxr-xr-x. 1 deparker deparker 2585117 2026-08-20 21:57:54.631005872 -0400 /tmp/pb/phaseshift-numa
+===
+numa: nodes 2 allowed 2
+numa: confinement declined: GOMAXPROCS exceeds node
+phase-shift GOMAXPROCS=256 heap=64MiB readers=4 phase=1s phases=2

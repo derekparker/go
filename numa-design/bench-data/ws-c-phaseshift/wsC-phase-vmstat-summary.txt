@@ -1,0 +1,66 @@
+wsC-phase-armB-r0: hint_faults=30291 pages_migrated=5349601
+hint_faults=30291 pages_migrated=5349601
+wsC-phase-armB-r10: hint_faults=26416 pages_migrated=4980448
+hint_faults=26416 pages_migrated=4980448
+wsC-phase-armB-r11: hint_faults=28390 pages_migrated=4762640
+hint_faults=28390 pages_migrated=4762640
+wsC-phase-armB-r12: hint_faults=77252 pages_migrated=5564395
+hint_faults=77252 pages_migrated=5564395
+wsC-phase-armB-r13: hint_faults=75079 pages_migrated=5260750
+hint_faults=75079 pages_migrated=5260750
+wsC-phase-armB-r14: hint_faults=18994 pages_migrated=2533124
+hint_faults=18994 pages_migrated=2533124
+wsC-phase-armB-r15: hint_faults=21068 pages_migrated=3909055
+hint_faults=21068 pages_migrated=3909055
+wsC-phase-armB-r16: hint_faults=76862 pages_migrated=5445377
+hint_faults=76862 pages_migrated=5445377
+wsC-phase-armB-r17: hint_faults=76496 pages_migrated=4859721
+hint_faults=76496 pages_migrated=4859721
+wsC-phase-armB-r18: hint_faults=29433 pages_migrated=5388870
+hint_faults=29433 pages_migrated=5388870
+wsC-phase-armB-r19: hint_faults=72938 pages_migrated=4787687
+hint_faults=72938 pages_migrated=4787687
+wsC-phase-armB-r1: hint_faults=1320371 pages_migrated=6409026
+hint_faults=1320371 pages_migrated=6409026
+wsC-phase-armB-r20: hint_faults=90293 pages_migrated=5035895
+hint_faults=90293 pages_migrated=5035895
+wsC-phase-armB-r2: hint_faults=30732 pages_migrated=5297719
+hint_faults=30732 pages_migrated=5297719
+wsC-phase-armB-r3: hint_faults=87478 pages_migrated=4949729
+hint_faults=87478 pages_migrated=4949729
+wsC-phase-armB-r4: hint_faults=76152 pages_migrated=5310910
+hint_faults=76152 pages_migrated=5310910
+wsC-phase-armB-r5: hint_faults=86048 pages_migrated=3905264
+hint_faults=86048 pages_migrated=3905264
+wsC-phase-armB-r6: hint_faults=72145 pages_migrated=3416077
+hint_faults=72145 pages_migrated=3416077
+wsC-phase-armB-r7: hint_faults=84770 pages_migrated=4960068
+hint_faults=84770 pages_migrated=4960068
+wsC-phase-armB-r8: hint_faults=77770 pages_migrated=5011762
+hint_faults=77770 pages_migrated=5011762
+wsC-phase-armB-r9: hint_faults=76771 pages_migrated=4262449
+hint_faults=76771 pages_migrated=4262449
+wsC-phase-armC-r0: hint_faults=0 pages_migrated=0
+wsC-phase-armC-r10: hint_faults=0 pages_migrated=0
+wsC-phase-armC-r11: hint_faults=0 pages_migrated=0
+wsC-phase-armC-r12: hint_faults=0 pages_migrated=0
+wsC-phase-armC-r13: hint_faults=0 pages_migrated=0
+wsC-phase-armC-r14: hint_faults=0 pages_migrated=0
+wsC-phase-armC-r15: hint_faults=0 pages_migrated=0
+wsC-phase-armC-r16: hint_faults=0 pages_migrated=0
+wsC-phase-armC-r17: hint_faults=0 pages_migrated=0
+wsC-phase-armC-r18: hint_faults=0 pages_migrated=0
+wsC-phase-armC-r19: hint_faults=1 pages_migrated=0
+hint_faults=1 pages_migrated=0
+wsC-phase-armC-r1: hint_faults=0 pages_migrated=0
+wsC-phase-armC-r20: hint_faults=1 pages_migrated=0
+hint_faults=1 pages_migrated=0
+wsC-phase-armC-r2: hint_faults=0 pages_migrated=0
+wsC-phase-armC-r3: hint_faults=0 pages_migrated=0
+wsC-phase-armC-r4: hint_faults=1 pages_migrated=0
+hint_faults=1 pages_migrated=0
+wsC-phase-armC-r5: hint_faults=0 pages_migrated=0
+wsC-phase-armC-r6: hint_faults=0 pages_migrated=0
+wsC-phase-armC-r7: hint_faults=0 pages_migrated=0
+wsC-phase-armC-r8: hint_faults=0 pages_migrated=0
+wsC-phase-armC-r9: hint_faults=0 pages_migrated=0

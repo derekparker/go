@@ -1,0 +1,7 @@
+phase-shift GOMAXPROCS=256 heap=6144MiB readers=64 phase=30s phases=4
+allowed cpuset: 128 even (node0) CPUs, 128 odd (node1) CPUs
+Allocating 6144MiB pointer-dense working set...
+Running 4 phases x 30s (noop-pin=false numamaps="/tmp/pb/wsC-phase-capture/wsC-phase-capture-armC-r3")...
+
+=== Phase Chase Results ===
+total reads=106376085504 elapsed=2m0.306323361s ns/read=1.13 noop-pin(armA)=false

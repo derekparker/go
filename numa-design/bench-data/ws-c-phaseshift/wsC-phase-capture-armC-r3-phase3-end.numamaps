@@ -1,0 +1,34 @@
+00400000 bind:0-1 file=/tmp/pb/phaseshift-numa mapped=171 active=0 N0=171 kernelpagesize_kB=4
+004ab000 bind:0-1 file=/tmp/pb/phaseshift-numa mapped=226 active=0 N0=226 kernelpagesize_kB=4
+0058d000 bind:0-1 file=/tmp/pb/phaseshift-numa anon=4 dirty=4 mapped=11 active=0 N0=11 kernelpagesize_kB=4
+00598000 bind:0-1 anon=25 dirty=25 active=0 N0=24 N1=1 kernelpagesize_kB=4
+2012d4000000 bind:0-1 anon=1024 dirty=1024 active=0 N0=1024 kernelpagesize_kB=4
+2012d4400000 bind:0-1 anon=1629184 dirty=1629184 active=0 N0=748032 N1=881152 kernelpagesize_kB=4
+201462000000 bind:0-1
+7f54ad1c0000 bind:0-1 anon=17093 dirty=17093 active=0 N0=12210 N1=4883 kernelpagesize_kB=4
+7f54b252e000 bind:0-1 anon=9430 dirty=9430 active=0 N0=2389 N1=7041 kernelpagesize_kB=4
+7f54b4ae9000 bind:0-1 anon=10108 dirty=10108 active=0 N0=1485 N1=8623 kernelpagesize_kB=4
+7f54b7af4000 bind:0-1 anon=4629 dirty=4629 active=0 N0=3713 N1=916 kernelpagesize_kB=4
+7f54b8e41000 bind:0-1 anon=1309 dirty=1309 active=0 N0=1235 N1=74 kernelpagesize_kB=4
+7f54b9377000 bind:0-1 anon=754 dirty=754 active=0 N0=754 kernelpagesize_kB=4
+7f54b966a000 bind:0-1 anon=2046 dirty=2046 active=0 N0=1707 N1=339 kernelpagesize_kB=4
+7f54bab00000 bind:0-1 anon=51 dirty=51 active=0 N0=24 N1=27 kernelpagesize_kB=4
+7f54bac00000 bind:0-1 anon=1 dirty=1 active=0 N0=1 kernelpagesize_kB=4
+7f54bcc00000 bind:0-1
+7f54d0c25000 bind:0-1 anon=4 dirty=4 active=0 N0=3 N1=1 kernelpagesize_kB=4
+7f54d0c29000 bind:0-1
+7f54f0c25000 bind:0-1 anon=4 dirty=4 active=0 N0=3 N1=1 kernelpagesize_kB=4
+7f54f0c29000 bind:0-1
+7f54ff404000 bind:0-1 anon=2 dirty=2 active=0 N0=2 kernelpagesize_kB=4
+7f54ff406000 bind:0-1
+7f5501100000 bind:0-1 anon=1 dirty=1 active=0 N0=1 kernelpagesize_kB=4
+7f5501101000 bind:0-1
+7f5501401000 bind:0-1 anon=169 dirty=169 active=0 N0=153 N1=16 kernelpagesize_kB=4
+7f55014cd000 bind:0-1
+7f550156d000 bind:0-1 anon=1 dirty=1 active=0 N0=1 kernelpagesize_kB=4
+7f550156e000 bind:0-1
+7f55015cd000 bind:0-1 anon=59 dirty=59 active=0 N0=59 kernelpagesize_kB=4
+7f550162d000 bind:0-1
+7f5501631000 bind:0-1
+7f5501633000 bind:0-1
+7fff02d91000 bind:0-1 stack anon=3 dirty=3 active=0 N0=3 kernelpagesize_kB=4
