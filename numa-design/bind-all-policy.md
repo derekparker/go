@@ -168,6 +168,64 @@ arm, matching the Layer-1 baseline character, not the ~1172 VMAs Layer 2's
 per-chunk different-node `MPOL_PREFERRED` calls produced (the same
 fragmentation Task 6 cites as one reason to remove that call).
 
+## Dynamic cpuset staleness (v3)
+
+`cpuset.mems` and `cpuset.cpus` can change at runtime under a container
+(a scheduler resizing the container's cgroup, an operator running
+`docker update --cpuset-mems`, etc.). This section is the accepted model
+for how — and how late — the runtime notices.
+
+**What is a startup snapshot.** Both masks the experiment builds its
+decisions from are read once, not tracked live:
+
+- `numaAllowedNodemask`, the allowed-node mask `numaSetProcessBindAll`
+  publishes from `get_mempolicy(MPOL_F_MEMS_ALLOWED)`.
+- `numaSavedAffinity`, the process's startup CPU affinity mask
+  `numaShouldConfine` saves via `sched_getaffinity` before any narrowing.
+
+**The only re-read point.** `numaSetProcessBindAll` has exactly two call
+sites: once from `numaSchedinit` at startup, and once from
+`numaStandDownWiden`, which runs after a stand-down trigger fires
+(`numaStandDownIfNeeded` — GOMAXPROCS grown past the confined node, or a
+GOMAXPROCS-control transition back to automatic). Stand-down is a
+consequence of a GOMAXPROCS change, not of a cpuset change — there is no
+code path that watches `cpuset.mems`/`cpuset.cpus` directly. So a cpuset
+that narrows while the process is running, with GOMAXPROCS untouched, is
+not observed until the *next* stand-down trigger or a process restart —
+whichever comes first.
+
+**What happens meanwhile.** Nothing crashes; placement just goes stale in
+the two ways below, both intersect-or-fail against the kernel's live
+policy rather than corrupt anything:
+
+- Heap arena `mbind` calls (`numaBindArena`, on the heap-growth path)
+  keep using the last-read `numaAllowedNodemask`. If the kernel's actual
+  allowed set has shrunk since, `mbind` targets nodes the cpuset no
+  longer permits; the kernel `mbind` call itself will reject or clip a
+  target outside the current cpuset (mbind errors are already ignored
+  here by design — see above).
+- The stand-down restore path (`numaFixThreadPlacement`,
+  `numaStandDownWiden`'s eager walk) restores each thread to the startup
+  `numaSavedAffinity` via `sched_setaffinity`. If that startup mask is no
+  longer a subset of the process's current cpuset, Linux's
+  `sched_setaffinity` either narrows the request to its intersection with
+  the live cpuset, or — if the intersection is empty — fails the call
+  outright (`numaSetThreadAffinity` returns `false`); a failure here is
+  read as "retry at next park" (`numaFixThreadPlacement`'s early return),
+  never treated as fatal.
+
+**Why this is accepted, not fixed.** Re-reading the cpuset on every heap
+grow (`numaBindArena` runs under `h.lock`, nosplit, once per ~4 MiB) would
+put a `get_mempolicy`/`set_mempolicy` syscall pair on the heap-growth
+path — exactly the cost this design goes out of its way to avoid
+elsewhere. And there is no portable notification that `cpuset.mems` or
+`cpuset.cpus` changed for the runtime to block on instead of polling;
+polling on a timer would reintroduce the same cost on a different clock.
+Containers that repartition cpusets mid-run therefore get
+correct-but-stale placement until the next stand-down trigger or restart
+— never a crash, never memory placed outside the mask that was live at
+the time each policy call was actually issued.
+
 ## Recommendation
 
 - **Do not add a STW-only `set_mempolicy` toggle.** It is the wrong window and

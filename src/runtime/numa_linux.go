@@ -205,6 +205,16 @@ func numaCurrentNode() int32 {
 // checked too -- a failing set_mempolicy also leaves numaAllowedNodemask
 // unpublished, so numaBindArena never spends a syscall on a policy the
 // kernel rejected.
+//
+// Staleness: this function has exactly two call sites -- here (startup,
+// from numaSchedinit) and numaStandDownWiden (a stand-down trigger). It is
+// never called from the heap-growth path or on any timer, so
+// numaAllowedNodemask is a snapshot of cpuset.mems as of one of those two
+// moments, not a live view. A container that repartitions its cpuset
+// mid-run is not observed until the next stand-down trigger (or process
+// restart); see numaBindArena's doc comment for why re-checking more
+// often is not worth it, and bind-all-policy.md's "Dynamic cpuset
+// staleness" section for the full accepted-staleness model.
 func numaSetProcessBindAll() {
 	if numaTopology.NumNodes < 2 {
 		return
@@ -303,6 +313,13 @@ func numaConfineIfSmall(procs int32) {
 // procs <= the boot node's CPU count.
 // As a side effect it saves the startup affinity mask for stand-down.
 // Every declined reason prints under GODEBUG=numa=1 (diagnosability).
+//
+// Both the published nodemask this checks and the affinity mask it saves
+// are startup snapshots (see numaSetProcessBindAll's doc comment): a
+// cpuset narrowed after this point is not detected here or anywhere else
+// until a stand-down trigger re-reads it (numaStandDownWiden). Accepted,
+// documented staleness -- see bind-all-policy.md's "Dynamic cpuset
+// staleness" section.
 func numaShouldConfine(procs int32) (int32, bool) {
 	if numaTopology.NumNodes < 2 || numaTopology.TruncatedNodes || !numaHasSetAffinity {
 		return 0, false
@@ -540,13 +557,16 @@ func numaStandDownWiden() {
 	// Best-effort re-read of the allowed-node mask before this thread's
 	// own convergence: numaSetProcessBindAll re-issues get_mempolicy
 	// (MPOL_F_MEMS_ALLOWED) and set_mempolicy, refreshing
-	// numaAllowedNodemask for dynamic cpusets -- the documented
-	// "re-read the mask on stand-down triggers" point for Task 14. Its
-	// own failure (e.g. a cpuset narrowed to one node since Layer 1 ran)
-	// is silently absorbed here: numaAllowedNodemask simply keeps its
-	// prior value, and numaFixThreadPlacement below -- not this call --
-	// is what actually converges (and correctly retries at the next
-	// park on failure) this M's affinity and task policy.
+	// numaAllowedNodemask -- this is the one point after startup where a
+	// cpuset narrowed while running (a container's cpuset.mems/cpuset.cpus
+	// edited mid-process) is picked up; see numaSetProcessBindAll's doc
+	// comment and bind-all-policy.md's "Dynamic cpuset staleness" section
+	// for why it is not re-read anywhere more often than this. Its own
+	// failure (e.g. a cpuset narrowed to one node since Layer 1 ran) is
+	// silently absorbed here: numaAllowedNodemask simply keeps its prior
+	// value, and numaFixThreadPlacement below -- not this call -- is what
+	// actually converges (and correctly retries at the next park on
+	// failure) this M's affinity and task policy.
 	numaSetProcessBindAll()
 	numaFixThreadPlacement()
 }
@@ -644,6 +664,21 @@ func numaFixThreadPlacement() {
 //
 // numaBindArena does not catch up already-mapped ranges once the mask
 // becomes available: see task-6-report.md for that scope decision.
+//
+// numaAllowedNodemask is read here, never refreshed: this function does
+// not call numaSetProcessBindAll (or otherwise re-query cpuset.mems)
+// itself. Two reasons. First, this is the heap-growth path -- it runs
+// under h.lock, nosplit, once per ~4 MiB grow -- and adding a
+// get_mempolicy/set_mempolicy syscall pair here to check whether the
+// cpuset moved would put syscalls exactly where the design goes out of
+// its way to avoid them. Second, there is no portable notification a
+// cgroup's cpuset.mems/cpuset.cpus changed that the runtime could block
+// on instead of polling; polling on every grow would just reintroduce the
+// same cost. So a cpuset narrowed after this process's mask was last
+// read is stale here until the next stand-down trigger (numaStandDownWiden,
+// which does call numaSetProcessBindAll) or a process restart -- accepted
+// by design, not a bug. See bind-all-policy.md's "Dynamic cpuset
+// staleness" section.
 //
 // mbind errors are ignored: this is deliberate (see design), not a
 // silently-swallowed bug.
