@@ -11,6 +11,7 @@ import (
 	"internal/testenv"
 	"os"
 	"runtime"
+	"strconv"
 	"strings"
 	"testing"
 )
@@ -171,6 +172,49 @@ func TestNUMAStandDownOnSetDefaultGOMAXPROCS(t *testing.T) {
 	if aaff <= baff {
 		t.Fatalf("after SetDefaultGOMAXPROCS: affinity=%d not restored past confined %d; %q", aaff, baff, got)
 	}
+}
+
+// TestNUMASoftAffinity exercises node-mask soft affinity from the
+// scheduler (design §12.4, task 10, ingredient c) end to end, isolated
+// from fill-one-socket confinement (Workstream A): GOMAXPROCS is set to
+// runtime.NumCPU() -- the whole machine, larger than any single node's
+// CPU count whenever NumNodes >= 2 -- so numaShouldConfine's
+// procs-exceeds-node-CPUs check always declines. Any thread the probe
+// finds narrowed to a single node therefore has to be numaNoteSchedule's
+// doing, not confinement's.
+func TestNUMASoftAffinity(t *testing.T) {
+	if runtime.NumaNumAllowedNodes() <= 1 {
+		t.Skip("not multi-node")
+	}
+	if !runtime.NumaHasSetAffinityForTest() {
+		t.Skip("no sched_setaffinity plumbing on this arch")
+	}
+	got := runTestProg(t, "testprog", "NUMASoftAffinity", "GOMAXPROCS="+strconv.Itoa(runtime.NumCPU()))
+	narrowed, total, gomaxprocs := parseSoftAffinity(t, got)
+	if total == 0 {
+		t.Fatalf("no threads observed; output %q", got)
+	}
+	if narrowed < gomaxprocs {
+		t.Fatalf("narrowed=%d below gomaxprocs=%d (total=%d threads observed): soft affinity did not narrow every worker M to a single node; output %q",
+			narrowed, gomaxprocs, total, got)
+	}
+}
+
+func parseSoftAffinity(t *testing.T, out string) (narrowed, total, gomaxprocs int) {
+	t.Helper()
+	for _, line := range strings.Split(out, "\n") {
+		if strings.HasPrefix(line, "softaffinity ") {
+			if strings.Contains(line, "SKIP") {
+				t.Skipf("probe skipped: %q", line)
+			}
+			if _, err := fmt.Sscanf(line, "softaffinity narrowed=%d total=%d gomaxprocs=%d", &narrowed, &total, &gomaxprocs); err != nil {
+				t.Fatalf("bad probe line %q: %v", line, err)
+			}
+			return narrowed, total, gomaxprocs
+		}
+	}
+	t.Fatalf("no %q line in output %q", "softaffinity", out)
+	return 0, 0, 0
 }
 
 func parsePlacement(t *testing.T, out, label string) (aff int, mode int) {
