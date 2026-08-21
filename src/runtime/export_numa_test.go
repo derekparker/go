@@ -10,7 +10,7 @@
 // archive, so this file carries its own //go:build linux tag.
 //
 // This file's (amd64 || arm64) restriction is a test-scoping one, not a
-// link-safety one: every export below except NumaCurrentNodeForTest
+// link-safety one: every export below except NumaGetCPUNodeForTest
 // (split out into export_numa_getcpu_test.go, which carries a wider tag
 // -- see that file) depends on numaSetThreadAffinity, which only has a
 // real implementation on amd64/arm64 (see numa_linux_affinity.go /
