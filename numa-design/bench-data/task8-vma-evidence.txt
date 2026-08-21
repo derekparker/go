@@ -1,0 +1,90 @@
+Task 8 review round I4 — heap VMA merge evidence
+==================================================
+
+Purpose: confirm per-node arena stream growth (design §12.3, task 8's
+homing mechanism, fixed per the C1/C2/I1/I2/I3/adjudication review
+round in commit e15eccba56) merges adjacent same-node chunks into few
+VMAs, as designed — not a Layer-2-style ~34x per-chunk blowup (the
+documented cause of Layer 2's removal; see task-6-report.md and
+RESULTS.md's "Layer 2 removal" section for that prior measurement).
+
+Host: numa-dell, 2 NUMA nodes, kernel 6.12.0-211.7.1.el10_2.x86_64,
+kernel.numa_balancing=1 (confirmed unchanged before and after).
+Branch: claude/numa-v2-implementation-a6eb4c at e15eccba56.
+Method: two throwaway (uncommitted) test files —
+runtime/zzz_vma_scratch_test.go (goexperiment.numa) and
+runtime/zzz_vma_scratch_off_test.go (!goexperiment.numa) — scp'd onto
+the built remote tree, run via `go test -run`, then deleted (neither
+file is part of any commit; reproducible from this text file's
+described method if needed again).
+
+1. On-experiment, two-stream run
+---------------------------------
+Command: GOEXPERIMENT=numa go test runtime -run 'TestZZZVMACount$' -v -count=1
+
+30 rounds of NumaHeapGrowForTest(1<<12 pages [32 MiB], node 0), each a
+separate mheap.grow -> sysMap -> numaBindGrowth (mbind MPOL_PREFERRED,
+node 0) call over a fresh sub-range, immediately followed by 30 rounds
+of the same targeting node 1. /proc/self/maps line count read before,
+between, and after.
+
+    before=322 after-30x-node0-grows=322 (delta=0) after-30x-node1-grows=333 (delta=11)
+
+Node 0 (which already had substantial pre-existing reserved/mapped
+headroom from the test binary's own startup allocations, all
+node-0-homed) added ZERO new VMA lines across 30 separate grow+mbind
+calls: full merge into already-present, identically-policied VMAs.
+
+Node 1 (untouched before this test — a genuinely fresh stream) added
+11 VMA lines across 30 grow+mbind calls covering ~960 MiB: roughly one
+new VMA per ~2.7 grow calls, not one per call. mallocinit's per-node
+hint layout gives node 1 several 1 TiB-apart hint regions; growth
+mostly bump-allocates contiguously within one such region (uniform
+MPOL_PREFERRED(node 1) merges cleanly there), with occasional
+discontiguous jumps to the next hint region accounting for the >1 VMA
+count. This is the expected shape for a fresh stream, and already far
+from "no merging" (which would show 30, one per call).
+
+2. Off-experiment baseline, single shared stream
+--------------------------------------------------
+Command: go test runtime -run 'TestZZZVMACountOff$' -v -count=1
+
+60 rounds of plain make([]byte, 32<<20) (stock heap growth, single
+shared stream — matching total grow-call count and per-call size to
+the on-experiment run's 30+30). /proc/self/maps line count before and
+after.
+
+    before=324 after-60x32MiB-allocs=337 (delta=13)
+
+3. Comparison
+--------------
+    on-experiment (2 streams, 60 grow calls total):  delta = 0 + 11 = 11 VMA lines
+    off-experiment baseline (1 stream, 60 alloc calls): delta = 13 VMA lines
+
+The two-stream, per-node-homed case's VMA growth (11) is the same
+order of magnitude as — in fact slightly better than — stock Go's own
+single-stream growth (13) for an equivalent volume and call count.
+This is the direct opposite of Layer 2's ~34x blowup, and is exactly
+the outcome design §12.3 predicts: address-partitioned streams keep
+each node's growth internally uniform (same MPOL_PREFERRED(node) on
+every chunk within a stream), so adjacent chunks merge the same way
+Layer 1's uniform BIND-all already does — unlike Layer 2, which varied
+the preferred node per chunk based on whichever thread happened to be
+growing the heap's single shared address stream at that moment.
+
+4. Direct mbind syscall confirmation (I2 regression check)
+-------------------------------------------------------------
+After the I2 fix (numaBindGrowth now requires node's bit set in
+numaAllowedNodemask before homing), re-straced growth targeting both
+nodes to confirm the nodemask check does not silently disable homing
+on a normal (non-cpuset-restricted) multi-node host — both node 0 and
+node 1 are members of numaAllowedNodemask here, so the AND check
+passes and every mbind still carries the correct per-node mask:
+
+    mbind(0x20e77000000, 134217728, MPOL_PREFERRED, [0x1], 65, 0) = 0   # node 0
+    mbind(0x40e74800000, 134217728, MPOL_PREFERRED, [0x2], 65, 0) = 0   # node 1
+    mbind(0x40eb6800000, 33554432,  MPOL_PREFERRED, [0x2], 65, 0) = 0   # node 1
+    ... (multiple further calls, all [0x1] or [0x2] matching their stream)
+
+numaMaxNode (65) fixed-width convention used throughout, matching
+numaBindArena's existing BIND-all calls.
