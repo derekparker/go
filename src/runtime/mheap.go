@@ -158,11 +158,19 @@ type mheap struct {
 	// this space to avoid interleaving it with the heap itself.
 	heapArenaAlloc linearAlloc
 
-	// arenaHints is a list of addresses at which to attempt to
-	// add more heap arenas. This is initially populated with a
-	// set of general hint addresses, and grown with the bounds of
+	// arenaHints is, per NUMA heap arena stream, a list of addresses
+	// at which to attempt to add more heap arenas. Each stream is
+	// initially populated with its own set of general hint addresses
+	// (see mallocinit), and grown with the bounds of that stream's
 	// actual heap arena ranges.
-	arenaHints *arenaHint
+	//
+	// With the experiment off, numaMaxHeapNodes == 1 (I5) and index 0
+	// is the only stream: this collapses to exactly the single list
+	// this field was before per-node streams (design §12.3), both in
+	// layout (a [1]*arenaHint array has the same size and alignment as
+	// *arenaHint) and, via mheap.grow's node/idx redirection, in the
+	// literal-constant-0 indexing the compiler generates for it.
+	arenaHints [numaMaxHeapNodes]*arenaHint
 
 	// arena is a pre-reserved space for allocating heap arenas
 	// (the actual arenas). This is only used on 32-bit.
@@ -197,9 +205,11 @@ type mheap struct {
 	// it can be read safely.
 	markArenas []arenaIdx
 
-	// curArena is the arena that the heap is currently growing
-	// into. This should always be physPageSize-aligned.
-	curArena struct {
+	// curArena is, per NUMA heap arena stream, the arena that the heap
+	// is currently growing into for that stream. Each base/end pair
+	// should always be physPageSize-aligned. See the arenaHints comment
+	// above for the off-build (numaMaxHeapNodes == 1) collapse.
+	curArena [numaMaxHeapNodes]struct {
 		base, end uintptr
 	}
 
@@ -335,6 +345,16 @@ type heapArena struct {
 	//
 	// Read atomically and written with an atomic CAS.
 	zeroedBase uintptr
+
+	// node is the NUMA node this arena's address range is homed to
+	// (design §12.3): the mheap.grow call that created this arena
+	// requested it for this node (see mheap.sysAlloc), and, when
+	// per-node homing is active, the arena's memory was mbind'd
+	// MPOL_PREFERRED to it. Always 0 with the experiment off (an
+	// mspan never crosses arenas, so span home node == arena home
+	// node -- numaArenaNode reuses spanOf's two-load arenas[l1][l2]
+	// lookup to read this field without a third load into spans[]).
+	node uint8
 }
 
 // arenaHint is a hint for where to grow the heap arenas. See
@@ -711,6 +731,40 @@ func spanOf(p uintptr) *mspan {
 		return nil
 	}
 	return ha.spans[(p/pageSize)%pagesPerArena]
+}
+
+// numaArenaNode returns the NUMA node heapArena.node recorded for the
+// arena containing p (design §12.3), or 0 if the experiment is off or p
+// does not point into any registered heap arena. It is the same
+// two-load mheap_.arenas[l1][l2] lookup spanOf uses, minus spanOf's
+// third load into spans[] -- an mspan never crosses arenas, so a span's
+// home node is always its arena's home node.
+//
+// This is a diagnostic/test lookup only (task 8's scope is homing, not
+// routing): nothing on a malloc or refill path calls it.
+func numaArenaNode(p uintptr) int32 {
+	if !goexperiment.Numa {
+		return 0
+	}
+	ri := arenaIndex(p)
+	if arenaL1Bits == 0 {
+		if ri.l2() >= uint(len(mheap_.arenas[0])) {
+			return 0
+		}
+	} else {
+		if ri.l1() >= uint(len(mheap_.arenas)) {
+			return 0
+		}
+	}
+	l2 := mheap_.arenas[ri.l1()]
+	if arenaL1Bits != 0 && l2 == nil {
+		return 0
+	}
+	ha := l2[ri.l2()]
+	if ha == nil {
+		return 0
+	}
+	return int32(ha.node)
 }
 
 // spanOfUnchecked is equivalent to spanOf, but the caller must ensure
@@ -1268,7 +1322,7 @@ func (h *mheap) allocSpan(npages uintptr, typ spanAllocType, spanclass spanClass
 		base, _ = h.pages.find(npages + extraPages)
 		if base == 0 {
 			var ok bool
-			growth, ok = h.grow(npages + extraPages)
+			growth, ok = h.grow(npages+extraPages, numaGrowNode())
 			if !ok {
 				unlock(&h.lock)
 				return nil
@@ -1287,7 +1341,7 @@ func (h *mheap) allocSpan(npages uintptr, typ spanAllocType, spanclass spanClass
 		base, scav = h.pages.alloc(npages)
 		if base == 0 {
 			var ok bool
-			growth, ok = h.grow(npages)
+			growth, ok = h.grow(npages, numaGrowNode())
 			if !ok {
 				unlock(&h.lock)
 				return nil
@@ -1540,11 +1594,51 @@ func (h *mheap) initSpan(s *mspan, typ spanAllocType, spanclass spanClass, base,
 // Try to add at least npage pages of memory to the heap,
 // returning how much the heap grew by and whether it worked.
 //
+// node selects which per-node arena hint stream (h.arenaHints[node]) and
+// current-arena cursor (h.curArena[node]) to grow, and tags any
+// newly-created heapArena with that node (heapArena.node, design §12.3).
+// Callers get node from numaGrowNode (getcpu at grow frequency, never
+// inside grow itself -- the v2/v3 forbidden list's malloc-fast-path
+// rule).
+//
+// With the experiment off, every caller passes node == 0 and
+// numaMaxHeapNodes == 1 (I5): idx below is then always the literal
+// constant 0 (node itself is never read -- see the goexperiment.Numa
+// guard), collapsing every indexed access in this function to the same
+// single slot h.curArena/h.arenaHints held before they became arrays,
+// with the same literal-constant-index codegen a bare field access
+// would produce.
+//
 // h.lock must be held.
-func (h *mheap) grow(npage uintptr) (uintptr, bool) {
+func (h *mheap) grow(npage uintptr, node int32) (uintptr, bool) {
 	assertLockHeld(&h.lock)
 
-	firstGrow := h.curArena.base == 0
+	idx := int32(0)
+	if goexperiment.Numa {
+		idx = node
+	}
+
+	// firstGrow gates the extra base-address randomization below, which
+	// draws from heapRandSeed -- a single 64-bit budget sized in
+	// mallocinit for exactly one randomization, consumed via
+	// nextHeapRandBits (which throws "not enough heapRandSeed bits
+	// remaining" on a second draw). Per-node streams (design §12.3) mean
+	// h.curArena[idx].base == 0 ("first grow into this stream") can now
+	// be true more than once per process -- once per node's first grow,
+	// not just once ever -- so this must stay keyed on stream 0
+	// specifically, not idx: stream 0 is always the first stream any
+	// process grows (heap growth starts before numaSchedinit runs, and
+	// numaGrowNode/numaCurrentNode return 0 before topology discovery
+	// completes -- see numaBindArena's init-order guard), so
+	// h.curArena[0].base == 0 is true exactly once ever, for exactly
+	// the grow call that also has idx == 0. Every other node's first
+	// grow finds stream 0 already touched and skips this extra
+	// randomization -- it still starts from a randomized hint address
+	// (mallocinit's per-hint randHeapBasePrefix applies to every
+	// stream), it just does not additionally consume the shared
+	// entropy budget for the finer-grained pallocChunk/page-level
+	// jitter below.
+	firstGrow := h.curArena[0].base == 0
 
 	// We must grow the heap in whole palloc chunks.
 	// We call sysMap below but note that because we
@@ -1555,39 +1649,40 @@ func (h *mheap) grow(npage uintptr) (uintptr, bool) {
 
 	totalGrowth := uintptr(0)
 	// This may overflow because ask could be very large
-	// and is otherwise unrelated to h.curArena.base.
-	end := h.curArena.base + ask
+	// and is otherwise unrelated to h.curArena[idx].base.
+	end := h.curArena[idx].base + ask
 	nBase := alignUp(end, physPageSize)
-	if nBase > h.curArena.end || /* overflow */ end < h.curArena.base {
+	if nBase > h.curArena[idx].end || /* overflow */ end < h.curArena[idx].base {
 		// Not enough room in the current arena. Allocate more
 		// arena space. This may not be contiguous with the
 		// current arena, so we have to request the full ask.
-		av, asize := h.sysAlloc(ask, &h.arenaHints, &h.heapArenas)
+		av, asize := h.sysAlloc(ask, &h.arenaHints[idx], &h.heapArenas, true, idx)
 		if av == nil {
 			inUse := gcController.heapFree.load() + gcController.heapReleased.load() + gcController.heapInUse.load()
 			print("runtime: out of memory: cannot allocate ", ask, "-byte block (", inUse, " in use)\n")
 			return 0, false
 		}
 
-		if uintptr(av) == h.curArena.end {
+		if uintptr(av) == h.curArena[idx].end {
 			// The new space is contiguous with the old
 			// space, so just extend the current space.
-			h.curArena.end = uintptr(av) + asize
+			h.curArena[idx].end = uintptr(av) + asize
 		} else {
 			// The new space is discontiguous. Track what
 			// remains of the current space and switch to
 			// the new space. This should be rare.
-			if size := h.curArena.end - h.curArena.base; size != 0 {
+			if size := h.curArena[idx].end - h.curArena[idx].base; size != 0 {
 				// Transition this space from Reserved to Prepared and mark it
 				// as released since we'll be able to start using it after updating
 				// the page allocator and releasing the lock at any time.
-				sysMap(unsafe.Pointer(h.curArena.base), size, &gcController.heapReleased, "heap")
+				sysMap(unsafe.Pointer(h.curArena[idx].base), size, &gcController.heapReleased, "heap")
 				if goexperiment.Numa {
 					// mmap(MAP_FIXED) inside sysMap reset any VMA
 					// policy this range had; re-bind it. See
-					// numaBindArena for the init-order guard that
-					// makes this a no-op before numaSchedinit runs.
-					numaBindArena(unsafe.Pointer(h.curArena.base), size)
+					// numaBindArena/numaBindArenaHome for the
+					// init-order guard that makes this a no-op
+					// before numaSchedinit runs.
+					numaBindGrowth(unsafe.Pointer(h.curArena[idx].base), size, idx)
 				}
 				// Update stats.
 				stats := memstats.heapStats.acquire()
@@ -1595,34 +1690,34 @@ func (h *mheap) grow(npage uintptr) (uintptr, bool) {
 				memstats.heapStats.release()
 				// Update the page allocator's structures to make this
 				// space ready for allocation.
-				h.pages.grow(h.curArena.base, size)
+				h.pages.grow(h.curArena[idx].base, size)
 				totalGrowth += size
 			}
 			// Switch to the new space.
-			h.curArena.base = uintptr(av)
-			h.curArena.end = uintptr(av) + asize
+			h.curArena[idx].base = uintptr(av)
+			h.curArena[idx].end = uintptr(av) + asize
 
 			if firstGrow && randomizeHeapBase {
 				// The top heapAddrBits-logHeapArenaBytes are randomized, we now
 				// want to randomize the next
 				// logHeapArenaBytes-log2(pallocChunkBytes) bits, making sure
-				// h.curArena.base is aligned to pallocChunkBytes.
+				// h.curArena[idx].base is aligned to pallocChunkBytes.
 				bits := logHeapArenaBytes - logPallocChunkBytes
 				offset := nextHeapRandBits(bits)
-				h.curArena.base = alignDown(h.curArena.base|(offset<<logPallocChunkBytes), pallocChunkBytes)
+				h.curArena[idx].base = alignDown(h.curArena[idx].base|(offset<<logPallocChunkBytes), pallocChunkBytes)
 			}
 		}
 
 		// Recalculate nBase.
 		// We know this won't overflow, because sysAlloc returned
-		// a valid region starting at h.curArena.base which is at
+		// a valid region starting at h.curArena[idx].base which is at
 		// least ask bytes in size.
-		nBase = alignUp(h.curArena.base+ask, physPageSize)
+		nBase = alignUp(h.curArena[idx].base+ask, physPageSize)
 	}
 
 	// Grow into the current arena.
-	v := h.curArena.base
-	h.curArena.base = nBase
+	v := h.curArena[idx].base
+	h.curArena[idx].base = nBase
 
 	// Transition the space we're going to use from Reserved to Prepared.
 	//
@@ -1631,8 +1726,8 @@ func (h *mheap) grow(npage uintptr) (uintptr, bool) {
 	// just add directly to heapReleased.
 	sysMap(unsafe.Pointer(v), nBase-v, &gcController.heapReleased, "heap")
 	if goexperiment.Numa {
-		// See the comment on the other numaBindArena call above.
-		numaBindArena(unsafe.Pointer(v), nBase-v)
+		// See the comment on the other numaBindGrowth call above.
+		numaBindGrowth(unsafe.Pointer(v), nBase-v, idx)
 	}
 
 	// The memory just allocated counts as both released

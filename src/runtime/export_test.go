@@ -531,8 +531,12 @@ func TracebackSystemstack(stk []uintptr, i int) int {
 	return n
 }
 
+// These three helpers operate on heap arena stream 0 (mheap_.arenaHints[0]):
+// with the experiment off (or on a single-stream build, I5), it is the only
+// stream and this is exactly the chain these functions always operated on
+// before arenaHints became a per-node array (design §12.3).
 func KeepNArenaHints(n int) {
-	hint := mheap_.arenaHints
+	hint := mheap_.arenaHints[0]
 	for i := 1; i < n; i++ {
 		hint = hint.next
 		if hint == nil {
@@ -549,7 +553,7 @@ func KeepNArenaHints(n int) {
 // This may fail to reserve memory. If it fails, it still returns the
 // address range it attempted to reserve.
 func MapNextArenaHint() (start, end uintptr, ok bool) {
-	hint := mheap_.arenaHints
+	hint := mheap_.arenaHints[0]
 	addr := hint.addr
 	if hint.down {
 		start, end = addr-heapArenaBytes, addr
@@ -568,10 +572,10 @@ func MapNextArenaHint() (start, end uintptr, ok bool) {
 }
 
 func NextArenaHint() (uintptr, bool) {
-	if mheap_.arenaHints == nil {
+	if mheap_.arenaHints[0] == nil {
 		return 0, false
 	}
-	return mheap_.arenaHints.addr, true
+	return mheap_.arenaHints[0].addr, true
 }
 
 type G = g

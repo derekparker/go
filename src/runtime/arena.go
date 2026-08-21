@@ -1007,13 +1007,15 @@ func (h *mheap) allocUserArenaChunk() *mspan {
 	} else {
 		// Free list was empty, so allocate a new arena.
 		hintList := &h.userArena.arenaHints
+		heap := false
 		if raceenabled {
-			// In race mode just use the regular heap hints. We might fragment
-			// the address space, but the race detector requires that the heap
-			// is mapped contiguously.
-			hintList = &h.arenaHints
+			// In race mode just use the regular heap hints (stream 0).
+			// We might fragment the address space, but the race
+			// detector requires that the heap is mapped contiguously.
+			hintList = &h.arenaHints[0]
+			heap = true
 		}
-		v, size := h.sysAlloc(userArenaChunkBytes, hintList, &mheap_.userArenaArenas)
+		v, size := h.sysAlloc(userArenaChunkBytes, hintList, &mheap_.userArenaArenas, heap, 0)
 		if size%userArenaChunkBytes != 0 {
 			throw("sysAlloc size is not divisible by userArenaChunkBytes")
 		}

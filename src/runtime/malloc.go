@@ -635,13 +635,33 @@ func mallocinit() {
 			// Switch to generating hints for user arenas if we've gone
 			// through about half the hints. In race mode, take only about
 			// a quarter; we don't have very much space to work with.
-			hintList := &mheap_.arenaHints
 			if (!raceenabled && i > 0x3f) || (raceenabled && i > 0x5f) {
-				hintList = &mheap_.userArena.arenaHints
+				hint := (*arenaHint)(mheap_.arenaHintAlloc.alloc())
+				hint.addr = p
+				hint.next, mheap_.userArena.arenaHints = mheap_.userArena.arenaHints, hint
+				continue
+			}
+			// Heap hint: distribute the (!raceenabled) 0..0x3f range
+			// across per-node arena streams (design §12.3), so growth
+			// for different nodes lands in disjoint, >=1TiB-apart
+			// address windows (h.arenaHints/h.curArena are indexed by
+			// node -- see mheap.grow). Race mode and riscv64's 39-bit
+			// VMA layout keep every heap hint on the single shared
+			// stream 0 instead (I5's tight-VA fallback): both already
+			// have far less address space to work with than the
+			// default 1<<40-per-hint layout assumes, and partitioning
+			// it further across streams would only fragment it. This
+			// also covers the experiment-off and numaMaxHeapNodes==1
+			// collapse (I5): node is always the literal constant 0
+			// there, so mheap_.arenaHints[node] indexes the same single
+			// slot this field was before per-node streams existed.
+			node := int32(0)
+			if goexperiment.Numa && !raceenabled && !(GOARCH == "riscv64" && vmaSize == 39) {
+				node = int32(i) / (0x40 / numaMaxHeapNodes)
 			}
 			hint := (*arenaHint)(mheap_.arenaHintAlloc.alloc())
 			hint.addr = p
-			hint.next, *hintList = *hintList, hint
+			hint.next, mheap_.arenaHints[node] = mheap_.arenaHints[node], hint
 		}
 	} else {
 		// On a 32-bit machine, we're much more concerned
@@ -706,9 +726,11 @@ func mallocinit() {
 				break
 			}
 		}
+		// 32-bit: tight VA (I5's tight-VA fallback), single shared
+		// stream -- node 0 always, same as the experiment-off collapse.
 		hint := (*arenaHint)(mheap_.arenaHintAlloc.alloc())
 		hint.addr = p
-		hint.next, mheap_.arenaHints = mheap_.arenaHints, hint
+		hint.next, mheap_.arenaHints[0] = mheap_.arenaHints[0], hint
 
 		// Place the hint for user arenas just after the large reservation.
 		//
@@ -737,13 +759,42 @@ func mallocinit() {
 //
 // arenaList is the list the arena should be added to.
 //
+// heap reports whether hintList is one of the regular heap's per-node
+// arena hint streams (h.arenaHints[node], design §12.3) as opposed to a
+// user arena hint chain (h.userArena.arenaHints). This replaces the old
+// hintList == &h.arenaHints pointer-identity check (I6): once arenaHints
+// became a per-node array, &h.arenaHints[node] is never equal to
+// &h.arenaHints in the old shape's sense for any node, so the caller now
+// states which case it is directly. heap enables the 32-bit-only h.arena
+// pre-reservation fast path below, which is heap-only.
+//
+// node selects which per-node heap hint chain, h.arenaHints[node],
+// receives newly-created hints when hintList's own chain runs dry and a
+// fallback "any address" allocation succeeds, and which node any
+// heapArena created by this call is tagged with (heapArena.node). It is
+// meaningful only when heap is true; non-heap (user arena) callers pass
+// 0, matching this function's pre-array behavior, where every fallback
+// hint landed on the one shared h.arenaHints chain regardless of which
+// hintList the call came in with (see allocUserArenaChunk's raceenabled
+// case, which already reused the heap's own hint chain before arenaHints
+// was ever an array).
+//
+// With the experiment off, numaMaxHeapNodes == 1 (I5) and idx below is
+// always the literal constant 0 (node itself is never read), matching
+// this function's shape before node existed.
+//
 // h must be locked.
-func (h *mheap) sysAlloc(n uintptr, hintList **arenaHint, arenaList *[]arenaIdx) (v unsafe.Pointer, size uintptr) {
+func (h *mheap) sysAlloc(n uintptr, hintList **arenaHint, arenaList *[]arenaIdx, heap bool, node int32) (v unsafe.Pointer, size uintptr) {
 	assertLockHeld(&h.lock)
+
+	idx := int32(0)
+	if goexperiment.Numa {
+		idx = node
+	}
 
 	n = alignUp(n, heapArenaBytes)
 
-	if hintList == &h.arenaHints {
+	if heap {
 		// First, try the arena pre-reservation.
 		// Newly-used mappings are considered released.
 		//
@@ -811,13 +862,16 @@ func (h *mheap) sysAlloc(n uintptr, hintList **arenaHint, arenaList *[]arenaIdx)
 			return nil, 0
 		}
 
-		// Create new hints for extending this region.
+		// Create new hints for extending this region. These always land
+		// on the heap's own per-node chain (h.arenaHints[idx]),
+		// regardless of which hintList this call came in with -- see
+		// this function's doc comment.
 		hint := (*arenaHint)(h.arenaHintAlloc.alloc())
 		hint.addr, hint.down = uintptr(v), true
-		hint.next, mheap_.arenaHints = mheap_.arenaHints, hint
+		hint.next, h.arenaHints[idx] = h.arenaHints[idx], hint
 		hint = (*arenaHint)(h.arenaHintAlloc.alloc())
 		hint.addr = uintptr(v) + size
-		hint.next, mheap_.arenaHints = mheap_.arenaHints, hint
+		hint.next, h.arenaHints[idx] = h.arenaHints[idx], hint
 	}
 
 	// Check for bad pointers or pointers we can't use.
@@ -884,6 +938,7 @@ mapped:
 				throw("out of memory allocating heap arena metadata")
 			}
 		}
+		r.node = uint8(idx)
 
 		// Register the arena in allArenas if requested.
 		if len((*arenaList)) == cap((*arenaList)) {

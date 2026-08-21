@@ -28,7 +28,12 @@ func TestNUMAHeapArenaStreams(t *testing.T) {
 		t.Skip("numaMaxHeapNodes < 2: no distinct per-node streams to test (I5 collapse)")
 	}
 
-	const npage = 1 // any growth on a fresh stream registers a new arena
+	// Large enough to exceed any headroom left in either stream's
+	// current arena (a single heapArenaBytes is 64 MiB on most
+	// platforms; this requests well over two of those in pages),
+	// guaranteeing mheap.grow calls sysAlloc and registers a fresh
+	// heapArena rather than just extending into existing room.
+	const npage = 1 << 15
 
 	base0, ok0 := runtime.NumaHeapGrowForTest(npage, 0)
 	if !ok0 {
