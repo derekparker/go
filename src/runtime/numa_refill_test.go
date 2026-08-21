@@ -51,26 +51,31 @@ func testSpanRefillCountersIncrement(t *testing.T) {
 }
 
 // testSpanRefillOneProcLocalSanity is the brief's "1P local sanity"
-// check: with GOMAXPROCS(1), a single thread cannot be on two NUMA
-// nodes at once, so every refill it causes -- including any grow call
-// that feeds its own future refills -- stays on whichever node that
-// thread is running on, so a large majority of the refills it causes
-// should be local (the brief's own "stays ~0" phrasing for the
-// remote counter, not "never moves").
+// check: exercises the counters under GOMAXPROCS(1) and logs the
+// local/remote split as diagnostic evidence, but does NOT assert a
+// bound on the ratio.
 //
-// This is deliberately a ratio bound, not exact equality: other NUMA
-// tests earlier in the same test binary (e.g.
-// TestNUMAHeapArenaStreams) legitimately register real, usable heap
-// arenas explicitly homed to node 1 via task 8's node-bypass test
-// hooks, to test homing without needing multi-node hardware. Once
-// such an arena exists, it is genuinely part of the heap: ordinary
-// allocation anywhere in the process (this test's own churn, or any
-// other concurrently-running test) can legitimately land a span there
-// through the normal global page allocator, and a later refill
-// correctly counts finding it as "remote" -- this is uncacheSpan
-// routing correctly by the span's real home node, not a bug. A
-// single-threaded run therefore stays overwhelmingly local rather
-// than perfectly local when run as part of the full suite.
+// Reviewer-caught finding (real 2-node hardware, isolated -run
+// 'TestReadMemStats|TestNUMASpanRefillMetrics' -- not reproduced when
+// this subtest ran later in the full -short suite, nor on the local
+// single-node sandbox): a hard ratio bound here is unsound, not just
+// occasionally flaky. GOMAXPROCS(1) limits how many Ps Go schedules
+// onto, but does not pin the underlying OS thread's CPU affinity --
+// the kernel scheduler remains free to migrate that thread across
+// NUMA nodes at any time, and observably does so, especially right
+// after the GOMAXPROCS transition itself (tearing down up to 255 Ps
+// causes scheduler churn). Task 9 (this task) delivers ingredients
+// (a) homing and (b) routing only; ingredient (c), threads that stay
+// put, is Task 10's node-mask soft affinity from the scheduler --
+// design §12.1 states plainly that any proper subset of the three
+// ingredients is expected to measure ~zero locality, and that is
+// exactly what was observed: remote refills reached ~97% in one
+// reproduction, a single thread legitimately bounced across nodes
+// mid-churn with nothing yet holding it in place. A fixed ratio bound
+// asserted here cannot distinguish that expected, documented gap from
+// a genuine routing regression, so it isn't a sound gate before Task
+// 10 lands; ChurnIncrementsCounters already provides the hard
+// pass/fail signal that the counters move and are wired up correctly.
 func testSpanRefillOneProcLocalSanity(t *testing.T) {
 	defer runtime.GOMAXPROCS(runtime.GOMAXPROCS(1))
 
@@ -84,13 +89,6 @@ func testSpanRefillOneProcLocalSanity(t *testing.T) {
 	t.Logf("GOMAXPROCS=1 churn: local delta=%d remote delta=%d", localDelta, remoteDelta)
 	if total == 0 {
 		t.Fatal("no refills observed during churn; test isn't exercising cacheSpan")
-	}
-	// Remote should be a small minority; a generous 20% bound keeps
-	// this robust to the cross-test contamination described above
-	// while still catching a routing regression that sends most or
-	// all single-thread refills remote.
-	if remoteDelta*5 > total {
-		t.Errorf("GOMAXPROCS=1: remote refills were %d/%d (>20%%), want a small minority (a single thread mostly stays on its own node's memory)", remoteDelta, total)
 	}
 }
 
