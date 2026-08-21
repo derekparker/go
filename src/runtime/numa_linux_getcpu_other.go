@@ -9,10 +9,11 @@ package runtime
 // numaGetCPUNode is the fallback for Linux architectures without a
 // getcpu(2) assembly stub -- see numa_linux_getcpu.go for the amd64/arm64
 // implementation and why this split exists. It always reports failure, so
-// numaBindArena's Layer 2 MPOL_PREFERRED step is unconditionally skipped
-// here; only the Layer 1 MPOL_BIND-all mbind (already issued before this
-// is consulted) applies. This is correct, conservative behavior on
-// architectures Layer 2 does not target -- not a bug to fix later.
+// numaCurrentNode always reports 0 here (no node it could otherwise report;
+// see numaCurrentNode's doc comment) and fill-one-socket-first confinement
+// (numaShouldConfine's getcpu check) never engages on these architectures.
+// This is correct, conservative behavior on architectures this getcpu stub
+// does not target -- not a bug to fix later.
 //
 //go:nosplit
 func numaGetCPUNode() (node uint32, ok bool) {

@@ -12,12 +12,12 @@ package runtime
 // This wrapper exists so that numa_linux.go -- built for every GOOS=linux
 // architecture -- never references runtime.getcpu directly. getcpu only
 // has an assembly implementation on amd64 and arm64 (see
-// sys_linux_amd64.s, sys_linux_arm64.s). Without this split,
-// numaBindArena's Layer 2 getcpu call (reachable from mheap.grow in any
-// ordinary GOEXPERIMENT=numa binary, not just tests) would fail to *link*
-// on every other Linux architecture with "relocation target
-// runtime.getcpu not defined" -- see numa_linux_getcpu_other.go for the
-// fallback used there.
+// sys_linux_amd64.s, sys_linux_arm64.s). Without this split, a direct
+// getcpu call from numaCurrentNode (reachable from schedinit's
+// confinement decision in any ordinary GOEXPERIMENT=numa binary, not just
+// tests) would fail to *link* on every other Linux architecture with
+// "relocation target runtime.getcpu not defined" -- see
+// numa_linux_getcpu_other.go for the fallback used there.
 //
 // ok is false if the getcpu syscall itself fails.
 //

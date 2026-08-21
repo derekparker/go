@@ -93,13 +93,6 @@ func numaNodemaskPopcount(m *numaNodemask) int {
 // mbind forever.
 var numaAllowedNodemask atomic.Uintptr
 
-// numaPreferredCalls counts every Layer 2 MPOL_PREFERRED mbind attempted by
-// numaBindArena (attempted, not necessarily kernel-accepted -- mbind errors
-// are ignored there just as they are for the Layer 1 MPOL_BIND-all call;
-// see numaBindArena's doc comment). Exported read-only for tests via
-// NumaPreferredBindCalls in export_numa_test.go.
-var numaPreferredCalls atomic.Uint32
-
 // numaTopology is the machine's NUMA topology, discovered by
 // numaInitTopology during schedinit. It is only populated when
 // GOEXPERIMENT=numa is set; otherwise it is left at its zero value, which
@@ -614,50 +607,30 @@ func numaFixThreadPlacement() {
 
 // numaBindArena sets MPOL_BIND, over the same allowed-node mask
 // numaSetProcessBindAll computed, as the VMA policy for the heap arena
-// range [addr, addr+size), then -- Layer 2 -- attempts to refine that to
-// MPOL_PREFERRED for whichever single NUMA node the calling M is running
-// on right now (via getcpu(2), through the numaGetCPUNode wrapper; see
-// numa_linux_getcpu.go). No span bookkeeping, no mcache/m.numaNode
-// tracking: the node comes from getcpu in this function only, once, at
-// grow time.
+// range [addr, addr+size). No span bookkeeping, no mcache/m.numaNode
+// tracking, no per-M node lookup: one uniform BIND-all mbind per chunk,
+// unconditionally.
 //
-// Kernel policy-replacement semantics (get this right in review): the
-// second mbind call does not stack on top of the first. The kernel's
-// vma_replace_policy REPLACES the VMA's policy outright, so a chunk that
-// gets a successful PREFERRED call ends up PREFERRED-only, not
-// BIND-then-PREFERRED. The BIND-all call is kept first regardless, purely
-// as a fallback: it guarantees the chunk is never left with no VMA policy
-// at all when the PREFERRED call is skipped (getcpu failure, or node >=
-// 64 -- the max node id this function's single-word-derived nodemask can
-// represent; see numaNodemask's doc comment). #14406 (suppressing the
-// NUMA balancer) still holds even for a PREFERRED-only chunk: a plain
-// mbind call (BIND or PREFERRED) never sets MPOL_F_MOF on the VMA, so the
-// balancer skips it regardless of mode, and every VMA this function never
-// reaches (or where PREFERRED is skipped) is still covered by the
-// task-wide policy numaSetProcessBindAll installed. Note that a successful
-// PREFERRED call also drops the BIND-all call's allowed-nodes restriction
-// for that one chunk -- MPOL_PREFERRED lets the kernel fall back to any
-// node if the preferred one is out of memory, whereas MPOL_BIND would not.
-// This is intentional (matching Linux's usual MPOL_PREFERRED semantics)
-// and not a containment gap: the process's cpuset (cpuset.mems, if any)
-// still bounds every allocation regardless of which mbind mode a given
-// chunk carries, exactly as it already bounds numaSetProcessBindAll's
-// task-wide policy.
+// A per-chunk MPOL_PREFERRED refinement (keyed off the growing M's
+// current node via getcpu(2)) previously ran here as a second mbind call
+// after this one -- Layer 2. It is gone: its IMC locality gate failed
+// (remote-DRAM share unchanged, +0.10%/-0.07% vs a required >=10% drop)
+// and a single-session three-arm sweep proved it behaviorally inert
+// (C-full vs C-L1, p=0.838) once fill-one-socket-first confinement was in
+// place. It was also the sole cause of the ~34x per-chunk VMA
+// fragmentation seen at Layer 2: adjacent chunks preferring different
+// nodes could not VMA-merge, where this function's single uniform BIND-all
+// mask merges cleanly. See task-6-report.md and RESULTS.md's "Layer 2
+// removal" section for the removal evidence.
 //
 // numaBindArena is called from mheap.grow, with h.lock held, immediately
 // after each sysMap of newly-backed heap memory (mmap with MAP_FIXED
 // resets any VMA policy the range previously had). It must stay
-// nosplit-safe and add nothing slower than two mbind syscalls plus one
-// getcpu syscall under that lock: no allocation, no lock acquisition, no
-// other syscalls. mheap.grow's true granularity is a palloc chunk (~4
-// MiB), not a 64 MiB arena, so this runs once per ~4 MiB of heap growth --
-// rare relative to malloc, but far more often than "per arena".
-//
-// CONCERN (VMA growth): adjacent chunks PREFERRED to different nodes
-// cannot VMA-merge, so worst case is approximately heap-size/4MiB VMAs
-// (under vm.max_map_count's default of 65530 even at tens of GiB of heap,
-// but not free -- extra kernel memory and fault-path cost). Tracked as an
-// open concern in RESULTS.md, not mitigated in this function.
+// nosplit-safe and add nothing slower than one mbind syscall under that
+// lock: no allocation, no lock acquisition, no other syscalls. mheap.grow's
+// true granularity is a palloc chunk (~4 MiB), not a 64 MiB arena, so this
+// runs once per ~4 MiB of heap growth -- rare relative to malloc, but far
+// more often than "per arena".
 //
 // Init-order guard: mheap.grow runs before numaSchedinit (goargs/goenvs
 // allocate heap memory before finishDebugVarsSetup, which precedes
@@ -672,8 +645,8 @@ func numaFixThreadPlacement() {
 // numaBindArena does not catch up already-mapped ranges once the mask
 // becomes available: see task-6-report.md for that scope decision.
 //
-// mbind errors are ignored for both calls: this is deliberate (see
-// design), not a silently-swallowed bug.
+// mbind errors are ignored: this is deliberate (see design), not a
+// silently-swallowed bug.
 //
 // Scavenger interaction: VMA policies survive sysUnused (MADV_FREE /
 // MADV_DONTNEED); pages that refault after being scavenged are re-placed
@@ -689,13 +662,4 @@ func numaBindArena(addr unsafe.Pointer, size uintptr) {
 	var mask numaNodemask
 	mask[0] = w0
 	linux.Syscall6(linux.SYS_MBIND, uintptr(addr), size, uintptr(_MPOL_BIND), uintptr(unsafe.Pointer(&mask[0])), numaMaxNode, 0)
-
-	node, ok := numaGetCPUNode()
-	if !ok || node >= 64 {
-		return
-	}
-	var pmask numaNodemask
-	pmask[uintptr(node)/numaNodemaskBits] = 1 << (uintptr(node) % numaNodemaskBits)
-	linux.Syscall6(linux.SYS_MBIND, uintptr(addr), size, uintptr(_MPOL_PREFERRED), uintptr(unsafe.Pointer(&pmask[0])), numaMaxNode, 0)
-	numaPreferredCalls.Add(1)
 }
