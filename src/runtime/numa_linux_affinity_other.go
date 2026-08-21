@@ -8,6 +8,7 @@ package runtime
 
 const numaHasSetAffinity = false
 
+//go:nosplit
 func numaSetThreadAffinity(tid int32, mask *[numaCPUMaskBytes]byte) bool {
 	return false
 }

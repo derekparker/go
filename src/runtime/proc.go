@@ -5277,6 +5277,22 @@ func syscall_runtime_BeforeFork() {
 	sigsave(&gp.m.sigmask)
 	sigblock(false)
 
+	// Node-mask soft affinity (design §12.4) narrows this M's own CPU
+	// affinity as a scheduling hint, not an operator placement choice --
+	// but sched_setaffinity's mask is inherited across fork(2)/clone(2),
+	// so without this, a child process forked from this M (about to
+	// exec, via os/exec) would start life with that narrowed mask as
+	// its own startup affinity, indistinguishable from real operator
+	// placement to its own numaShouldConfine/numaNoteSchedule checks.
+	// Widen back to full before the fork/clone syscall runs (below,
+	// still in the syscall package) so the child inherits the correct,
+	// wide mask; see numaWidenForFork's doc comment (numa_linux.go).
+	// Gated on goexperiment.Numa, a compile-time constant, so this
+	// dead-code-eliminates out of an experiment-off binary.
+	if goexperiment.Numa {
+		numaWidenForFork(gp.m)
+	}
+
 	// This function is called before fork in syscall package.
 	// Code between fork and exec must not allocate memory nor even try to grow stack.
 	// Here we spoil g.stackguard0 to reliably detect any attempts to grow stack.

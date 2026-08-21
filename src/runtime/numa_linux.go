@@ -903,22 +903,32 @@ func numaBindArenaHome(addr unsafe.Pointer, size uintptr, node int32) {
 // this as a plain bool with no atomics, exactly like numaTopology itself.
 var numaStartupFullAffinity bool
 
-// numaDetectStartupAffinity computes numaStartupFullAffinity. Called once
-// from numaSchedinit, after numaSetProcessBindAll. No-ops (leaving
-// numaStartupFullAffinity at its zero value, false -- fail closed) on a
-// single-node host or an arch without numaSetThreadAffinity, since
-// neither can ever reach numaNoteSchedule's eligibility gate
-// (numaSoftAffinityEligible) regardless of this value.
+// numaStartupAffinity is the raw CPU affinity mask numaDetectStartupAffinity
+// read at startup (the same sched_getaffinity result numaStartupFullAffinity
+// is derived from). Kept, not just the derived bool, because
+// numaWidenForFork needs the actual mask to restore a soft-affinity-
+// narrowed M to before it forks (see that function's doc comment) --
+// and unlike numaShouldConfine's own numaSavedAffinity, this is captured
+// unconditionally (independent of sched.customGOMAXPROCS), so it is
+// reliably populated whenever numaStartupFullAffinity is true.
+var numaStartupAffinity [numaCPUMaskBytes]byte
+
+// numaDetectStartupAffinity computes numaStartupFullAffinity and saves
+// the mask it was computed from into numaStartupAffinity. Called once
+// from numaSchedinit, after numaSetProcessBindAll. No-ops (leaving both
+// at their zero values -- fail closed) on a single-node host or an arch
+// without numaSetThreadAffinity, since neither can ever reach
+// numaNoteSchedule's eligibility gate (numaSoftAffinityEligible)
+// regardless of this value.
 func numaDetectStartupAffinity() {
 	if numaTopology.NumNodes < 2 || !numaHasSetAffinity {
 		return
 	}
-	var mask [numaCPUMaskBytes]byte
-	r := sched_getaffinity(0, uintptr(numaCPUMaskBytes), &mask[0])
+	r := sched_getaffinity(0, uintptr(numaCPUMaskBytes), &numaStartupAffinity[0])
 	if r <= 0 {
 		return
 	}
-	numaStartupFullAffinity = numaAffinityPopcount(mask[:r]) == numaOnlineCPUCount()
+	numaStartupFullAffinity = numaAffinityPopcount(numaStartupAffinity[:r]) == numaOnlineCPUCount()
 }
 
 // numaSoftAffinityEligible reports whether node-mask soft affinity
@@ -1007,5 +1017,50 @@ func numaNoteSchedule() {
 	}
 	if numaSetThreadAffinity(0, &mask) {
 		mp.numa.setSoftAffinityNode(int8(node))
+	}
+}
+
+// numaWidenForFork undoes node-mask soft affinity's per-M CPU narrowing
+// on the calling M just before it forks, so a child process spawned
+// (via os/exec, from any goroutine on this M) does not inherit a
+// scheduling HINT as if it were deliberate operator placement.
+//
+// sched_setaffinity's mask is inherited across fork(2)/clone(2): without
+// this, a child forked from a soft-affinity-narrowed M would start life
+// with that narrowed mask as its OWN startup affinity -- and nothing
+// about that mask distinguishes "the runtime narrowed the forking
+// thread as a transient scheduling hint" from "an operator ran the
+// parent under taskset". A GOEXPERIMENT=numa child would read that
+// inherited mask via its own numaDetectStartupAffinity/numaShouldConfine
+// checks and conclude "operator placement wins", silently declining
+// both confinement and its own soft affinity for its entire lifetime --
+// this is exactly the failure mode design §12.4's stand-down rule exists
+// to prevent, just triggered by an internal artifact instead of a real
+// operator.
+//
+// Widens back to numaStartupAffinity: this process's own true starting
+// mask, which is always the full mask whenever this M could have been
+// soft-affinity-narrowed in the first place (numaSoftAffinityEligible
+// requires numaStartupFullAffinity, which is only ever true when
+// numaStartupAffinity's popcount already equals numaOnlineCPUCount()).
+// Also clears this M's cached softAffinityNode: without that, the next
+// numaNoteSchedule pass would see the same node as before and believe
+// no change is needed, permanently leaving this M's real kernel affinity
+// wide (silently losing soft affinity for it) instead of re-narrowing.
+// No separate restore is needed after fork returns in the parent -- the
+// clear alone makes the next schedule() pass self-heal.
+//
+// Called from syscall_runtime_BeforeFork (proc.go), under the same "no
+// more allocation or calls of non-assembly functions" constraint
+// syscall.forkAndExecInChild1 documents at its own runtime_BeforeFork
+// call site -- everything from here down must stay nosplit.
+//
+//go:nosplit
+func numaWidenForFork(mp *m) {
+	if _, ok := mp.numa.softAffinityNode(); !ok {
+		return // never soft-narrowed; nothing to undo
+	}
+	if numaSetThreadAffinity(0, &numaStartupAffinity) {
+		mp.numa.clearSoftAffinityNode()
 	}
 }

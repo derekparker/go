@@ -101,3 +101,13 @@ func numaBindGrowth(addr unsafe.Pointer, size uintptr, node int32) {
 // is not Linux-specific, has something to call on every GOOS.
 func numaNoteSchedule() {
 }
+
+// numaWidenForFork is a no-op on non-Linux platforms, for the same
+// reason as numaNoteSchedule above: it exists purely so
+// syscall_runtime_BeforeFork (proc.go), which is not Linux-specific, has
+// something to call on every GOOS; its call site is gated on
+// goexperiment.Numa, so this body never runs with the experiment off.
+//
+//go:nosplit
+func numaWidenForFork(mp *m) {
+}

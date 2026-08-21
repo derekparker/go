@@ -50,3 +50,10 @@ func (s *mNUMAState) softAffinityNode() (node int8, ok bool) {
 // setSoftAffinityNode records that numaNoteSchedule just narrowed this
 // M's CPU affinity to node.
 func (s *mNUMAState) setSoftAffinityNode(node int8) { s.lastNode = node + 1 }
+
+// clearSoftAffinityNode resets lastNode to "never narrowed" (see
+// numaWidenForFork, numa_linux.go): after widening this M's real kernel
+// affinity back to full ahead of a fork, the cached node must be cleared
+// too, or the next numaNoteSchedule pass would see no change and skip
+// re-narrowing, silently leaving the M's actual affinity wide forever.
+func (s *mNUMAState) clearSoftAffinityNode() { s.lastNode = 0 }
