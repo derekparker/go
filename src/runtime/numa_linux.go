@@ -1032,7 +1032,7 @@ func numaNoteSchedule() {
 	if !mp.numa.softAffinityCheckDue(now) {
 		return // steady state: throttled, no getcpu syscall this pass
 	}
-	mp.numa.armSoftAffinityCheck(now)
+	mp.numa.armSoftAffinityCheck(now + numaSoftAffinityCheckInterval)
 	node := numaCurrentNode()
 	if node < 0 || node >= 64 {
 		// getcpu failed, or reported a node id beyond what this

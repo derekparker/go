@@ -74,11 +74,17 @@ func (s *mNUMAState) clearSoftAffinityNode() { s.lastNode = 0 }
 // getcpu-check deadline.
 func (s *mNUMAState) softAffinityCheckDue(now int64) bool { return now >= s.nextCheck }
 
-// armSoftAffinityCheck schedules this M's next getcpu check for
-// numaSoftAffinityCheckInterval after now. Called every time
-// numaNoteSchedule actually pays the getcpu syscall -- both when it
-// finds a node change and when it doesn't -- so a busy M that stays on
-// the same node also stays throttled, not just one that migrates.
-func (s *mNUMAState) armSoftAffinityCheck(now int64) {
-	s.nextCheck = now + numaSoftAffinityCheckInterval
+// armSoftAffinityCheck records deadline as this M's next getcpu-check
+// time (see softAffinityCheckDue). The caller (numaNoteSchedule,
+// numa_linux.go) computes deadline as now + numaSoftAffinityCheckInterval
+// -- that constant lives in the Linux-only numa_linux.go, so it must not
+// be referenced from this file: unlike numa_linux.go, this file compiles
+// on every GOOS whenever goexperiment.numa is set (an earlier version
+// referenced the constant directly here and broke the darwin/windows
+// GOEXPERIMENT=numa build). Called every time numaNoteSchedule actually
+// pays the getcpu syscall -- both when it finds a node change and when
+// it doesn't -- so a busy M that stays on the same node also stays
+// throttled, not just one that migrates.
+func (s *mNUMAState) armSoftAffinityCheck(deadline int64) {
+	s.nextCheck = deadline
 }
