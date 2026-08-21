@@ -93,3 +93,11 @@ func numaHeapHomingActive() bool {
 //go:nosplit
 func numaBindGrowth(addr unsafe.Pointer, size uintptr, node int32) {
 }
+
+// numaNoteSchedule is a no-op on non-Linux platforms: node-mask soft
+// affinity (design §12.4) is Linux-only (see numa_linux.go). Its call
+// site in schedule() is also gated on goexperiment.Numa, so this body
+// never runs with the experiment off; it exists purely so proc.go, which
+// is not Linux-specific, has something to call on every GOOS.
+func numaNoteSchedule() {
+}

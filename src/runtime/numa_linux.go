@@ -122,6 +122,7 @@ func numaSchedinit() {
 	}
 	numaInitTopology()
 	numaSetProcessBindAll()
+	numaDetectStartupAffinity()
 	if debug.numa > 0 {
 		println("numa: nodes", numaTopology.NumNodes, "allowed", numaTopology.NumAllowedNodes)
 	}
@@ -303,6 +304,52 @@ func numaConfineIfSmall(procs int32) {
 	}
 }
 
+// numaOnlineCPUCount returns the total number of CPUs numaTopology found
+// across every discovered node. Shared by numaShouldConfine (compared
+// against the startup affinity mask's popcount to detect a narrowed
+// mask, locked decision 6's "operator placement wins" check) and
+// numaDetectStartupAffinity (Task 10's independent, unconditional
+// version of the same check, for node-mask soft affinity).
+func numaOnlineCPUCount() int32 {
+	online := int32(0)
+	for i := int32(0); i < numaTopology.NumNodes; i++ {
+		online += numaTopology.Nodes[i].NumCPUs
+	}
+	return online
+}
+
+// numaAffinityPopcount returns the number of set bits across mask, an
+// affinity bitmask in sched_getaffinity's on-the-wire byte format.
+func numaAffinityPopcount(mask []byte) int32 {
+	pop := int32(0)
+	for _, b := range mask {
+		for b != 0 {
+			b &= b - 1
+			pop++
+		}
+	}
+	return pop
+}
+
+// numaNodeAffinityMask fills *mask with the CPU affinity bitmask for
+// every CPU numaTopology.NodeOfCPU reports as belonging to node, and
+// reports whether at least one CPU was found (a topology with no CPUs
+// for this node -- e.g. a CPU-less memory-only node -- cannot be
+// narrowed to). Shared by numaConfine (process-wide fill-one-socket
+// confinement, once, from schedinit) and numaNoteSchedule (per-M soft
+// affinity, design §12.4).
+func numaNodeAffinityMask(node int32, mask *[numaCPUMaskBytes]byte) bool {
+	*mask = [numaCPUMaskBytes]byte{}
+	n := 0
+	for cpu := 0; cpu < 8192; cpu++ {
+		if numaTopology.NodeOfCPU(cpu) == node {
+			mask[cpu/8] |= 1 << (uint(cpu) % 8)
+			n++
+		}
+	}
+	return n > 0
+}
+
 // numaShouldConfine reports whether fill-one-socket-first should engage
 // (design §12.2): multi-node machine, representable topology, Layer 1
 // actually engaged (published nodemask), an EXPLICITLY chosen GOMAXPROCS
@@ -348,18 +395,7 @@ func numaShouldConfine(procs int32) (int32, bool) {
 		return 0, false
 	}
 	numaSavedAffinityLen = int32(r)
-	online := int32(0)
-	for i := int32(0); i < numaTopology.NumNodes; i++ {
-		online += numaTopology.Nodes[i].NumCPUs
-	}
-	pop := int32(0)
-	for _, b := range numaSavedAffinity[:r] {
-		for b != 0 {
-			b &= b - 1
-			pop++
-		}
-	}
-	if pop != online {
+	if numaAffinityPopcount(numaSavedAffinity[:r]) != numaOnlineCPUCount() {
 		// taskset / narrowed cpuset: operator placement wins. NOTE:
 		// offline CPUs can also make sysfs-online and the affinity
 		// popcount disagree; the check then declines — conservative
@@ -415,14 +451,7 @@ func numaNodeCPUCount(node int32) int32 {
 // style map blowup.
 func numaConfine(node int32) bool {
 	var cpumask [numaCPUMaskBytes]byte
-	n := 0
-	for cpu := 0; cpu < 8192; cpu++ {
-		if numaTopology.NodeOfCPU(cpu) == node {
-			cpumask[cpu/8] |= 1 << (uint(cpu) % 8)
-			n++
-		}
-	}
-	if n == 0 {
+	if !numaNodeAffinityMask(node, &cpumask) {
 		return false
 	}
 	if !numaSetThreadAffinity(0, &cpumask) {
@@ -841,4 +870,142 @@ func numaBindArenaHome(addr unsafe.Pointer, size uintptr, node int32) {
 	var mask numaNodemask
 	mask[0] = uintptr(1) << uint(node)
 	linux.Syscall6(linux.SYS_MBIND, uintptr(addr), size, uintptr(_MPOL_PREFERRED), uintptr(unsafe.Pointer(&mask[0])), numaMaxNode, 0)
+}
+
+// Node-mask soft affinity from the scheduler (design §12.4, task 10,
+// ingredient c). Ingredients a (numaBindArenaHome/numaGrowNode above) and
+// b (mcentral per-node spanSets, numa_refill_test.go) home memory by
+// node; this ingredient keeps the M that touches that memory running on
+// (a CPU of) the same node, so the kernel's own NUMA balancer -- exempted
+// from scanning our VMAs by decision 1's explicit mempolicies -- is not
+// the only thing discouraging cross-node scheduling drift.
+
+// numaStartupFullAffinity records whether this process began life with
+// CPU affinity over every online CPU numaTopology found -- i.e. NOT
+// narrowed by taskset, a narrowed cpuset, or any other operator
+// placement. Computed once, unconditionally, by numaDetectStartupAffinity
+// during numaSchedinit.
+//
+// This is deliberately independent of numaShouldConfine's own narrowed-
+// affinity check (numa_linux.go, locked decision 6): that check only
+// runs when sched.customGOMAXPROCS is set, because fill-one-socket
+// confinement itself requires an explicitly chosen GOMAXPROCS. Node-mask
+// soft affinity carries no such precondition -- it applies to any
+// multi-node process, confined or not, with any GOMAXPROCS -- so its own
+// "operator placement wins" stand-down rule (design §12.4) needs an
+// answer that does not depend on customGOMAXPROCS. Both checks reuse the
+// same detection mechanism (numaAffinityPopcount vs numaOnlineCPUCount);
+// only the trigger conditions differ.
+//
+// Set once, single-threaded, from numaSchedinit -- schedinit runs before
+// any other runtime thread exists, the same invariant numaConfine and
+// numaSetProcessBindAll rely on -- so every M created afterward may read
+// this as a plain bool with no atomics, exactly like numaTopology itself.
+var numaStartupFullAffinity bool
+
+// numaDetectStartupAffinity computes numaStartupFullAffinity. Called once
+// from numaSchedinit, after numaSetProcessBindAll. No-ops (leaving
+// numaStartupFullAffinity at its zero value, false -- fail closed) on a
+// single-node host or an arch without numaSetThreadAffinity, since
+// neither can ever reach numaNoteSchedule's eligibility gate
+// (numaSoftAffinityEligible) regardless of this value.
+func numaDetectStartupAffinity() {
+	if numaTopology.NumNodes < 2 || !numaHasSetAffinity {
+		return
+	}
+	var mask [numaCPUMaskBytes]byte
+	r := sched_getaffinity(0, uintptr(numaCPUMaskBytes), &mask[0])
+	if r <= 0 {
+		return
+	}
+	numaStartupFullAffinity = numaAffinityPopcount(mask[:r]) == numaOnlineCPUCount()
+}
+
+// numaSoftAffinityEligible reports whether node-mask soft affinity
+// (numaNoteSchedule) may ever engage for this process at all: the
+// experiment is on, this arch implements numaSetThreadAffinity, the
+// machine is multi-node, and this process started with full affinity
+// (numaStartupFullAffinity -- operator placement always wins, same rule
+// Layer 1/confinement follow). Every input is either a compile-time
+// constant or a plain package var written once, single-threaded, during
+// numaSchedinit -- so this whole function is a handful of loads, cheap
+// enough for numaNoteSchedule's common (steady-state) schedule() path.
+func numaSoftAffinityEligible() bool {
+	return goexperiment.Numa && numaHasSetAffinity && numaTopology.NumNodes >= 2 && numaStartupFullAffinity
+}
+
+// numaNoteSchedule applies node-mask soft affinity to the current M
+// (design §12.4, ingredient c): reads the M's current NUMA node via
+// getcpu (numaCurrentNode -- scheduler-pass frequency, the same
+// established class as Task 8/9's grow/refill-frequency getcpu calls;
+// see the plan's Forbidden list, "no getcpu on a malloc fast path,
+// refill/grow/scheduler-pass frequency only") and, ONLY if it differs
+// from the node this M's affinity was last narrowed to
+// (mp.numa.softAffinityNode), sched_setaffinity's the M to that node's
+// CPU mask -- narrowing which CPUs the M may run on without pinning to a
+// single CPU, so the kernel keeps full scheduling freedom within the
+// node. Node CHANGE is the only trigger for that second syscall: once a
+// node is established, every later steady-state call pays the getcpu
+// syscall plus a handful of loads and one compare, nothing else.
+//
+// Called from schedule(), after findRunnable returns and before execute,
+// where mp.locks == 0 is a scheduler invariant (findRunnable never
+// returns otherwise -- execute assumes it too); asserted defensively
+// below rather than relied upon. Must never be called from acquirep:
+// procresize asserts sched.lock held on its call path and allocm holds
+// allocmLock plus acquirem on its, so a syscall there would be a
+// lock-ordering/latency hazard (design's I3 note) -- schedule() is where
+// the M is about to run user code with no locks held, which is exactly
+// why the hook lives here instead.
+//
+// Never engages (returns before any syscall) when: the machine is
+// single-node; this arch cannot set thread affinity; the process itself
+// started with narrowed CPU affinity (operator placement wins --
+// numaSoftAffinityEligible's numaStartupFullAffinity check);
+// fill-one-socket confinement is currently active (numaConfined -- the
+// process is already single-node, nothing to do); or confinement has
+// stood down (numaStoodDown -- the operator/API raised GOMAXPROCS past
+// the node; soft affinity must not re-narrow threads stand-down just
+// widened back to full). numaStoodDown is a one-way latch (see its doc
+// comment in numa_standdown.go), so once it is set, soft affinity stays
+// disabled for the rest of the process's life -- there is no path back
+// from a stand-down to re-engaging either ingredient.
+//
+// The experiment-off case is not checked here: like
+// numaConfineIfSmall/numaFixThreadPlacement, this function relies
+// entirely on its call site (schedule(), proc.go) gating on
+// goexperiment.Numa -- a compile-time constant -- so the call itself
+// dead-code-eliminates out of an experiment-off binary instead of
+// costing a function call that immediately returns.
+func numaNoteSchedule() {
+	mp := getg().m
+	if mp.locks != 0 {
+		// Defensive only -- see the doc comment above; findRunnable is
+		// never supposed to return with locks held. A silent return
+		// (skip this pass, retry next schedule()) fails safe rather
+		// than crashing a process on an invariant this function does
+		// not otherwise need to police.
+		return
+	}
+	if !numaSoftAffinityEligible() || numaConfined.Load() || numaStoodDown.Load() {
+		return
+	}
+	node := numaCurrentNode()
+	if node < 0 || node >= 64 {
+		// getcpu failed, or reported a node id beyond what this
+		// process's nodemask machinery can represent (numaMaxNode,
+		// the same bound numaShouldConfine's own getcpu check uses).
+		// Nothing to do this pass; retried at the next schedule().
+		return
+	}
+	if last, ok := mp.numa.softAffinityNode(); ok && int32(last) == node {
+		return // steady state: already narrowed to this node
+	}
+	var mask [numaCPUMaskBytes]byte
+	if !numaNodeAffinityMask(node, &mask) {
+		return
+	}
+	if numaSetThreadAffinity(0, &mask) {
+		mp.numa.setSoftAffinityNode(int8(node))
+	}
 }

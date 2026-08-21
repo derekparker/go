@@ -19,3 +19,6 @@ type mNUMAState struct{}
 
 func (s *mNUMAState) placementDone() bool { return false }
 func (s *mNUMAState) setPlacementDone()   {}
+
+func (s *mNUMAState) softAffinityNode() (node int8, ok bool) { return 0, false }
+func (s *mNUMAState) setSoftAffinityNode(node int8)          {}

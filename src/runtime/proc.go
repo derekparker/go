@@ -4293,6 +4293,21 @@ top:
 		goto top
 	}
 
+	// Node-mask soft affinity (design §12.4, task 10, ingredient c):
+	// this is the one point in the scheduler where the M is about to
+	// run user code with mp.locks == 0 and no locks held -- unlike
+	// acquirep, whose call paths (procresize under sched.lock, allocm
+	// under allocmLock+acquirem) make a syscall here a lock-ordering
+	// hazard (design's I3 note). Gated on goexperiment.Numa, a
+	// compile-time constant, so the call dead-code-eliminates out of an
+	// experiment-off binary entirely; numaNoteSchedule itself gates
+	// every other precondition (multi-node, not confined, not stood
+	// down, started with full affinity) and fires the underlying
+	// sched_setaffinity syscall only on an actual NUMA node change.
+	if goexperiment.Numa {
+		numaNoteSchedule()
+	}
+
 	execute(gp, inheritTime)
 }
 
