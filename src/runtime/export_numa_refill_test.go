@@ -23,59 +23,171 @@
 
 package runtime
 
-// MCentralGrowForTest allocates a fresh span of npages pages for
-// spanClass spc, homed to node via the real mheap.alloc entry point
-// (mcentral.grow's own path) with genuine effectively true (bypassing
-// numaRefillNode/getcpu -- the same test-bypass pattern task 8's
-// NumaHeapGrowForTest uses for mheap.grow), marks exactly one object
-// in it allocated via nextFreeFast (mallocgc's own fast-path
-// primitive -- see MCentralFreeSpanForTest for why a bare allocCount
-// write is not enough), and returns the span's base address, or 0 on
-// failure (a real OOM).
+import (
+	"internal/goexperiment"
+	"internal/runtime/atomic"
+	"unsafe"
+)
+
+// MCentralGrowAndSpanForTest attempts ONE grow-and-claim cycle for
+// spanClass spc, node: grows npage pages via mheap.grow directly
+// (bypassing numaRefillNode/getcpu, like task 8's own
+// NumaHeapGrowForTest), then immediately builds a spanNPages-page span
+// at the base of the range that grow call just registered with the
+// page allocator, marking exactly one object in it allocated, all
+// before releasing mheap_.lock. grew false means mheap.grow itself
+// failed (a real OOM, fatal for the caller) and base is meaningless;
+// otherwise base is always valid -- there is no retry/newArena
+// signal to check (see the fix history below for why an earlier
+// version needed one and why it turned out not to).
 //
-// Review C1 fix history: an earlier version of this function
-// bypassed mheap.alloc entirely, claiming an exact address range
-// directly via h.pages.allocRange + h.initSpan, to defeat
-// mheap.alloc's free-page-reuse (see npages's doc below) without
-// needing a retry loop. That approach required hand-mirroring
-// allocSpan's HaveSpan accounting block, which an even earlier
-// version got wrong (see MCentralFreeSpanForTest's doc comment for
-// that history) -- and, once the accounting was fixed, a reviewer
-// reproduced a SEPARATE, more fundamental problem on real 2-node
-// hardware: h.pages.allocRange -> pageAlloc.update panicked with
-// "index out of range" indexing p.summary, a page-allocator-internal
-// invariant this test-only reimplementation was not upholding
-// correctly (the exact mechanism was not fully root-caused; the
-// hardware-specific trigger, and the fact that the local single-node
-// sandbox never reproduced it, both point at something in how sparse,
-// widely-separated (~2 TiB apart per task 8) real per-node address
-// ranges interact with pageAlloc's summary growth, which the local
-// sandbox's much closer-together addresses never exercised).
+// Review re-review NEW-3 fix history, three rounds:
 //
-// Going through the real, unmodified mheap.alloc/allocSpan path
-// instead sidesteps the entire class of bug: every page-allocator-
-// internal invariant is upheld by construction (it's the same code
-// every real allocation uses), and the accounting block comes for
-// free -- no hand-mirroring needed at all. The cost is needing a
-// retry loop for node-targeting instead of an exact-address claim;
-// see npages's doc and growForNodeUntilHomed (numa_refill_test.go).
-func MCentralGrowForTest(spc uint8, node int32, npages uintptr) uintptr {
-	var base uintptr
+// Round 1: an intermediate version went through mheap.alloc instead of
+// mheap.grow directly (retrying with a growing npages, checking either
+// numaArenaNode(base) == node or, later, whether a new heapArena
+// registered). Neither retry criterion reliably escaped
+// self-contamination under repeated invocation (-count=20): every
+// rejected attempt gets freed back to the general free pool (review
+// C1 -- rejecting a span without freeing it would itself be a leak),
+// and mheap.alloc's own free-page-reuse (see allocSpan) happily
+// satisfies a LATER, larger request from THAT freed memory before
+// ever reaching mheap.grow again -- observed as a 19/20 Skip rate on
+// real hardware even with the new-heapArena check.
+//
+// Round 2: switched to task 8's own growUntilNewArena (which grows raw
+// address space directly via mheap.grow and never frees anything back
+// to the general pool, so it can't self-contaminate) for the address,
+// paired with a SEPARATE call building the span via h.pages.allocRange
+// at that address. This reproduced a "fatal error: index out of
+// range" panic inside pageAlloc.update, indexing p.summary -- first on
+// real 2-node hardware, then (this round's own finding) locally too,
+// under -shuffle=1, requesting node 0. The initial hypothesis (a race
+// between growUntilNewArena's own lock release and a second,
+// independent lock acquisition for the claim step) was WRONG: fusing
+// both steps under one continuous mheap_.lock hold (an earlier version
+// of this very function) reproduced the identical crash, ruling out a
+// race entirely -- see below for the actual mechanism.
+//
+// Round 3 (this version) is the real root cause and fix. Both
+// growUntilNewArena and the round-2 fusion used
+// arenaBase(heapArenas[len(heapArenas)-1]) -- the highest-address
+// heapArena registered by this grow call -- as the claim address. But
+// heapArena registration (in mheap.sysAlloc) and page-allocator
+// registration (in mheap.grow, via h.pages.grow) use two DIFFERENT
+// granularities that only sometimes coincide: sysAlloc rounds its
+// reservation up to a whole number of heapArenaBytes (~64 MiB) and
+// registers a heapArena for every such chunk in that rounded
+// reservation, while h.pages.grow only registers the page allocator's
+// summary/chunk metadata for the exact byte range mheap.grow actually
+// asked for (npage pages, rounded only to the much smaller
+// pallocChunkBytes, ~4 MiB). Whenever the requested size isn't already
+// a whole heapArenaBytes multiple -- true for essentially any npage
+// this file uses -- sysAlloc's rounding registers one or more
+// heapArenas that sit PAST the page allocator's actual grown range: a
+// "reserved and heapArena-metadata-valid, but not yet
+// page-allocator-registered" slack region. heapArenas[len-1] can land
+// in that slack, and indexing pageAlloc.p.summary for an address there
+// is exactly "index out of range" -- deterministic given the right
+// npage/reservation-boundary alignment, not a race, and reproducible
+// with no other goroutine involved at all.
+//
+// The actual page-allocator-registered range from a given mheap.grow
+// call is exactly [v, nBase) where v was h.curArena[idx].base before
+// the call and nBase is h.curArena[idx].base after -- mheap.grow
+// always calls h.pages.grow(v, nBase-v) unconditionally on every
+// successful call, so that range is always genuinely fresh, forward-
+// only address space (this also means the "self-contaminating /
+// reused headroom" concern the round-1/round-2 retry-until-new-arena
+// loop was designed around does not actually apply to a direct
+// mheap.grow call the way it did to mheap.alloc -- see growForNodeUntilHomed,
+// numa_refill_test.go, for why that loop is gone in this round too).
+// Reading h.curArena[idx].base immediately after grow returns gives
+// nBase directly, with no heapArenaBytes-rounding slack anywhere
+// near it; claiming spanNPages pages ending at that exact frontier
+// (spanNPages is tiny relative to npage, so it never reaches back
+// before v) is always within the range h.pages.grow just registered.
+//
+// Mirrors allocSpan's HaveSpan accounting block exactly (sysUsed for
+// scavenged pages, gcController.heapReleased/heapFree/heapInUse, and
+// the consistent memstats.heapStats deltas) -- an earlier version of
+// this function's predecessor left those untouched, so every span
+// built was invisible to ReadMemStats/gcController bookkeeping despite
+// genuinely claiming real address space and pages from the page
+// allocator, corrupting heap accounting (a reviewer-reproduced
+// TestReadMemStats failure under -count=2). MCentralFreeSpanForTest is
+// the exact inverse via mheap.freeSpan, which reverses precisely this
+// same block.
+//
+// The one object marked allocated is via nextFreeFast itself (the
+// exact function mallocgc's own fast path uses), not a bare
+// allocCount write, so allocCache/freeindex stay consistent with it --
+// see MCentralFreeSpanForTest's doc comment for why a bare write isn't
+// enough. This bypasses mcache.refill's normal
+// smallAllocCount/tinyAllocs bookkeeping entirely -- a transient
+// memstats residual, not a leak: it's never incremented here, and
+// MCentralFreeSpanForTest's plain freeSpan never decrements it either,
+// so the two omissions cancel and there is no net effect on final
+// counts, only a window (between this call and the matching
+// MCentralFreeSpanForTest) where a concurrent ReadMemStats could
+// observe smallAllocCount undercounting this one object relative to
+// allocCount/heapInUse.
+func MCentralGrowAndSpanForTest(spc uint8, node int32, npage, spanNPages uintptr) (base uintptr, grew bool) {
 	systemstack(func() {
-		s := mheap_.alloc(npages, spanClass(spc), node)
-		if s == nil {
+		// idx mirrors mheap.grow's own internal index computation
+		// exactly (mheap.go, top of (*mheap).grow) -- this is the
+		// same array slot mheap.grow itself will read and write
+		// h.curArena[idx] through below.
+		idx := int32(0)
+		if goexperiment.Numa && node >= 0 {
+			idx = node
+		}
+
+		lock(&mheap_.lock)
+		_, grew = mheap_.grow(npage, node)
+		if !grew {
+			unlock(&mheap_.lock)
 			return
 		}
+		// h.curArena[idx].base is now nBase: the exact upper bound of
+		// the range this grow call just registered with the page
+		// allocator via h.pages.grow(v, nBase-v) (see this function's
+		// doc comment, round 3). Claiming spanNPages pages ending
+		// exactly at that frontier keeps the claim inside [v, nBase)
+		// with no heapArenaBytes-rounding slack involved.
+		arenaBaseAddr := mheap_.curArena[idx].base - spanNPages*pageSize
+
+		// Still holding mheap_.lock from the grow above.
+		scav := mheap_.pages.allocRange(arenaBaseAddr, spanNPages)
+		s := mheap_.allocMSpanLocked()
+		unlock(&mheap_.lock)
+
+		mheap_.initSpan(s, spanAllocHeap, spanClass(spc), arenaBaseAddr, spanNPages, scav)
+
+		nbytes := spanNPages * pageSize
+		if scav != 0 {
+			sysUsed(unsafe.Pointer(arenaBaseAddr), nbytes, scav)
+			gcController.heapReleased.add(-int64(scav))
+		}
+		gcController.heapFree.add(-int64(nbytes - scav))
+		gcController.heapInUse.add(int64(nbytes))
+		stats := memstats.heapStats.acquire()
+		atomic.Xaddint64(&stats.committed, int64(scav))
+		atomic.Xaddint64(&stats.released, -int64(scav))
+		atomic.Xaddint64(&stats.inHeap, int64(nbytes))
+		memstats.heapStats.release()
+
 		if nextFreeFast(s) == 0 {
-			throw("MCentralGrowForTest: nextFreeFast failed on a freshly-allocated span")
+			throw("MCentralGrowAndSpanForTest: nextFreeFast failed on a freshly-initialized span")
 		}
 		base = s.base()
 	})
-	return base
+	return base, grew
 }
 
-// MCentralFreeSpanForTest is the exact inverse of MCentralGrowForTest's
-// allocation (review C1): clears the one fabricated allocation
+// MCentralFreeSpanForTest is the exact inverse of
+// MCentralGrowAndSpanForTest's allocation (review C1): clears the one
+// fabricated allocation
 // (freeSpanLocked requires allocCount == 0 and sweepgen == h.sweepgen
 // for an in-use span, so both are reset here immediately before
 // freeing) and returns the span to the heap via mheap.freeSpan, which
@@ -99,8 +211,8 @@ func MCentralFreeSpanForTest(base uintptr) {
 }
 
 // MCentralUncacheAndFindForTest simulates the tail of one refill round
-// trip for a span this test already built via MCentralGrowForTest at
-// base: runs it through the real uncacheSpan, then searches spanClass
+// trip for a span this test already built via MCentralGrowAndSpanForTest
+// at base: runs it through the real uncacheSpan, then searches spanClass
 // spc's partial sets for exactly wantNode (no fallback to any other
 // node -- unlike cacheSpan, this is a direct, single-node probe of
 // uncacheSpan's home-node routing, design §12.4) for a span at base.
@@ -126,7 +238,16 @@ func MCentralFreeSpanForTest(base uintptr) {
 func MCentralUncacheAndFindForTest(spc uint8, base uintptr, wantNode int32, limit int) bool {
 	s := spanOf(base)
 	mheap_.central[spc].mcentral.uncacheSpan(s)
+	return MCentralFindForTest(spc, base, wantNode, limit)
+}
 
+// MCentralFindForTest is MCentralUncacheAndFindForTest's search half on
+// its own, without the uncacheSpan call -- for a span that's already
+// sitting in mcentral (e.g. via MCentralPlaceForTest, or one
+// MCentralUncacheAndFindForTest already placed and a caller now needs
+// to relocate again without re-placing it, which would push a second,
+// duplicate reference to the same span into the spanSet's block list).
+func MCentralFindForTest(spc uint8, base uintptr, wantNode int32, limit int) bool {
 	sg := mheap_.sweepgen
 	c := &mheap_.central[spc].mcentral
 	return searchSpanSetForTest(c.partialSwept(sg, wantNode), base, limit) ||
@@ -145,12 +266,14 @@ func MCentralUncacheAndFindForTest(spc uint8, base uintptr, wantNode int32, limi
 // lock is held across the pop/push calls below, and this runs on a
 // normal goroutine stack), but avoiding a reentrant allocation
 // entirely is the simpler, more defensible choice for a white-box
-// allocator test. limit is capped at the array's capacity, which is
-// far more than this test ever needs to walk through in practice
-// (a freshly-built, mostly-empty probe span in a small region of the
+// allocator test. limit is capped at the array's capacity. Kept small
+// (re-review M5 nit: an earlier version used 4096, an unnecessarily
+// heavy 32 KiB zeroed stack array for every call) -- still far more
+// than this test ever needs to walk through in practice (a
+// freshly-built, mostly-empty probe span in a small region of the
 // set).
 func searchSpanSetForTest(set *spanSet, base uintptr, limit int) bool {
-	const maxOthers = 4096
+	const maxOthers = 256
 	if limit > maxOthers {
 		limit = maxOthers
 	}
@@ -173,4 +296,48 @@ func searchSpanSetForTest(set *spanSet, base uintptr, limit int) bool {
 		set.push(others[i])
 	}
 	return found
+}
+
+// NumaRefillNodeForTest exports numaRefillNode (review NEW-3): lets a
+// test read the same node/genuine pair mcentral.cacheSpan itself would
+// read for a refill happening right now, so a test can predict which
+// per-node spanSet a real cacheSpan call should route to without
+// needing to control getcpu.
+func NumaRefillNodeForTest() (node int32, genuine bool) {
+	return numaRefillNode()
+}
+
+// MCentralPlaceForTest runs a span already built via
+// MCentralGrowAndSpanForTest through the real uncacheSpan, placing it
+// into its home node's spanSet
+// (design §12.4) -- unlike MCentralUncacheAndFindForTest, this does not
+// also search for and remove it again; the span is left sitting in
+// mcentral for something else (e.g. a real MCentralCacheSpanForTest
+// call) to find.
+func MCentralPlaceForTest(spc uint8, base uintptr) {
+	s := spanOf(base)
+	mheap_.central[spc].mcentral.uncacheSpan(s)
+}
+
+// MCentralCacheSpanForTest drives spanClass spc's real, unmodified
+// mcentral.cacheSpan -- the exact function under test, including its
+// I1 local/remote classification and counter increments -- and returns
+// the resulting span's base address. Review NEW-3: this is what makes
+// the I1 fix's local/remote classification testable at all; every
+// earlier test in this file exercised only mcentral.uncacheSpan's
+// placement (via MCentralUncacheAndFindForTest) or mheap.grow/
+// h.pages.allocRange (via MCentralGrowAndSpanForTest), neither of
+// which goes through cacheSpan itself, so a mutation collapsing cacheSpan's
+// local computation to an unconditional true passed every prior
+// subtest.
+func MCentralCacheSpanForTest(spc uint8) uintptr {
+	var base uintptr
+	systemstack(func() {
+		s := mheap_.central[spc].mcentral.cacheSpan()
+		if s == nil {
+			throw("MCentralCacheSpanForTest: cacheSpan returned nil (real OOM?)")
+		}
+		base = s.base()
+	})
+	return base
 }

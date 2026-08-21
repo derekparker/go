@@ -24,6 +24,7 @@ func TestNUMASpanRefillMetrics(t *testing.T) {
 	t.Run("ChurnIncrementsCounters", testSpanRefillCountersIncrement)
 	t.Run("OneProcLocalSanity", testSpanRefillOneProcLocalSanity)
 	t.Run("NodePureRouting", testSpanRefillNodePureRouting)
+	t.Run("CounterMatchesHomeNode", testSpanRefillCounterMatchesHomeNode)
 }
 
 // testSpanRefillCountersIncrement is the primary red-test property:
@@ -98,7 +99,7 @@ func testSpanRefillOneProcLocalSanity(t *testing.T) {
 // its OWN home node, not wherever the freeing thread happens to be
 // running -- exactly the "node-pure set behavior where observable"
 // this task calls for. This does not require real multi-node
-// hardware: MCentralGrowForTest homes a span to an explicit node,
+// hardware: growForNodeUntilHomed homes a span to an explicit node,
 // bypassing getcpu entirely, the same portability trick task 8's
 // NumaHeapGrowForTest uses.
 func testSpanRefillNodePureRouting(t *testing.T) {
@@ -126,7 +127,7 @@ func testSpanRefillNodePureRouting(t *testing.T) {
 	// Matches searchSpanSetForTest's fixed-size backing array (review
 	// M5) -- comfortably more than this test ever needs to walk
 	// through in practice.
-	const searchLimit = 4096
+	const searchLimit = 256
 
 	// Each node's alloc -> find -> free cycle runs to completion
 	// before moving to the next node, rather than allocating both
@@ -141,8 +142,8 @@ func testSpanRefillNodePureRouting(t *testing.T) {
 	base0 := growForNodeUntilHomed(t, spc, 0)
 	if runtime.MCentralUncacheAndFindForTest(spc, base0, 0, searchLimit) {
 		// Review C1: free it back (the exact inverse of
-		// MCentralGrowForTest's allocation) now that the probe is
-		// done with it, rather than leaving it a permanent leak.
+		// MCentralGrowAndSpanForTest's allocation) now that the probe
+		// is done with it, rather than leaving it a permanent leak.
 		runtime.MCentralFreeSpanForTest(base0)
 	} else {
 		t.Errorf("span homed to node 0 not found in node 0's partial-swept set after uncacheSpan")
@@ -158,71 +159,195 @@ func testSpanRefillNodePureRouting(t *testing.T) {
 	}
 }
 
-// growForNodeUntilHomed allocates a fresh span for spanClass spc,
-// homed to node, doubling the page request until numaArenaNode
-// confirms the returned span's base really belongs to node --
-// mheap.alloc can otherwise satisfy a small request from any
-// already-free page in the heap, regardless of which node's arena it
-// came from (see MCentralGrowForTest's doc comment), which would
-// silently defeat this probe by handing back memory grown for some
-// other node entirely.
+// testSpanRefillCounterMatchesHomeNode is re-review NEW-3's
+// mutation-kill coverage for the I1 fix: nothing in the rest of this
+// file drives mcentral.cacheSpan itself (NodePureRouting exercises
+// uncacheSpan's placement via MCentralUncacheAndFindForTest;
+// ChurnIncrementsCounters/OneProcLocalSanity exercise cacheSpan only
+// indirectly, through real getcpu-dependent thread placement they
+// can't control), so a mutation collapsing cacheSpan's `local :=
+// !goexperiment.Numa || numaArenaNode(s.base()) == node` to an
+// unconditional `local := true` passed every prior subtest in this
+// file.
 //
-// maxNpages is capped well below where mspan.nelems (a uint16) would
-// overflow for spc's 32768-byte elements (that boundary is 65535 *
-// 32768 bytes, i.e. 262140 pages at 8 KiB/page) -- checked BEFORE
-// each attempt, not just before deciding whether to double again: an
-// earlier version checked npages > maxNpages only after an attempt at
-// npages == maxNpages failed, which let the *next* (already-doubled)
-// npages value through to one more MCentralGrowForTest call before
-// the cap could stop it, silently overflowing nelems and making
-// nextFreeFast throw on an apparently "fresh" span with zero free
-// slots.
+// This drives one real refill (MCentralCacheSpanForTest, i.e.
+// mcentral.cacheSpan itself, not a stand-in) through an
+// explicitly-homed, pre-placed span and asserts that whichever counter
+// actually moved agrees with numaArenaNode(returned span's base) ==
+// the refill node read the same way cacheSpan itself reads it
+// (NumaRefillNodeForTest). This is definitional and, unlike
+// OneProcLocalSanity's dropped ratio bound, does not depend on the
+// calling thread staying on one NUMA node: it doesn't matter which
+// node cacheSpan routes for, only whether the counter agrees with the
+// ACTUAL span it returned. The refill node is read a second time,
+// immediately before driving the refill (not reused from the earlier
+// read used to pick otherNode below), to keep the window in which the
+// calling thread could migrate as short as possible -- the same kind
+// of short-window residual task 8's own TestArenaCollision accepts.
+func testSpanRefillCounterMatchesHomeNode(t *testing.T) {
+	maxNodes := runtime.NumaMaxHeapNodesForTest()
+	if maxNodes < 2 {
+		t.Skip("numaMaxHeapNodes < 2: no distinct per-node sets to test (I5 collapse)")
+	}
+	if !runtime.NumaHeapStreamsEnabledForTest() {
+		t.Skip("numaHeapStreamsEnabled is false: streams are not populated on this build/run (race, tight-VA, or 32-bit)")
+	}
+
+	initialNode, genuine := runtime.NumaRefillNodeForTest()
+	if !genuine {
+		t.Skip("numaRefillNode not genuine on this run")
+	}
+
+	// Bias toward a node other than wherever this thread currently
+	// looks like it's running, so the placed span is likely to be
+	// found "remote" -- needed to have a real chance of catching the
+	// local:=true mutation (which only ever predicts "local"). This is
+	// only a bias, not a requirement for correctness: the assertion
+	// below checks the actual observed relationship, whatever it
+	// turns out to be, not that this specific span is found remote.
+	otherNode := int32(0)
+	if otherNode == initialNode {
+		otherNode = 1
+	}
+
+	// A spanClass distinct from NodePureRouting's (135) and from
+	// anything allocChurnForRefill touches (its largest allocation is
+	// 2055 bytes), so nothing else in this process concurrently
+	// populates the refill node's own set for this class and confuses
+	// which node cacheSpan actually finds something in.
+	const spc = 133 // sizeclass 66, noscan (28672-byte elements)
+	// Matches searchSpanSetForTest's fixed-size backing array (review M5).
+	const searchLimit = 256
+
+	base := growForNodeUntilHomed(t, spc, otherNode)
+	runtime.MCentralPlaceForTest(spc, base)
+
+	// reclaimPlaced searches for and frees the span placed above,
+	// WITHOUT calling uncacheSpan on it again (MCentralFindForTest,
+	// not MCentralUncacheAndFindForTest -- base is already sitting in
+	// mcentral from the MCentralPlaceForTest call; re-uncacheSpan-ing
+	// it would push a second, duplicate reference into the spanSet's
+	// block list). Used on every exit path once base has been placed,
+	// so nothing here can leak it (review C1) or corrupt mcentral by
+	// freeing a span that's still linked into a spanSet.
+	reclaimPlaced := func() {
+		if runtime.MCentralFindForTest(spc, base, otherNode, searchLimit) {
+			runtime.MCentralFreeSpanForTest(base)
+		} else {
+			t.Errorf("could not find and reclaim the span placed at %#x in node %d's set; may have leaked", base, otherNode)
+		}
+	}
+
+	refillNode, genuine := runtime.NumaRefillNodeForTest()
+	if !genuine {
+		reclaimPlaced()
+		t.Skip("numaRefillNode not genuine on this run")
+	}
+
+	before := readSpanRefillCounters(t)
+	gotBase := runtime.MCentralCacheSpanForTest(spc)
+	after := readSpanRefillCounters(t)
+
+	if gotBase == base {
+		// The common, expected case: cacheSpan found and returned
+		// exactly the span this test placed, which cacheSpan's own
+		// pop already removed from mcentral -- safe to free directly.
+		runtime.MCentralFreeSpanForTest(gotBase)
+	} else {
+		// cacheSpan returned something else (a different pre-existing
+		// span, or a freshly grown one) instead of the one placed
+		// above -- free that separately, and reclaim the placed span,
+		// which is presumably still sitting in mcentral untouched.
+		runtime.MCentralFreeSpanForTest(gotBase)
+		reclaimPlaced()
+	}
+
+	localDelta := after.local - before.local
+	remoteDelta := after.remote - before.remote
+	gotLocal := localDelta == 1 && remoteDelta == 0
+	gotRemote := remoteDelta == 1 && localDelta == 0
+	if !gotLocal && !gotRemote {
+		t.Fatalf("span-refills counters moved unexpectedly for one refill: local delta=%d remote delta=%d", localDelta, remoteDelta)
+	}
+
+	wantLocal := runtime.NumaArenaNodeForTest(gotBase) == refillNode
+	if wantLocal != gotLocal {
+		t.Errorf("counter/home-node mismatch: numaArenaNode(span.base())==refillNode is %v, but the span-refills counter that moved says local=%v (span base=%#x home node=%d refill node=%d)",
+			wantLocal, gotLocal, gotBase, runtime.NumaArenaNodeForTest(gotBase), refillNode)
+	}
+}
+
+// growForNodeUntilHomed builds a fresh span for spanClass spc, homed
+// to node (re-review NEW-3), via a single call to
+// MCentralGrowAndSpanForTest, which grows AND claims the span's pages
+// under one continuous mheap_.lock hold.
 //
-// Known compounding limitation, deliberately made a Skip rather than
-// a Fatal: every wrongly-homed span this loop rejects gets freed back
-// to the general free pool (review C1 -- rejecting a span without
-// freeing it would itself be a leak), and once freed it becomes
-// available to contaminate a LATER attempt exactly the same way
-// TestNUMAHeapArenaStreams's own growUntilNewArena call does. Under
-// repeated invocation in the same process (e.g. -count=20) this can
-// compound across iterations faster than any fixed cap can reliably
-// out-grow. The other two subtests (ChurnIncrementsCounters,
-// OneProcLocalSanity) already exercise routing and the metrics
-// through real, unmodified allocation, so this white-box probe
-// degrading to a Skip under adversarial repeated-invocation
-// contamination -- instead of failing the whole test -- is an
-// acceptable, honestly-documented trade-off rather than a fixed cap
-// large enough to risk exhausting real memory on a small test box.
+// This replaces three earlier, less reliable designs, the last two of
+// which retried a growing npage in a loop (mirroring task 8's own
+// growUntilNewArena) until some signal indicated "genuinely fresh"
+// address space. The first checked whether the returned span's
+// numaArenaNode matched node; the second (after switching to
+// mheap.alloc and checking whether a new heapArena was registered,
+// rather than trusting a possibly-coincidental node match) still went
+// through mheap.alloc, whose own free-page reuse can satisfy even a
+// large request from memory THIS TEST'S OWN earlier rejected attempts
+// freed back (review C1 requires freeing rejected spans, not leaking
+// them) -- self-contaminating and compounding across repeated
+// invocation, observed as a 19/20 Skip rate under -count=20 on real
+// hardware even with the new-heapArena check. The third switched to
+// growUntilNewArena/mheap.grow directly (which never frees anything
+// back to the general pool, so it can't self-contaminate the way
+// mheap.alloc-based retries did) but used "a new heapArena got
+// registered" as its signal for "safe to claim from" -- which turned
+// out to be the wrong signal: heapArena registration (sysAlloc,
+// rounded up to whole heapArenaBytes chunks) and page-allocator
+// registration (mheap.grow's own h.pages.grow call, rounded only to
+// the much smaller pallocChunkBytes) don't cover the same range
+// whenever the requested size isn't already heapArenaBytes-aligned --
+// true for essentially any npage this file uses. The highest-address
+// newly-registered heapArena can sit in the resulting "reserved but
+// not yet page-allocator-registered" slack, and claiming a span there
+// hits "fatal error: index out of range" indexing pageAlloc's summary
+// -- deterministic given the right size/alignment, not a race, and
+// reproducible with no concurrent goroutine involved at all (first
+// seen on real 2-node hardware, then reproduced locally under
+// -shuffle=1 too, in this round). See MCentralGrowAndSpanForTest's
+// doc comment (export_numa_refill_test.go) for the full mechanism and
+// the fix: every successful mheap.grow call always registers a fresh,
+// forward-only page-allocator range on its own, with no reuse
+// possible from a direct mheap.grow call (unlike mheap.alloc) -- so
+// there both is no self-contamination risk to retry away, and no
+// "new arena" signal to wait for. One call is enough.
 func growForNodeUntilHomed(t *testing.T, spc uint8, node int32) uintptr {
 	t.Helper()
-	// npages starts at the same scale growUntilNewArena's own initial
-	// guess uses (1<<14, ~128 MiB) -- the realistic worst-case
-	// contamination this loop needs to out-grow on a single, cold
-	// invocation is that single call (TestNUMAHeapArenaStreams calls
-	// it once per node), so starting at the same order of magnitude
-	// and doubling a few times is enough without wasting time (real
-	// memory gets touched/zeroed on every attempt, so a needlessly
-	// high cap or starting point makes this loop needlessly slow, not
-	// just needlessly memory-hungry).
-	npages := uintptr(1 << 14)
-	const maxNpages = uintptr(1 << 16) // 512 MiB at 8 KiB pages; stays well under the nelems overflow boundary (262140 pages)
-	for {
-		if npages > maxNpages {
-			t.Skipf("MCentralGrowForTest(spc, node=%d) never returned memory homed to node %d after npages=%d -- likely compounding free-pool contamination from repeated invocation (-count > 1); see this function's doc comment", node, node, npages)
-		}
-		base := runtime.MCentralGrowForTest(spc, node, npages)
-		if base == 0 {
-			t.Fatalf("MCentralGrowForTest(spc, node=%d, npages=%d) failed: real OOM?", node, npages)
-		}
-		if runtime.NumaArenaNodeForTest(base) == node {
-			return base
-		}
-		// Wrong node (satisfied from free-page reuse, not a genuine
-		// grow) -- free it back before retrying with a larger
-		// request, rather than leaking it.
-		runtime.MCentralFreeSpanForTest(base)
-		npages *= 2
+	// spanNPages is small and fixed -- it only needs to fit inside a
+	// freshly-grown range (npage below is far larger), not to
+	// out-grow anything, since that range is exclusively-owned,
+	// never-before-touched address space.
+	//
+	// It must still be large enough that mspan.nelems ends up >= 2 for
+	// every spanClass this file uses (135's and 133's elements are
+	// 32768 and 28672 bytes -- the two largest size classes, chosen
+	// for headroom in an earlier version of this test that no longer
+	// needs it, but kept for their rarity: nothing else in this
+	// process is likely to touch them). 16 pages (128 KiB) gives
+	// nelems=4 for both. A too-small value here doesn't fail loudly:
+	// nelems=1 with the one object nextFreeFast marks allocated makes
+	// uncacheSpan correctly route the span to the *full* set (nelems -
+	// allocCount == 0), which every test in this file only ever
+	// searches the *partial* sets for -- "not found"/"could not
+	// reclaim" failures that look like a routing bug but are actually
+	// this parameter being wrong for the spanClass in use.
+	const spanNPages = 16
+
+	// npage no longer needs to grow across retries (see the doc
+	// comment above) -- a single, fixed, generous size is enough.
+	const npage = uintptr(1 << 14)
+	base, grew := runtime.MCentralGrowAndSpanForTest(spc, node, npage, spanNPages)
+	if !grew {
+		t.Fatalf("MCentralGrowAndSpanForTest(node %d, npage %d) failed: mheap.grow itself returned false (real OOM?)", node, npage)
 	}
+	return base
 }
 
 type spanRefillCounts struct {

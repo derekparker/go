@@ -97,21 +97,32 @@ func (s sweepClass) split() (spc spanClass, full bool) {
 // The background sweeper doesn't route by node the way cacheSpan does
 // (design §12.4) -- it just needs to drain every unswept span
 // eventually, so it tries every node's set for a given span class
-// before moving on. This deliberately does NOT use numaGrowLoopBound
-// (review I3) the way cacheSpan's remote-fallback loop does: an
-// earlier version bounded this loop the same way and a reviewer
-// reproduced a hard crash from it on real 2-node hardware
-// ("attempt to clear non-empty span set", finishsweep_m ->
-// spanSet.reset) -- I3's optimization is safe for cacheSpan because a
-// miss there just falls through to a correct, if suboptimal, grow
-// call, but nextSpanForSweep has a strict correctness requirement
-// (finishsweep_m's own full-range reset asserts every unswept span
-// was already drained by this function, and throws otherwise) that a
-// bounded search cannot be proven to uphold with full confidence
-// against sweep.centralIndex's forward-only progress marker
-// interacting with a high-water mark that can still be moving during
-// the same sweep phase. With the experiment off, numaMaxHeapNodes ==
-// 1 (I5) and this inner loop always runs exactly once regardless.
+// before moving on.
+//
+// This deliberately does NOT use numaGrowLoopBound (review I3) the way
+// cacheSpan's remote-fallback loop does, but re-review NEW-1 corrected
+// the reasoning recorded here for an earlier version of this comment:
+// the bound WOULD now be sound here too. numaGrowHighWaterNode is
+// monotonic and updated inside mheap.grow strictly before any
+// heapArena (and therefore any span, and therefore any spanSet
+// population -- swept-role push or the sweepgen rotation that later
+// reinterprets it as unswept) for that node can exist (see
+// numaGrowHighWaterNodeUpdate's doc comment for the exact ordering
+// argument). The crash an earlier, bounded version of this function
+// hit on real 2-node hardware ("attempt to clear non-empty span set",
+// finishsweep_m -> spanSet.reset) traced to a *different* bug: an
+// errant package init() was clobbering the high-water mark back to a
+// stale value well after real growth had already advanced it (see
+// numaGrowHighWaterNode's doc comment) -- not a flaw in the bound
+// itself. With that clobber fixed, nextSpanForSweep stays full-range
+// anyway: it is the one place a wrong bound would be a hard
+// correctness failure (finishsweep_m's own reset() asserts every
+// unswept span was already drained by this function, and throws
+// otherwise) rather than a recoverable miss, and it isn't on any
+// malloc/refill-frequency path, so the walk this avoids is cheap
+// relative to the margin of safety kept by not depending on the bound
+// here too. With the experiment off, numaMaxHeapNodes == 1 (I5) and
+// this inner loop always runs exactly once regardless.
 func (h *mheap) nextSpanForSweep() *mspan {
 	sg := h.sweepgen
 	for sc := sweep.centralIndex.load(); sc < numSweepClasses; sc++ {

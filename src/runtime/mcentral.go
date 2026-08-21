@@ -212,76 +212,94 @@ func (c *mcentral) cacheSpan() *mspan {
 
 	node, genuine := numaRefillNode()
 
-	// If we sweep spanBudget spans without finding any free
-	// space, just allocate a fresh span. This limits the amount
-	// of time we can spend trying to find free space and
-	// amortizes the cost of small object sweeping over the
-	// benefit of having a full free span to allocate from. By
-	// setting this to 100, we limit the space overhead to 1%.
-	//
-	// This budget is shared across every node searched below (I5-style
-	// off-build collapse aside, this is the same global bound the
-	// pre-task-9 single-set search always had -- routing spreads the
-	// same amount of sweep work across nodes rather than multiplying
-	// it per node).
-	//
-	// TODO(austin,mknyszek): This still has bad worst-case
-	// throughput. For example, this could find just one free slot
-	// on the 100th swept span. That limits allocation latency, but
-	// still has very poor throughput. We could instead keep a
-	// running free-to-used budget and switch to fresh span
-	// allocation if the budget runs low.
-	spanBudget := 100
-
-	// Review I2: begin the sweeper's process-global sweepLocker ONCE
-	// for this whole refill and share it across every node
-	// cacheSpanFromNode tries below, rather than once per node (up to
-	// numaGrowLoopBound+1 begin/end pairs, each a CAS pair on a
-	// process-global word -- real contention on the exact box this
-	// workstream targets, under concurrent refills from many Ps).
-	sl := sweep.active.begin()
-
-	s := c.cacheSpanFromNode(node, &spanBudget, sl)
-	if s == nil && goexperiment.Numa {
-		hwm := numaGrowLoopBound()
-		for other := int32(0); other <= hwm; other++ {
-			if other == node {
-				continue
-			}
-			// Review M2: this loop is not gated on remaining budget.
-			// Every node's first probe (partialSwept.pop, inside
-			// cacheSpanFromNode) costs no sweep budget at all --
-			// stopping the whole fallback early because budget ran
-			// out on an EARLIER node would skip that free check on
-			// every later node for no reason. cacheSpanFromNode's own
-			// internal loops still stop doing actual sweep work once
-			// budget is spent.
-			if s = c.cacheSpanFromNode(other, &spanBudget, sl); s != nil {
-				break
-			}
-		}
-	}
-
-	if sl.valid {
-		sweep.active.end(sl)
-	}
+	// Review NEW-2: probe the local node's partial-swept set BEFORE
+	// ever registering as a sweeper, matching upstream's own
+	// pre-routing behavior (the original single-set cacheSpan always
+	// popped partialSwept first and only called sweep.active.begin()
+	// on a miss). The I2 fix below (sharing one sweepLocker across the
+	// whole search instead of one per node) initially hoisted begin()
+	// to always run first, even when this free, no-sweep-cost probe
+	// alone would have sufficed -- regressing the hot path relative to
+	// upstream. This keeps I2's win (still at most one begin/end pair
+	// per refill) without paying for it on the common no-sweep-needed
+	// case.
+	sg := mheap_.sweepgen
+	s := c.partialSwept(sg, node).pop()
 
 	if s == nil {
-		trace = traceAcquire()
-		if trace.ok() {
-			trace.GCSweepDone()
-			traceDone = true
-			traceRelease(trace)
+		// If we sweep spanBudget spans without finding any free
+		// space, just allocate a fresh span. This limits the amount
+		// of time we can spend trying to find free space and
+		// amortizes the cost of small object sweeping over the
+		// benefit of having a full free span to allocate from. By
+		// setting this to 100, we limit the space overhead to 1%.
+		//
+		// This budget is shared across every node searched below (I5-style
+		// off-build collapse aside, this is the same global bound the
+		// pre-task-9 single-set search always had -- routing spreads the
+		// same amount of sweep work across nodes rather than multiplying
+		// it per node).
+		//
+		// TODO(austin,mknyszek): This still has bad worst-case
+		// throughput. For example, this could find just one free slot
+		// on the 100th swept span. That limits allocation latency, but
+		// still has very poor throughput. We could instead keep a
+		// running free-to-used budget and switch to fresh span
+		// allocation if the budget runs low.
+		spanBudget := 100
+
+		// Review I2: begin the sweeper's process-global sweepLocker
+		// ONCE for the rest of this refill and share it across every
+		// node cacheSpanFromNode tries below (including a re-check of
+		// the local node's own unswept sets), rather than once per
+		// node (up to numaGrowLoopBound+1 begin/end pairs, each a CAS
+		// pair on a process-global word -- real contention on the
+		// exact box this workstream targets, under concurrent refills
+		// from many Ps).
+		sl := sweep.active.begin()
+
+		s = c.cacheSpanFromNode(node, &spanBudget, sl)
+		if s == nil && goexperiment.Numa {
+			hwm := numaGrowLoopBound()
+			for other := int32(0); other <= hwm; other++ {
+				if other == node {
+					continue
+				}
+				// Review M2: this loop is not gated on remaining budget.
+				// Every node's first probe (partialSwept.pop, inside
+				// cacheSpanFromNode) costs no sweep budget at all --
+				// stopping the whole fallback early because budget ran
+				// out on an EARLIER node would skip that free check on
+				// every later node for no reason. cacheSpanFromNode's own
+				// internal loops still stop doing actual sweep work once
+				// budget is spent.
+				if s = c.cacheSpanFromNode(other, &spanBudget, sl); s != nil {
+					break
+				}
+			}
 		}
 
-		// We failed to get a span from the mcentral so get one from
-		// mheap, homed to the node this refill is routing for (ties
-		// task 8's per-node growth streams to this routing decision,
-		// and reuses the numaRefillNode reading above instead of a
-		// second getcpu call at grow time).
-		s = c.grow(node, genuine)
+		if sl.valid {
+			sweep.active.end(sl)
+		}
+
 		if s == nil {
-			return nil
+			trace = traceAcquire()
+			if trace.ok() {
+				trace.GCSweepDone()
+				traceDone = true
+				traceRelease(trace)
+			}
+
+			// We failed to get a span from the mcentral so get one from
+			// mheap, homed to the node this refill is routing for (ties
+			// task 8's per-node growth streams to this routing decision,
+			// and reuses the numaRefillNode reading above instead of a
+			// second getcpu call at grow time).
+			s = c.grow(node, genuine)
+			if s == nil {
+				return nil
+			}
 		}
 	}
 
