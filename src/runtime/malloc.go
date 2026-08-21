@@ -392,6 +392,29 @@ var (
 	heapRandSeedBitsRemaining int
 )
 
+// numaHeapStreamsEnabled is the single source of truth (review C1/C2)
+// for whether per-node heap arena streams (design §12.3) are usable at
+// all on this build/process: computed once in mallocinit, alongside
+// (and from the same inputs as) the address-layout switch that decides
+// hint placement, then read by numaGrowNode at grow time.
+//
+// False whenever mallocinit's hint layout does not have room to
+// address-partition: the experiment is off, this is a race build (the
+// TSAN runtime requires the heap in one fixed, small window -- 8
+// hints, not 64, and even those are already tight), this is riscv64
+// with a 39-bit VMA layout (the same "far less address space than the
+// default 1<<40-per-hint layout assumes" case), or this is a 32-bit
+// platform (the ultimate tight-VA case, single fixed reservation, no
+// hint chain to partition at all). Before this was a single flag,
+// numaGrowNode had no matching exclusion for any of these cases: on a
+// race build specifically, numaGrowNode could return a nonzero stream
+// that mallocinit's hint loop never populated (mallocinit's raceenabled
+// case never runs the per-node distribution below), so the second
+// stream's arenaHints[node] chain was permanently nil and its first
+// growth fatally ran out of hints ("too many address space collisions
+// for -race mode") instead of gracefully falling back.
+var numaHeapStreamsEnabled bool
+
 func nextHeapRandBits(bits int) uintptr {
 	if bits > heapRandSeedBitsRemaining {
 		throw("not enough heapRandSeed bits remaining")
@@ -597,6 +620,14 @@ func mallocinit() {
 			}
 		}
 
+		// One source of truth for whether per-node heap arena streams
+		// are usable (review C1/C2): computed here, from the exact same
+		// inputs (raceenabled, vmaSize) the hint-placement switch below
+		// uses, and read later by numaGrowNode at grow time. See
+		// numaHeapStreamsEnabled's doc comment for why a mismatch
+		// between this and the hint loop is fatal, not just suboptimal.
+		numaHeapStreamsEnabled = goexperiment.Numa && !raceenabled && !(GOARCH == "riscv64" && vmaSize == 39)
+
 		for i := 0x7f; i >= 0; i-- {
 			var p uintptr
 			switch {
@@ -645,18 +676,19 @@ func mallocinit() {
 			// across per-node arena streams (design §12.3), so growth
 			// for different nodes lands in disjoint, >=1TiB-apart
 			// address windows (h.arenaHints/h.curArena are indexed by
-			// node -- see mheap.grow). Race mode and riscv64's 39-bit
-			// VMA layout keep every heap hint on the single shared
-			// stream 0 instead (I5's tight-VA fallback): both already
-			// have far less address space to work with than the
-			// default 1<<40-per-hint layout assumes, and partitioning
-			// it further across streams would only fragment it. This
-			// also covers the experiment-off and numaMaxHeapNodes==1
-			// collapse (I5): node is always the literal constant 0
-			// there, so mheap_.arenaHints[node] indexes the same single
-			// slot this field was before per-node streams existed.
+			// node -- see mheap.grow). numaHeapStreamsEnabled is false
+			// (I5's tight-VA fallback) for race mode and riscv64's
+			// 39-bit VMA layout -- both already have far less address
+			// space to work with than the default 1<<40-per-hint layout
+			// assumes, and partitioning it further across streams would
+			// only fragment it -- keeping every heap hint on the single
+			// shared stream 0 instead. This also covers the
+			// experiment-off and numaMaxHeapNodes==1 collapse (I5):
+			// node is always the literal constant 0 there, so
+			// mheap_.arenaHints[node] indexes the same single slot this
+			// field was before per-node streams existed.
 			node := int32(0)
-			if goexperiment.Numa && !raceenabled && !(GOARCH == "riscv64" && vmaSize == 39) {
+			if numaHeapStreamsEnabled {
 				node = int32(i) / (0x40 / numaMaxHeapNodes)
 			}
 			hint := (*arenaHint)(mheap_.arenaHintAlloc.alloc())
@@ -664,6 +696,14 @@ func mallocinit() {
 			hint.next, mheap_.arenaHints[node] = mheap_.arenaHints[node], hint
 		}
 	} else {
+		// 32-bit: tight VA, the ultimate I5 tight-VA-fallback case --
+		// numaHeapStreamsEnabled stays false (its zero value; set
+		// explicitly here so this is a stated fact about this branch,
+		// not an accident of initialization order). Single fixed
+		// reservation below, no hint chain to partition across nodes at
+		// all; heap growth here always uses stream 0 (see mheap.grow).
+		numaHeapStreamsEnabled = false
+
 		// On a 32-bit machine, we're much more concerned
 		// about keeping the usable heap contiguous.
 		// Hence:
@@ -938,7 +978,7 @@ mapped:
 				throw("out of memory allocating heap arena metadata")
 			}
 		}
-		r.node = uint8(idx)
+		numaArenaSetNode(r, idx)
 
 		// Register the arena in allArenas if requested.
 		if len((*arenaList)) == cap((*arenaList)) {

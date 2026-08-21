@@ -535,6 +535,21 @@ func TracebackSystemstack(stk []uintptr, i int) int {
 // with the experiment off (or on a single-stream build, I5), it is the only
 // stream and this is exactly the chain these functions always operated on
 // before arenaHints became a per-node array (design §12.3).
+//
+// TestArenaCollision (malloc_test.go), the only caller, therefore assumes
+// its allocating goroutine grows stream 0 throughout the test: with the
+// experiment on and real multi-node hardware, numaGrowNode reads the
+// calling thread's current node at every grow, so a goroutine that
+// migrated across nodes mid-test could in principle grow a different
+// stream, desynchronizing this tracking from what mheap.grow actually
+// used. Not pinned (no per-node CPU-mask affinity plumbing is exported
+// for tests today, and TestArenaCollision is a stock, non-NUMA test --
+// adding NUMA-specific pinning to it was judged out of scope for a
+// one-goroutine, sub-second test) -- instead stress-verified empirically
+// on real 2-node hardware (numa-dell): 25/25 clean runs with
+// GOEXPERIMENT=numa, no flakiness observed. See task-8-report.md's
+// "Concerns for the controller" for this residual, flagged for whoever
+// next touches this test or hits it flaking.
 func KeepNArenaHints(n int) {
 	hint := mheap_.arenaHints[0]
 	for i := 1; i < n; i++ {

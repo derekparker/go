@@ -27,22 +27,20 @@ func TestNUMAHeapArenaStreams(t *testing.T) {
 	if maxNodes < 2 {
 		t.Skip("numaMaxHeapNodes < 2: no distinct per-node streams to test (I5 collapse)")
 	}
-
-	// Large enough to exceed any headroom left in either stream's
-	// current arena (a single heapArenaBytes is 64 MiB on most
-	// platforms; this requests well over two of those in pages),
-	// guaranteeing mheap.grow calls sysAlloc and registers a fresh
-	// heapArena rather than just extending into existing room.
-	const npage = 1 << 15
-
-	base0, ok0 := runtime.NumaHeapGrowForTest(npage, 0)
-	if !ok0 {
-		t.Fatal("NumaHeapGrowForTest(node 0) did not register a new heap arena")
+	// numaMaxHeapNodes alone is a build-time constant and does not mean
+	// mallocinit actually populated stream 1's hint chain (review
+	// C1/C2): race builds, riscv64's 39-bit VMA layout, and 32-bit all
+	// keep numaMaxHeapNodes at 8 while disabling per-node distribution
+	// at run time. NumaHeapGrowForTest bypasses numaGrowNode's own
+	// check by taking node directly, so this test must check it too, or
+	// risk growing into a stream with no hints (the exact fatal
+	// "too many address space collisions" this review round caught).
+	if !runtime.NumaHeapStreamsEnabledForTest() {
+		t.Skip("numaHeapStreamsEnabled is false: streams are not populated on this build/run (race, tight-VA, or 32-bit)")
 	}
-	base1, ok1 := runtime.NumaHeapGrowForTest(npage, 1)
-	if !ok1 {
-		t.Fatal("NumaHeapGrowForTest(node 1) did not register a new heap arena")
-	}
+
+	base0 := growUntilNewArena(t, 0)
+	base1 := growUntilNewArena(t, 1)
 
 	node0 := runtime.NumaArenaNodeForTest(base0)
 	node1 := runtime.NumaArenaNodeForTest(base1)
@@ -53,7 +51,51 @@ func TestNUMAHeapArenaStreams(t *testing.T) {
 	if node1 != 1 {
 		t.Errorf("arena grown for node 1: numaArenaNode = %d, want 1", node1)
 	}
-	if node0 == node1 {
-		t.Fatalf("arenas grown for different nodes (0, 1) both report node %d -- streams are not address-partitioned", node0)
+
+	// The real design §12.3 property under test: per-node streams are
+	// address-partitioned, hint addresses >= 1 TiB apart per node, not
+	// merely "arenas that happen to compare unequal" (review M1 --
+	// node0 == node1 is already dead once both node0 == 0 and node1 ==
+	// 1 are individually asserted above; this checks the property those
+	// two assertions don't).
+	// uint64, not uintptr: this test only runs when numaHeapStreamsEnabled
+	// (skipped above otherwise, which always excludes 32-bit -- see
+	// numaHeapStreamsEnabled's doc comment), but the constant itself
+	// must still compile on every arch this file builds for, and
+	// uintptr(1)<<40 overflows a 32-bit uintptr at compile time.
+	const oneTiB = uint64(1) << 40
+	diff := uint64(base1) - uint64(base0)
+	if base0 > base1 {
+		diff = uint64(base0) - uint64(base1)
 	}
+	if diff < oneTiB {
+		t.Fatalf("node 0 and node 1 arenas only %#x apart, want >= %#x (1 TiB, design §12.3)", diff, oneTiB)
+	}
+}
+
+// growUntilNewArena grows node's stream, doubling the request each time
+// mheap.grow succeeds without registering a new heap arena (i.e. it
+// just extended existing headroom in that stream's current arena), and
+// returns the base address of the first newly-registered arena.
+//
+// A fixed npage (review M2 asked for 1<<14, ~128 MiB) is not reliable
+// here on its own: stream 0 in particular accumulates arbitrary
+// headroom from every allocation earlier in the same test binary --
+// none when this test runs in isolation, potentially much more as part
+// of the full `go test -short runtime` suite, where many other tests
+// have already grown stream 0 first. Node 1's stream never has this
+// problem (nothing else in this binary touches it), but the same
+// helper handles both for symmetry.
+func growUntilNewArena(t *testing.T, node int32) uintptr {
+	t.Helper()
+	npage := uintptr(1 << 14)
+	const maxNpage = uintptr(1) << 20 // ~8 GiB at 8 KiB pages; generous cap
+	for npage <= maxNpage {
+		if base, ok := runtime.NumaHeapGrowForTest(npage, node); ok {
+			return base
+		}
+		npage *= 2
+	}
+	t.Fatalf("NumaHeapGrowForTest(node %d) never registered a new heap arena, gave up at npage=%d", node, npage)
+	return 0
 }

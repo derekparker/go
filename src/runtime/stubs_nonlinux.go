@@ -62,14 +62,16 @@ func numaStandDownWiden() {
 func numaFixThreadPlacement() {
 }
 
-// numaGrowNode always returns node 0 (the single/off-build collapse value)
-// on non-Linux platforms: NUMA node discovery via getcpu is Linux-only (see
-// numa_linux.go). mheap.grow's callers (allocSpan) call this on every GOOS,
+// numaGrowNode always returns (0, false) on non-Linux platforms: NUMA node
+// discovery via getcpu is Linux-only (see numa_linux.go). homed == false
+// (review I1) is correct here regardless -- there is no genuine per-node
+// reading to home to on a platform with no getcpu path. mheap.grow's
+// callers (allocSpan, via numaGrowNodeArg) call this on every GOOS,
 // unconditionally, not just with goexperiment.Numa set, so this stub exists
 // purely so those call sites compile everywhere; heapArena.node's only
 // consumer today is numaArenaNode's diagnostic/test lookup.
-func numaGrowNode() int32 {
-	return 0
+func numaGrowNode() (stream int32, homed bool) {
+	return 0, false
 }
 
 // numaHeapHomingActive is always false on non-Linux platforms, for the same
@@ -77,6 +79,8 @@ func numaGrowNode() int32 {
 // implementation. Its call site (via numaBindGrowth, from mheap.grow) is
 // gated on goexperiment.Numa, so this body never runs with the experiment
 // off.
+//
+//go:nosplit
 func numaHeapHomingActive() bool {
 	return false
 }

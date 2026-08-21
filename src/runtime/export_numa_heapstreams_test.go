@@ -28,6 +28,18 @@ package runtime
 // NumaMaxHeapNodesForTest exports numaMaxHeapNodes.
 func NumaMaxHeapNodesForTest() int32 { return int32(numaMaxHeapNodes) }
 
+// NumaHeapStreamsEnabledForTest exports numaHeapStreamsEnabled (review
+// C1/C2): whether mallocinit actually populated per-node arena hint
+// chains beyond stream 0. numaMaxHeapNodes alone is not enough to tell
+// -- it is a build-time constant (8 on this build) that stays >= 2 even
+// when streams are disabled at run time (race builds, riscv64's 39-bit
+// VMA layout, 32-bit): NumaHeapGrowForTest calls mheap.grow directly
+// with an explicit node, bypassing numaGrowNode's own
+// numaHeapStreamsEnabled check, so callers forcing a nonzero stream
+// (e.g. TestNUMAHeapArenaStreams) must check this themselves or risk
+// growing into a stream mallocinit left with an empty hint chain.
+func NumaHeapStreamsEnabledForTest() bool { return numaHeapStreamsEnabled }
+
 // NumaArenaNodeForTest exports numaArenaNode.
 func NumaArenaNodeForTest(p uintptr) int32 { return numaArenaNode(p) }
 

@@ -213,6 +213,21 @@ type mheap struct {
 		base, end uintptr
 	}
 
+	// didFirstGrow latches true the first time mheap.grow runs, ever,
+	// across every stream (review I3). grow's one-shot ASLR
+	// randomization draws from heapRandSeed, a fixed 64-bit budget
+	// mallocinit sizes for exactly one consumption; it must fire on
+	// the process's true first grow call and never again, regardless
+	// of which stream that call (or any later one) targets. An
+	// explicit latch, rather than inferring "first grow" from
+	// curArena[0].base == 0, does not depend on stream 0 happening to
+	// be the first stream any code path grows into -- that ordering is
+	// true today (heap growth predates numaSchedinit, so
+	// numaGrowNode/numaCurrentNode return 0 before topology discovery
+	// completes) but is not a boundary this field should have to keep
+	// silently correct if that ordering ever changes.
+	didFirstGrow bool
+
 	// central free lists for small size classes.
 	// the padding makes sure that the mcentrals are
 	// spaced CacheLinePadSize bytes apart, so that each mcentral.lock
@@ -273,6 +288,20 @@ type mheap struct {
 
 var mheap_ mheap
 
+// numaMaxHeapNodes must be a power of two no larger than 0x40 (review
+// M3): mallocinit's hint-distribution loop divides the fixed 0x40-hint
+// range evenly by it (0x40 / numaMaxHeapNodes, requiring no remainder),
+// and 0x40 keeps it comfortably inside every fixed-width nodemask this
+// package uses (numaMaxNode == 65 bits) regardless of platform word
+// size. These are compile-time-only checks: a non-power-of-two or
+// too-large numaMaxHeapNodes (in either numa_heapstreams_on.go or
+// numa_heapstreams_off.go) fails the build with a negative-array-length
+// error rather than misbehaving at runtime.
+var (
+	_ [0x40 - numaMaxHeapNodes]byte
+	_ [1 - numaMaxHeapNodes&(numaMaxHeapNodes-1)]byte
+)
+
 // A heapArena stores metadata for a heap arena. heapArenas are stored
 // outside of the Go heap and accessed via the mheap_.arenas index.
 type heapArena struct {
@@ -330,6 +359,28 @@ type heapArena struct {
 	// stored directly at the top end of the span's memory.
 	pageUseSpanInlineMarkBits [pagesPerArena / 8]uint8
 
+	// node is the NUMA node this arena's address range is homed to
+	// (design §12.3): the mheap.grow call that created this arena
+	// requested it for this node (see mheap.sysAlloc), and, when
+	// per-node homing is active, the arena's memory was mbind'd
+	// MPOL_PREFERRED to it. An mspan never crosses arenas, so span home
+	// node == arena home node -- numaArenaNode reuses spanOf's two-load
+	// arenas[l1][l2] lookup to read this field without a third load
+	// into spans[].
+	//
+	// Build-tagged length (controller adjudication), not a bare uint8:
+	// numaHeapArenaNodeBytes is 1 on this build, 0 off, so a [0]uint8
+	// array costs zero bytes with the experiment off rather than the 8
+	// bytes a bare unconditional uint8 field cost here to alignment
+	// padding (verified by the off-build sizeof(heapArena) census).
+	// Placed here, before checkmarks, rather than as the struct's
+	// trailing field, so the zero-length off-build array doesn't
+	// trigger the compiler's trailing-zero-size-field padding (which
+	// exists to keep &lastField from aliasing the next heap object).
+	// Access only via numaArenaNode / numaArenaSetNode, which compile
+	// to "return 0" / a no-op when the experiment is off.
+	node [numaHeapArenaNodeBytes]uint8
+
 	// checkmarks stores the debug.gccheckmark state. It is only
 	// used if debug.gccheckmark > 0 or debug.checkfinalizers > 0.
 	checkmarks *checkmarksMap
@@ -345,16 +396,6 @@ type heapArena struct {
 	//
 	// Read atomically and written with an atomic CAS.
 	zeroedBase uintptr
-
-	// node is the NUMA node this arena's address range is homed to
-	// (design §12.3): the mheap.grow call that created this arena
-	// requested it for this node (see mheap.sysAlloc), and, when
-	// per-node homing is active, the arena's memory was mbind'd
-	// MPOL_PREFERRED to it. Always 0 with the experiment off (an
-	// mspan never crosses arenas, so span home node == arena home
-	// node -- numaArenaNode reuses spanOf's two-load arenas[l1][l2]
-	// lookup to read this field without a third load into spans[]).
-	node uint8
 }
 
 // arenaHint is a hint for where to grow the heap arenas. See
@@ -764,7 +805,25 @@ func numaArenaNode(p uintptr) int32 {
 	if ha == nil {
 		return 0
 	}
-	return int32(ha.node)
+	return heapArenaNode(ha)
+}
+
+// numaArenaSetNode tags ha with its home node (design §12.3), called
+// once from mheap.sysAlloc when a heapArena is created. A no-op when
+// the experiment is off, via setHeapArenaNode's off-build body: ha.node
+// is a [0]uint8 array off-build (numaHeapArenaNodeBytes == 0), so
+// unlike numaArenaNode/numaArenaSetNode's own goexperiment.Numa guard
+// above, indexing it at ha.node[0] would be a *compile-time*
+// out-of-bounds error even in dead code -- heapArenaNode/
+// setHeapArenaNode are therefore build-tag-split implementations
+// (numa_heapstreams_on.go / numa_heapstreams_off.go), not a single
+// body gated by a runtime check, so the off-build's source simply never
+// mentions ha.node[0] at all.
+func numaArenaSetNode(ha *heapArena, node int32) {
+	if !goexperiment.Numa {
+		return
+	}
+	setHeapArenaNode(ha, node)
 }
 
 // spanOfUnchecked is equivalent to spanOf, but the caller must ensure
@@ -1322,7 +1381,7 @@ func (h *mheap) allocSpan(npages uintptr, typ spanAllocType, spanclass spanClass
 		base, _ = h.pages.find(npages + extraPages)
 		if base == 0 {
 			var ok bool
-			growth, ok = h.grow(npages+extraPages, numaGrowNode())
+			growth, ok = h.grow(npages+extraPages, numaGrowNodeArg())
 			if !ok {
 				unlock(&h.lock)
 				return nil
@@ -1341,7 +1400,7 @@ func (h *mheap) allocSpan(npages uintptr, typ spanAllocType, spanclass spanClass
 		base, scav = h.pages.alloc(npages)
 		if base == 0 {
 			var ok bool
-			growth, ok = h.grow(npages, numaGrowNode())
+			growth, ok = h.grow(npages, numaGrowNodeArg())
 			if !ok {
 				unlock(&h.lock)
 				return nil
@@ -1591,6 +1650,22 @@ func (h *mheap) initSpan(s *mspan, typ spanAllocType, spanclass spanClass, base,
 	publicationBarrier()
 }
 
+// numaGrowNodeArg computes mheap.grow's node argument from
+// numaGrowNode's (stream, homed) pair (review I1): homed folds into the
+// sentinel node < 0 ("grow stream 0's address space, but this is not a
+// genuine per-node reading -- do not home it"), so grow's own signature
+// can stay the plan's fixed grow(npage, node) shape rather than growing
+// a third parameter. See grow's doc comment for how it unpacks this
+// again into idx (the array index, always >= 0) and node (passed
+// through unclamped to numaBindGrowth).
+func numaGrowNodeArg() int32 {
+	stream, homed := numaGrowNode()
+	if !homed {
+		return -1
+	}
+	return stream
+}
+
 // Try to add at least npage pages of memory to the heap,
 // returning how much the heap grew by and whether it worked.
 //
@@ -1600,6 +1675,16 @@ func (h *mheap) initSpan(s *mspan, typ spanAllocType, spanclass spanClass, base,
 // Callers get node from numaGrowNode (getcpu at grow frequency, never
 // inside grow itself -- the v2/v3 forbidden list's malloc-fast-path
 // rule).
+//
+// node < 0 is a sentinel meaning "grow stream 0's address space, but
+// this is not a genuine per-node reading to home memory to" (review
+// I1): numaGrowNode returns it whenever streams are disabled, getcpu
+// failed, or the running node is beyond numaMaxHeapNodes and had to
+// stand down to the shared stream. idx (the array index, always >= 0)
+// and node (passed through unclamped to numaBindGrowth, which treats
+// node < 0 as "do not home this growth") are deliberately kept
+// separate below rather than collapsing node < 0 to idx == 0 and
+// losing the distinction.
 //
 // With the experiment off, every caller passes node == 0 and
 // numaMaxHeapNodes == 1 (I5): idx below is then always the literal
@@ -1614,7 +1699,7 @@ func (h *mheap) grow(npage uintptr, node int32) (uintptr, bool) {
 	assertLockHeld(&h.lock)
 
 	idx := int32(0)
-	if goexperiment.Numa {
+	if goexperiment.Numa && node >= 0 {
 		idx = node
 	}
 
@@ -1622,23 +1707,15 @@ func (h *mheap) grow(npage uintptr, node int32) (uintptr, bool) {
 	// draws from heapRandSeed -- a single 64-bit budget sized in
 	// mallocinit for exactly one randomization, consumed via
 	// nextHeapRandBits (which throws "not enough heapRandSeed bits
-	// remaining" on a second draw). Per-node streams (design §12.3) mean
-	// h.curArena[idx].base == 0 ("first grow into this stream") can now
-	// be true more than once per process -- once per node's first grow,
-	// not just once ever -- so this must stay keyed on stream 0
-	// specifically, not idx: stream 0 is always the first stream any
-	// process grows (heap growth starts before numaSchedinit runs, and
-	// numaGrowNode/numaCurrentNode return 0 before topology discovery
-	// completes -- see numaBindArena's init-order guard), so
-	// h.curArena[0].base == 0 is true exactly once ever, for exactly
-	// the grow call that also has idx == 0. Every other node's first
-	// grow finds stream 0 already touched and skips this extra
-	// randomization -- it still starts from a randomized hint address
-	// (mallocinit's per-hint randHeapBasePrefix applies to every
-	// stream), it just does not additionally consume the shared
-	// entropy budget for the finer-grained pallocChunk/page-level
-	// jitter below.
-	firstGrow := h.curArena[0].base == 0
+	// remaining" on a second draw). An explicit one-shot latch
+	// (h.didFirstGrow, review I3) rather than inferring "first grow"
+	// from curArena[0].base == 0: that inference is correct today
+	// (stream 0 is always the first stream any process grows -- heap
+	// growth predates numaSchedinit, and numaGrowNode/numaCurrentNode
+	// return 0 before topology discovery completes) but silently
+	// depends on that ordering never changing; the latch does not.
+	firstGrow := !h.didFirstGrow
+	h.didFirstGrow = true
 
 	// We must grow the heap in whole palloc chunks.
 	// We call sysMap below but note that because we
@@ -1682,7 +1759,7 @@ func (h *mheap) grow(npage uintptr, node int32) (uintptr, bool) {
 					// numaBindArena/numaBindArenaHome for the
 					// init-order guard that makes this a no-op
 					// before numaSchedinit runs.
-					numaBindGrowth(unsafe.Pointer(h.curArena[idx].base), size, idx)
+					numaBindGrowth(unsafe.Pointer(h.curArena[idx].base), size, node)
 				}
 				// Update stats.
 				stats := memstats.heapStats.acquire()
@@ -1727,7 +1804,7 @@ func (h *mheap) grow(npage uintptr, node int32) (uintptr, bool) {
 	sysMap(unsafe.Pointer(v), nBase-v, &gcController.heapReleased, "heap")
 	if goexperiment.Numa {
 		// See the comment on the other numaBindGrowth call above.
-		numaBindGrowth(unsafe.Pointer(v), nBase-v, idx)
+		numaBindGrowth(unsafe.Pointer(v), nBase-v, node)
 	}
 
 	// The memory just allocated counts as both released

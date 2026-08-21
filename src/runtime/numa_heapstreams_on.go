@@ -20,3 +20,24 @@ package runtime
 // them rather than sharing via node % numaMaxHeapNodes, which would
 // falsely suggest locality where none exists. See numaGrowNode.
 const numaMaxHeapNodes = 8
+
+// numaHeapArenaNodeBytes is the array length of heapArena.node
+// (controller adjudication): 1 on this build. See
+// numa_heapstreams_off.go for the off-build value and the reasoning
+// (a bare unconditional uint8 field cost 8 bytes off-build to
+// alignment padding; a build-tagged zero-length array costs nothing).
+const numaHeapArenaNodeBytes = 1
+
+// heapArenaNode and setHeapArenaNode are heapArena.node's accessors on
+// this build. Split into build-tagged files (rather than a single body
+// gated by a runtime goexperiment.Numa check, as their callers
+// numaArenaNode/numaArenaSetNode in mheap.go are) because
+// numaHeapArenaNodeBytes is 0 off-build, making ha.node[0] a
+// *compile-time* out-of-bounds error there even in unreachable code --
+// seeing this file's source at all requires the goexperiment.numa
+// build tag, which is exactly what guarantees numaHeapArenaNodeBytes
+// is 1 here.
+func heapArenaNode(ha *heapArena) int32 { return int32(ha.node[0]) }
+func setHeapArenaNode(ha *heapArena, node int32) {
+	ha.node[0] = uint8(node)
+}

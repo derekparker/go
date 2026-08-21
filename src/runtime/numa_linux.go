@@ -709,28 +709,41 @@ func numaBindArena(addr unsafe.Pointer, size uintptr) {
 // removed Layer 2, adjacent chunks always share the same node's policy and
 // merge cleanly (see numaBindArenaHome's doc comment).
 
-// numaGrowNode returns the NUMA node mheap.grow should grow into: the node
-// the calling thread is currently running on (getcpu, via numaCurrentNode),
-// clamped to a valid heap arena stream index.
+// numaGrowNode returns the NUMA node mheap.grow should grow into (stream),
+// and whether that is a genuine per-node reading safe to home memory to
+// (homed) -- review I1.
 //
-// Called from allocSpan, at heap-growth frequency only (mheap.grow itself
-// never calls getcpu -- the v2/v3 forbidden list's "no getcpu on a malloc
-// fast path, refill/grow/scheduler-pass frequency only" rule). With the
-// experiment off this returns 0 before any syscall, matching every other
-// numaCurrentNode caller.
-func numaGrowNode() int32 {
-	if !goexperiment.Numa {
-		return 0
+// stream is always a valid heap arena stream index ([0, numaMaxHeapNodes)),
+// even when homed is false: stream 0's address space always exists and is
+// always safe to grow into, regardless of whether this call can vouch for
+// it being where the calling thread actually runs. homed is false, and
+// stream is unconditionally 0, in every case where collapsing to node 0
+// would otherwise be mistaken for a genuine node-0 reading:
+//
+//   - streams are disabled entirely (numaHeapStreamsEnabled -- experiment
+//     off, race build, tight-VA riscv64, or 32-bit; review C1/C2);
+//   - the running node could not be determined (a failed getcpu) -- a
+//     syscall failure says nothing about which node is actually running,
+//     least of all that it's node 0;
+//   - the running node is >= numaMaxHeapNodes (I5: "not node % N sharing" --
+//     a host with more real nodes than streams does not get false locality
+//     for the nodes it has no stream for, and must not be homed to node 0
+//     on their behalf either -- sparse/high node ids exist even on hosts
+//     with few total nodes, e.g. CXL memory nodes).
+//
+// Called from allocSpan (via numaGrowNodeArg), at heap-growth frequency
+// only (mheap.grow itself never calls getcpu -- the v2/v3 forbidden list's
+// "no getcpu on a malloc fast path, refill/grow/scheduler-pass frequency
+// only" rule). With streams disabled this returns before any syscall.
+func numaGrowNode() (stream int32, homed bool) {
+	if !numaHeapStreamsEnabled {
+		return 0, false
 	}
 	node := numaCurrentNode()
-	// -1 (a failed getcpu) and any node id at or beyond numaMaxHeapNodes
-	// both stand down to stream 0 (I5: "not node % N sharing" -- a host
-	// with more real nodes than streams does not get false locality for
-	// the nodes it has no stream for).
 	if node < 0 || node >= numaMaxHeapNodes {
-		return 0
+		return 0, false
 	}
-	return node
+	return node, true
 }
 
 // numaHeapHomingActive reports whether mheap.grow should home newly mapped
@@ -746,26 +759,39 @@ func numaGrowNode() int32 {
 //     numaBindArena uses, since mheap.grow can run before numaSchedinit.
 //
 // False collapses grow's homing call to exactly today's numaBindArena
-// BIND-all: single-node hosts, hosts where topology discovery hasn't run
-// yet, and (implicitly, via numaGrowNode's clamp) any node beyond
-// numaMaxHeapNodes's stream count that shares stream 0 -- that stream stays
-// on BIND-all rather than being homed to node 0 specifically, so a real
-// node-0 thread sharing it with excess nodes' threads is not preferentially
-// favored over them.
+// BIND-all: single-node hosts and hosts where topology discovery hasn't run
+// yet. (numaGrowNode's own homed=false cases -- disabled streams, failed
+// getcpu, node >= numaMaxHeapNodes -- are handled by numaBindGrowth passing
+// node < 0 through, not by this function.)
+//
+//go:nosplit
 func numaHeapHomingActive() bool {
 	return goexperiment.Numa && numaMaxHeapNodes > 1 && numaTopology.NumNodes > 1 && numaAllowedNodemask.Load() != 0
 }
 
 // numaBindGrowth is mheap.grow's single call site for arena VMA policy: it
-// dispatches to numaBindArenaHome (per-node PREFERRED) when per-node homing
-// is active, and to numaBindArena (uniform BIND-all) otherwise. Same
-// nosplit-under-h.lock contract as numaBindArena -- see that function's doc
-// comment for the full rationale (init-order guard, scavenger interaction,
-// ignored mbind errors); it is not repeated here.
+// dispatches to numaBindArenaHome (per-node PREFERRED) only when node is a
+// genuine per-node reading (node >= 0 -- see numaGrowNode/numaGrowNodeArg
+// for the sentinel, review I1) AND per-node homing is active AND node is
+// actually one of this process's allowed NUMA nodes (review I2: node's bit
+// must be set in numaAllowedNodemask, the same mask numaBindArena's
+// BIND-all already restricts itself to -- a cpuset can exclude a node that
+// still fits in numaMaxHeapNodes's index range, e.g. a container pinned to
+// nodes {0,3} on an 8-node host; mbind'ing MPOL_PREFERRED to an excluded
+// node either fails outright or, worse, silently succeeds and leaves the
+// range with no VMA policy at all once it hits a kernel that permits it,
+// losing the balancer exemption decision 1 relies on). Every other case
+// falls back to numaBindArena (uniform BIND-all) -- one atomic load and one
+// AND to check the nodemask bit, no syscall spent on a policy the kernel
+// would reject or that would silently under-exempt the range.
+//
+// Same nosplit-under-h.lock contract as numaBindArena -- see that
+// function's doc comment for the full rationale (init-order guard,
+// scavenger interaction, ignored mbind errors); it is not repeated here.
 //
 //go:nosplit
 func numaBindGrowth(addr unsafe.Pointer, size uintptr, node int32) {
-	if numaHeapHomingActive() {
+	if node >= 0 && numaHeapHomingActive() && numaAllowedNodemask.Load()&(uintptr(1)<<uint(node)) != 0 {
 		numaBindArenaHome(addr, size, node)
 		return
 	}
@@ -778,6 +804,21 @@ func numaBindGrowth(addr unsafe.Pointer, size uintptr, node int32) {
 // MPOL_BIND to a single node -- the OOM footgun bind-all-policy.md forbids
 // for the whole process; here it is a graceful-spill VMA policy over one
 // preferred node, not a hard process-wide bind).
+//
+// Unlike numaBindArena's MPOL_BIND (which restricts allocation to
+// numaAllowedNodemask -- every node this process is actually allowed to use,
+// per its cpuset), MPOL_PREFERRED(node) drops that restriction at the VMA
+// level: if node fills, the kernel spills to *any* node, not just the
+// process's allowed set. numaBindGrowth's caller (review I2) is what keeps
+// this safe -- node is only ever passed here after confirming node's own
+// bit is set in numaAllowedNodemask, so preferring it is never itself a
+// cpuset violation -- but the range's *spill* target is not cpuset-bounded
+// by this VMA policy the way BIND-all's was. In practice the process's
+// cpuset (cgroup cpuset.mems) still bounds actual page allocation
+// independently of mempolicy -- the kernel enforces cpuset membership as a
+// hard ceiling beneath any mempolicy, including PREFERRED's spill target --
+// so this is not an escape from the cpuset, just a weaker *preference*
+// restriction than BIND-all carried.
 //
 // Unlike the removed Layer 2 (which keyed a per-chunk PREFERRED off
 // whichever thread happened to be growing the heap's single shared address
