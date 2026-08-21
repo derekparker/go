@@ -1,0 +1,3 @@
+Gate2a: n(b)=10 n(n)=10 CV_b=22.44% CV_n=26.86% pooled=24.74% MDE(n=10)=30.99%
+Gate2c: n(b)=30 n(n)=30 CV_b=25.92% CV_n=32.31% pooled=29.29% MDE(n=30)=21.18%
+Gate2c sec/op medians: base=2.20343e+06 numa=2.33667e+06 rel=+6.05%

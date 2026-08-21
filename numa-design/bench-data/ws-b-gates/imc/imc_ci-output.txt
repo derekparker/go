@@ -1,0 +1,8 @@
+Welch: bmean=48.38% nmean=46.25% diff=-2.13pp se=0.560pp df=4.28 t_crit=2.776
+Welch relative-drop 95% CI: [-7.62%, -1.19%]
+Bootstrap ratio-of-medians 95% CI: [-8.09%, -1.06%]  (0/200000 resamples reach <= -10%)
+exact MWU p floor at n=5,5 (complete separation): 0.00794
+volume range: 36,829,449 to 162,295,334 (spread 4.41x)
+Pearson r (volume vs share, all 10 runs pooled): -0.053
+Pearson r baseline only: -0.128
+Pearson r numa only: 0.066

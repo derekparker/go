@@ -1,0 +1,2 @@
+n(a)= 10 n(c)= 10
+exact MWU (full enumeration): U1=64.0 U2=36.0 p=0.3150  total_combos=184756

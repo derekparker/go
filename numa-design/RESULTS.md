@@ -3044,6 +3044,26 @@ section supersedes it in place, per instruction to keep the pause as
 history rather than deleting it from the record). The second sitting
 resumed from Step 2 through the full battery, recorded below.
 
+**Audit round (post-completion, same day):** an independent audit
+reproduced every number below and confirmed the overall FAIL verdict as
+sound — stronger, in fact, once corrected. Five Important-severity
+findings and several minors were identified and are fixed in place
+throughout this section (each marked inline as "audit round" or "I1"-"I5"
+at its point of correction): (I1) missing per-round vmstat snapshot pairs
+for the three pathology sweeps, restored from `numa-dell` into the
+archive; (I2) a self-contradictory causal claim in Gate 2b, corrected;
+(I3) unsupported cross-campaign "tighter/stronger than Workstream A"
+comparisons in the pathology candidates, withdrawn in favor of
+within-session-only claims (the untreated stock arms moved substantially
+between sessions, so most apparent cross-session narrowing was session
+stability, not treatment effect); (I4) an unreported +201.6% 1P STW-ns/op
+regression, surfaced as an exploratory finding; (I5) missing MDE
+statements for Gate 2a and Gate 2c's `sec/op`, added, with Gate 2c's FAIL
+reframed as "significant, magnitude imprecise" at its own MDE. Two cheap
+follow-up experiments (E1, E2) were also run, pre-registered in place
+before execution — see "Exploratory attribution experiments" after the
+Step 5 verdict below.
+
 Raw `.out`/`.csv` files, benchstat/analysis-script transcripts, sweep-driver
 invocations, and `go version -m` transcripts are archived under
 `numa-design/bench-data/ws-b-gates/` (subdirectories per gate: `gate2-1p/`,
@@ -3094,7 +3114,31 @@ JSON-1  user+sys-sec/op:   32.00m ± 46%  32.40m ± 49%  ~ (p=0.393 n=10)
 ```
 
 Neither primary metric significant; both nominally +1.2%/+1.3%, well
-inside noise. **PASS.** Archived `gate2-1p/baseline.out`, `gate2-1p/numa.out`.
+inside noise. **Achieved MDE:** per-arm CV 22.4%/26.9% (recomputed
+directly from the raw round values, not benchstat's own ± summary — see
+`gate2-1p/mde_compute.py`), pooled ≈24.7%, giving MDE ≈31.0% at n=10
+(α=0.05, power=0.80) — this PASS excludes only gross regressions ≥~31%,
+the same honest-MDE caveat Workstream A's own Gates 1/3 already carry.
+**PASS.**
+
+**Exploratory finding, surfaced from this gate's own archived output (not
+part of the pre-declared verdict, but a real, tight, reproducible signal
+worth recording as a clue to the CPU-cost question raised throughout this
+battery):** `STW-ns/op` shows a **+201.56% regression** at 1P —
+baseline 4,578ns ± 50%, numa 13,806ns ± 53%, **p=0.000, n=10, complete
+separation** (every numa round's STW time exceeds every baseline round's).
+This does **not** recur at 256P: pooled n=30, `STW-sec/op` 157.6µs vs
+153.8µs, **not significant, p=0.786** (see Step 2c-e below). At
+`GOMAXPROCS=1` there is exactly one P doing all GC-assist and mark work,
+so any fixed per-STW-episode cost (e.g., additional per-node spanSet
+bookkeeping touched during a stop-the-world sweep/mark transition) shows
+up undiluted; at 256P the same fixed cost is a much smaller fraction of a
+much larger aggregate STW total across many Ps, and disappears into noise.
+This is consistent with — though does not by itself prove — a
+constant-per-episode (not per-byte, not per-thread-count-scaled) source
+for at least part of the CPU-time-cost pattern recorded throughout this
+battery (Gates 2b, 2c, 4c below). Archived `gate2-1p/baseline.out`,
+`gate2-1p/numa.out`.
 
 #### 2b. 1P alloc micro (`Malloc(8|16|Types)`, `-count=10`): **FAIL**
 
@@ -3118,12 +3162,22 @@ tight and reproducible signal, not a borderline miss. This is a real,
 small but consistent per-allocation overhead on the fastest possible
 malloc path even at `GOMAXPROCS=1` (where refill-time `getcpu` routing and
 soft affinity are both essentially inert — one P, no node changes to
-narrow on). The likely source is fixed per-call bookkeeping now present
-in the mcache/mcentral fast path (additional branches/field reads that
-exist regardless of whether a refill or a node-change actually occurs),
-not a routing- or scheduling-frequency cost — consistent with the
-`(*mcentral).cacheSpan`/`cacheSpanFromNode` split the off-binary census
-below shows structurally changed even in the off build. Archived
+narrow on). **Correction (I2, audit round):** an earlier draft of this
+section attributed the delta to the `(*mcentral).cacheSpan`/
+`cacheSpanFromNode` restructuring the off-binary census (Step 2f, below)
+shows in the off build — that explanation was self-contradictory and is
+withdrawn: the census's off-build restructuring is present identically in
+**both** arms of this comparison (the "baseline" arm here is the same
+`GOEXPERIMENT`-unset off-build shape the census itself uses), so it
+cancels between arms and cannot explain an on-vs-off delta. The correct
+framing: **the source is experiment-gated** (`goexperiment.Numa`-guarded
+code paths present only in the `numa` arm's binary); the census's
+off-build restructuring is a real, disclosed deviation from a literal
+byte-identical off-binary (Step 2f) but is orthogonal to this gate's
+on-vs-off delta, not a cause of it. What specifically inside the gated
+code costs ~3.7% here is not isolated by this gate alone — see the STW
+exploratory finding above (Gate 2a) and the CPU-cost attribution
+experiment (E2, below) for the available evidence. Archived
 `gate2-1p/wsB-gate2-alloc-base.out`, `gate2-1p/wsB-gate2-alloc-numa.out`.
 
 ### Step 2c-e. 256P json (hard) + RSS + vmstat wrap
@@ -3150,14 +3204,28 @@ JSON-256  user+sys-sec/op:   174.9m ± 11%  209.8m ± 17%  +19.96% (p=0.025 n=30
 JSON-256  peak-RSS-bytes:    6.379Gi ± 47%  5.690Gi ± 49%  ~ (p=0.254 n=30)
 ```
 
-**Verdict: FAIL** on `user+sys-sec/op` (+19.96%, p=0.025, pooled n=30 —
-statistically significant, not a noise artifact like Gates 1/3's own MDE
-caveats elsewhere in this file). Wall-clock `sec/op` is **not** significant
-(p=0.358) — real elapsed time is not distinguishably worse, but CPU time
-is a real, measured cost at 256P too, consistent with Gate 2b's finding at
-1P. **RSS: PASS**, not systematically fatter — nominally *lower* for the
-numa arm, not significant (p=0.254); per-node spanSets stranding memory
-was the theoretical risk this sub-gate exists to catch, and it did not
+**Achieved MDE (I5, audit round):** recomputed directly from raw pooled
+round values (`gate3-256p/mde_compute-output.txt`), not benchstat's own ±
+summary: per-arm CV 25.9%/32.3%, pooled ≈29.3%, MDE ≈21.2% at n=30
+(α=0.05, power=0.80). **`sec/op`'s PASS excludes only gross regressions
+≥~21%** — the pooled median is already **+6.05%** (2.203ms → 2.337ms,
+not significant at p=0.358, but not a clean parity reading either; this
+gate's resolving power simply cannot distinguish +6% from 0% at this
+noise level). `user+sys-sec/op`'s **FAIL is real** (+19.96%, p=0.025,
+below this gate's own ≈21% MDE) but should be read as **"significant,
+magnitude imprecise"** rather than a precisely-pinned +19.96% cost: the
+true effect could plausibly be anywhere the confidence interval around
+that point estimate allows, given a comparably-sized MDE to the effect
+itself. **Verdict: FAIL** on `user+sys-sec/op` — statistically significant,
+not a noise artifact like Gates 1/3's own MDE caveats elsewhere in this
+file, but reported with the same MDE honesty this plan requires
+everywhere else. Wall-clock `sec/op` is **not** significant (p=0.358) —
+real elapsed time is not distinguishably worse at this gate's resolving
+power, but CPU time is a real, measured cost at 256P too, consistent with
+Gate 2b's finding at 1P and Gate 4c's finding at 256P (below). **RSS:
+PASS**, not systematically fatter — nominally *lower* for the numa arm,
+not significant (p=0.254); per-node spanSets stranding memory was the
+theoretical risk this sub-gate exists to catch, and it did not
 materialize here.
 
 vmstat 0/0 wrap (run twice per protocol, counters are machine-global):
@@ -3225,9 +3293,16 @@ zero unrelated-function changes (three explicit hot-path spot checks
 byte-identical), zero new symbols beyond the two already disclosed and
 accepted in Tasks 8/9's own review rounds, all 11 line-count deltas
 confined to functions in the workstream's own declared file map
-(`mheap.go`, `mcentral.go`). Archived `census/census-{head,parent}.txt`
-(full stripped disassembly, 7.8M each), `census/census-summary.txt`,
-`census/census-canary.go`.
+(`mheap.go`, `mcentral.go`). **Gap recorded (audit round):** this census
+is a static, structural check (instruction-line counts, symbol presence)
+only — none of the 11 changed function bodies were given a **behavioral**
+off-vs-parent check (e.g., a benchmark or differential test confirming
+the off-build's restructured `cacheSpan`/`cacheSpanFromNode` actually
+produces identical results/timing to the pre-restructure parent). The
+census answers "did the shape change unexpectedly," not "does the changed
+shape behave identically" — a real, open gap, not one this task's own
+data closes. Archived `census/census-{head,parent}.txt` (full stripped
+disassembly, 7.8M each), `census/census-summary.txt`, `census/census-canary.go`.
 
 ### Step 3 — IMC decision gate (pre-registered primary): **FAIL**
 
@@ -3264,9 +3339,38 @@ Unlike Layer 2's null result (+0.10%/−0.07%, arms statistically
 indistinguishable), this is a **clean, statistically significant effect
 in the right direction**: `max(numa)=47.98% < min(baseline)=48.06%` —
 complete separation between the two arms across all 5×5 runs, exact
-two-sided Mann-Whitney U p=0.00794. The three-ingredient unit genuinely
-moves the metric that killed Layer 2. It does not move it far enough to
-clear the pre-registered bar.
+two-sided Mann-Whitney U p=0.00794 (this **is the exact-test floor at
+n=5,5** — the smallest p-value complete separation can produce at this
+sample size, not a value that would shrink further without more runs;
+noted so it isn't misread as an unusually strong significance level).
+
+**Confidence intervals on the relative drop (audit round, `imc/imc_ci.py`,
+both independently reproduced and matching the audit's own figures
+exactly):**
+
+- Welch's t-test 95% CI (raw share values, Welch–Satterthwaite df≈4.28):
+  **[−7.62%, −1.19%]**
+- Bootstrap, ratio-of-medians (200,000 resamples with replacement, each
+  arm independently): 95% CI **[−8.09%, −1.06%]**; **0 of 200,000
+  resamples** reach the −10% pass bar.
+
+Both intervals **strengthen** the FAIL verdict rather than soften it: even
+under the most favorable resampling of this exact data, the relative drop
+never approaches −10%. The three-ingredient unit genuinely moves the
+metric that killed Layer 2, with a real and now interval-bounded effect.
+It does not move it far enough to clear the pre-registered bar, and the
+data rule out that a differently-unlucky sample of the same size would
+have cleared it.
+
+**Volume independence (minor, audit round):** the five runs per arm swept
+a **4.41× range** in total L3-miss volume (36.8M to 162.3M combined
+local+remote events, driven by the benchmark's own `-benchtime=10s`
+wall-clock-bounded iteration count varying with machine state) — the
+remote share itself does not track that volume: Pearson r ≈ **−0.05**
+pooled across all 10 runs (r≈−0.13 within baseline, r≈+0.07 within numa —
+both consistent with no relationship). The remote-share metric is a
+stable per-access-pattern signature, not an artifact of how much traffic
+happened to be sampled in a given 10-second window.
 
 **Corroboration — `/numa/span-refills` in-vivo proxy (ON arm, same
 `GOMAXPROCS=256`, unpinned, `routing-probe -totalmb=16384`):**
@@ -3329,17 +3433,28 @@ Non-inferiority (upper bound <= +10%): PASS
 Paired sign test: C slower than A in 11/15 rounds, faster in 4 — **not
 significant** (exact two-sided p=0.1185).
 
-**Verdict: PASS, and a materially tighter result than Workstream A's own
-candidate 1 gate** (which had point estimate +2.69%, CI upper +8.26%, and
-a *significant* paired sign test, p=0.035, 12/15 rounds). Here: point
-estimate essentially zero (−0.03%), CI upper +2.32% (well under a third of
-A's own margin), and the sign test does **not** reach significance. The
-full three-ingredient unit holds — and modestly tightens — Workstream A's
-confinement win on this workload at GOMAXPROCS=128 (where confinement is
-active for both A's pin and C's own `numaConfineIfSmall`). In-sweep-
-adjacent confinement observation (same command, run immediately after the
-sweep): `Cpus_allowed_list` narrowed to node 1's odd CPUs (this session's
-boot node). Archived `cand1-128p/`.
+**Verdict: PASS, within this session.** Point estimate essentially zero
+(−0.03%), CI upper +2.32%, sign test not significant — C ties the pinned
+oracle A, and beats stock B by −32.65%. **Correction (I3, audit round):**
+an earlier draft of this section additionally claimed this result was
+"materially tighter" than Workstream A's own candidate 1 gate (CI upper
++8.26%, significant sign test). That cross-campaign comparison is
+**withdrawn** — it is not a like-for-like read. The untreated, unchanged
+stock arms moved substantially between the two sessions: arm A (pinned
+oracle, identical binary/command shape both times) had CV 7.4% in
+Workstream A's own sweep vs. **1.3% here** (a 5.7× drop), and arm B
+(stock, also unchanged) shifted **+12.7%** in absolute ns/op between
+sessions (Workstream A: 2.558ms → this session: 2.882ms). Since both
+untreated arms moved this much between sessions, most of the apparent CI
+narrowing reflects **this session's own machine/measurement stability**,
+not anything C is doing differently from Workstream A's own C. The only
+claim this data actually supports is the **within-session** one: C ties A
+(non-inferiority PASS, point estimate −0.03%) and clearly beats B
+(−32.65%), in the same single session, under the same rotating-order
+protocol — a real result, just not a cross-session "improvement over
+Workstream A" one. In-sweep-adjacent confinement observation (same
+command, run immediately after the sweep): `Cpus_allowed_list` narrowed to
+node 1's odd CPUs (this session's boot node). Archived `cand1-128p/`.
 
 #### 4b. Candidate 2 — `gc-pause-bench` heavy profile, GOMAXPROCS=128, n=10 round-level (80 cycles/arm): **PASS**
 
@@ -3363,19 +3478,30 @@ normal-approx p=0.0002 SIGNIFICANT; exact (full enumeration) p=1.083e-05 SIGNIFI
 === Secondary: A vs B ===
 A median=3107.53ms  B median=3906.96ms  rel(B vs A)=+25.73%  p=0.0002 SIGNIFICANT
 === C vs A (context) ===
-A median=3107.53ms  C median=3078.54ms  rel(C vs A)=-0.93%  p=0.3075 not significant
+A median=3107.53ms  C median=3078.54ms  rel(C vs A)=-0.93%  p=0.3075 (normal-approx) not significant
 ```
 
-Non-inferiority CI: `n=10 point_estimate_C/A-1=-0.53% 95%CI=[-2.37%, +1.34%] — PASS`
-(tighter than Workstream A's own +5.15% upper bound). Paired sign test: C
-faster than A in 8/10 rounds — not significant (exact two-sided p=0.1094).
+**Correction (minor, audit round):** the script's normal-approximation
+p=0.3075 above is conservative; the true **exact** Mann-Whitney U
+(full enumeration, `184,756` combinations, `cand2_exact_p.py`) is
+**p=0.3150** — both agree on "not significant," the exact value is the
+one to cite. U1=64.0, U2=36.0.
 
-**Verdict: PASS**, same pattern as candidate 1 — a clean win over stock
-(B), and a modest, non-significant *improvement* over Workstream A's own
-already-passing non-inferiority bound against the pinned oracle (A). The
-three-ingredient unit does not regress Workstream A's confinement-era
-wins at GOMAXPROCS=128 on either candidate; both point estimates land
-closer to zero than Workstream A's own gate battery achieved. In-sweep-
+Non-inferiority CI: `n=10 point_estimate_C/A-1=-0.53% 95%CI=[-2.37%, +1.34%] — PASS`.
+Paired sign test: C faster than A in 8/10 rounds — not significant (exact
+two-sided p=0.1094).
+
+**Verdict: PASS, within this session** — a clean win over stock (B,
+−21.20%), and C ties the pinned oracle A (non-inferiority PASS, point
+estimate −0.53%, not significant either direction). **Correction (I3,
+audit round):** an earlier draft additionally framed the CI bound here
+(+1.34% upper) as "tighter than Workstream A's own +5.15% upper bound" —
+withdrawn for the same reason as candidate 1 above (I3): that comparison
+was not verified as like-for-like against Workstream A's own candidate 2
+session-to-session noise characteristics, and this battery's own audit of
+candidate 1 already showed such cross-session comparisons are dominated
+by session stability, not by anything the treatment does differently.
+Only the within-session claim stands: C ties A, C beats B. In-sweep-
 adjacent confinement observation: `Cpus_allowed_list` narrowed to node 1's
 odd CPUs. Archived `cand2-gcpause/`.
 
@@ -3420,8 +3546,8 @@ measurable overhead. Archived `cand1-256p-exploratory/`.
 | 2e. vmstat 0/0 (hard) | PASS — 0/0 twice |
 | 2f. Off-binary census, workstream-once (hard) | PASS (substantive) — both deviations previously disclosed/accepted in Tasks 8/9's own reviews; hot paths byte-identical |
 | 3. IMC decision gate (pre-registered primary) | **FAIL** — −4.49% relative (need ≥−10.00%); real, corroborated, complete-separation effect (exact p=0.00794), just short of the bar |
-| 4a. Pathology candidate 1 (128P, supporting) | PASS — B-vs-C −32.65% (p=0.000); C-vs-A non-inferiority tighter than Workstream A's own (CI upper +2.32% vs +8.26%) |
-| 4b. Pathology candidate 2 (128P, supporting) | PASS — B-vs-C −21.20% (exact p=1.08e-5); C-vs-A non-inferiority tighter than Workstream A's own (CI upper +1.34% vs +5.15%) |
+| 4a. Pathology candidate 1 (128P, supporting) | PASS — B-vs-C −32.65% (p=0.000); C-vs-A non-inferiority CI upper +2.32% (within-session only; cross-session "tighter than WS-A" claim withdrawn, I3) |
+| 4b. Pathology candidate 2 (128P, supporting) | PASS — B-vs-C −21.20% (exact p=1.08e-5); C-vs-A non-inferiority CI upper +1.34% (within-session only; cross-session "tighter than WS-A" claim withdrawn, I3) |
 | 4c. Exploratory 256P garbage (informational) | sec/op not significant; user+sys-sec/op +7.45% (p=0.011) — third confirmation of the CPU-time-cost pattern |
 
 **Two hard gates fail** (1P alloc micro +3.73%, 256P user+sys +19.96%,
@@ -3508,12 +3634,18 @@ measure honestly, not to diagnose exhaustively.
    gate. Any follow-up work should treat this as a real, load-bearing
    finding, not something to explain away.
 2. The pathology candidates at GOMAXPROCS=128 (where Workstream A's own
-   confinement is active for arm C too) both look *better* than
-   Workstream A's own gate battery on the same workloads — worth noting
-   explicitly so this is not read as "Workstream B made things worse
-   everywhere": the two hard-gate failures and the IMC shortfall are
-   real, but they coexist with a genuine, measured improvement over
-   Workstream A alone on confinement-eligible workloads.
+   confinement is active for arm C too) both **tie the pinned oracle A
+   and beat stock B, within this session** — worth noting explicitly so
+   this is not read as "Workstream B made things worse everywhere": the
+   two hard-gate failures and the IMC shortfall are real, but they
+   coexist with genuine, measured wins on confinement-eligible
+   workloads. **Corrected (I3, audit round):** this is deliberately no
+   longer phrased as "better than Workstream A's own gate battery" — that
+   cross-campaign framing is withdrawn (see 4a/4b above); the untreated
+   stock arms moved substantially between the two sessions (arm A's CV
+   fell 5.7× session-to-session, arm B moved +12.7%), so a same-session
+   tie against the pinned oracle is the only comparison this data
+   actually supports.
 3. This battery did not attempt to separate "the CPU-time cost is from
    ingredient (b)'s refill-time `getcpu` calls" from "the cost is from
    ingredient (c)'s soft-affinity scheduler hook" from "the cost is from
