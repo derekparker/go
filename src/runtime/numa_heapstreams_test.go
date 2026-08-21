@@ -108,6 +108,13 @@ func TestNUMAHeapArenaStreams(t *testing.T) {
 // arena, not a doubled-but-never-tried value -- an earlier version of
 // this loop checked the cap after doubling, so its failure message
 // named a size this function had never actually asked mheap.grow for.
+//
+// Re-review NEW-3/task-8-helper-doc: the returned base is valid ONLY
+// for heapArena-metadata lookups (as TestNUMAHeapArenaStreams uses it,
+// via NumaArenaNodeForTest) -- see NumaHeapGrowForTest's doc comment
+// (export_numa_heapstreams_test.go) for why it is NOT necessarily
+// inside the page-allocator-registered range this same grow call
+// extended.
 func growUntilNewArena(t *testing.T, node int32) uintptr {
 	t.Helper()
 	npage := uintptr(1 << 14)

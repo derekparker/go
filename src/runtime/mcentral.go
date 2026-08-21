@@ -258,7 +258,15 @@ func (c *mcentral) cacheSpan() *mspan {
 		// from many Ps).
 		sl := sweep.active.begin()
 
-		s = c.cacheSpanFromNode(node, &spanBudget, sl)
+		// Review NEW-2 micro-nit: the local node's partial-swept set was
+		// already probed (empty) just above, under the same sg -- skip
+		// cacheSpanFromNode's own equivalent probe for node specifically,
+		// rather than paying for an immediate, guaranteed-empty repeat of
+		// the exact check this function just made. sg is threaded through
+		// (not re-read inside cacheSpanFromNode) so every call below,
+		// local and remote alike, agrees on the same sweepgen snapshot
+		// this whole refill is operating under.
+		s = c.cacheSpanFromNode(node, &spanBudget, sl, sg, true)
 		if s == nil && goexperiment.Numa {
 			hwm := numaGrowLoopBound()
 			for other := int32(0); other <= hwm; other++ {
@@ -273,7 +281,7 @@ func (c *mcentral) cacheSpan() *mspan {
 				// every later node for no reason. cacheSpanFromNode's own
 				// internal loops still stop doing actual sweep work once
 				// budget is spent.
-				if s = c.cacheSpanFromNode(other, &spanBudget, sl); s != nil {
+				if s = c.cacheSpanFromNode(other, &spanBudget, sl, sg, false); s != nil {
 					break
 				}
 			}
@@ -349,19 +357,30 @@ func (c *mcentral) cacheSpan() *mspan {
 // cacheSpan tries, see there). Returns nil if node has nothing usable
 // within the remaining budget.
 //
+// sg is the sweepgen every call cacheSpan makes across one refill
+// shares (threaded through rather than re-read here, review NEW-2
+// micro-nit) -- see below. skipSwept, when true, skips this
+// function's own partialSwept probe entirely: cacheSpan's local-node
+// fast path (see there) already made that exact check, under the
+// same sg, immediately before calling here, so repeating it would
+// just re-derive the same empty result. Only cacheSpan's very first
+// call (for the local node) passes true; every remote-node fallback
+// call passes false, since those nodes' partialSwept sets have not
+// been probed yet.
+//
 // This is exactly the pre-task-9 (single, unindexed) cacheSpan search
 // body, parameterized by which node's sets to search and given a
 // shared sweepLocker instead of acquiring its own; see cacheSpan for
 // the local-then-remote-then-grow routing order this is composed
 // into.
-func (c *mcentral) cacheSpanFromNode(node int32, budget *int, sl sweepLocker) *mspan {
-	sg := mheap_.sweepgen
-
+func (c *mcentral) cacheSpanFromNode(node int32, budget *int, sl sweepLocker, sg uint32, skipSwept bool) *mspan {
 	// Try partial swept spans first. This costs no sweep budget --
-	// review M2 -- so it's always tried, even if the shared budget is
-	// already exhausted from an earlier node.
-	if s := c.partialSwept(sg, node).pop(); s != nil {
-		return s
+	// review M2 -- so it's always tried (unless skipSwept), even if
+	// the shared budget is already exhausted from an earlier node.
+	if !skipSwept {
+		if s := c.partialSwept(sg, node).pop(); s != nil {
+			return s
+		}
 	}
 
 	if !sl.valid {

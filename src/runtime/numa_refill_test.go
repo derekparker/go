@@ -254,12 +254,20 @@ func testSpanRefillCounterMatchesHomeNode(t *testing.T) {
 		// pop already removed from mcentral -- safe to free directly.
 		runtime.MCentralFreeSpanForTest(gotBase)
 	} else {
-		// cacheSpan returned something else (a different pre-existing
-		// span, or a freshly grown one) instead of the one placed
-		// above -- free that separately, and reclaim the placed span,
-		// which is presumably still sitting in mcentral untouched.
-		runtime.MCentralFreeSpanForTest(gotBase)
+		// cacheSpan returned something else instead of the span placed
+		// above -- reclaim the placed span (still presumably sitting
+		// in mcentral untouched), and return whatever cacheSpan
+		// actually gave us via MCentralReturnCacheSpanForTest, NOT an
+		// unconditional MCentralFreeSpanForTest (re-review NEW-4): that
+		// something else may be a genuinely pre-existing, real,
+		// possibly still-in-use span cacheSpan legitimately routed to
+		// this test from elsewhere in the process, and forcing it free
+		// would be a use-after-free of live data. See
+		// MCentralReturnCacheSpanForTest's doc comment
+		// (export_numa_refill_test.go) for how it tells that case
+		// apart from a genuinely fresh, safe-to-free span.
 		reclaimPlaced()
+		runtime.MCentralReturnCacheSpanForTest(spc, gotBase)
 	}
 
 	localDelta := after.local - before.local
@@ -303,10 +311,15 @@ func testSpanRefillCounterMatchesHomeNode(t *testing.T) {
 // rounded up to whole heapArenaBytes chunks) and page-allocator
 // registration (mheap.grow's own h.pages.grow call, rounded only to
 // the much smaller pallocChunkBytes) don't cover the same range
-// whenever the requested size isn't already heapArenaBytes-aligned --
-// true for essentially any npage this file uses. The highest-address
-// newly-registered heapArena can sit in the resulting "reserved but
-// not yet page-allocator-registered" slack, and claiming a span there
+// whenever the two roundings don't coincide -- not only when the
+// requested size itself isn't heapArenaBytes-aligned, but also
+// whenever h.curArena[idx].base isn't heapArenaBytes-aligned at the
+// point a new sysAlloc reservation is drawn (common after any
+// contiguous in-place extension of an already-partially-consumed
+// arena), since sysAlloc's own rounding is relative to that base, not
+// a fixed grid. The highest-address newly-registered heapArena can sit
+// in the resulting "reserved but not yet page-allocator-registered"
+// slack, and claiming a span there
 // hits "fatal error: index out of range" indexing pageAlloc's summary
 // -- deterministic given the right size/alignment, not a race, and
 // reproducible with no concurrent goroutine involved at all (first

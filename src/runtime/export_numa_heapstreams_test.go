@@ -71,6 +71,27 @@ func NumaGrowNodeForTest() (stream int32, homed bool) { return numaGrowNode() }
 // differently to a genuine failure (see growUntilNewArena in
 // numa_heapstreams_test.go).
 //
+// Re-review NEW-3/task-8-helper-doc: base (when newArena is true) is
+// valid ONLY for heapArena-metadata lookups (numaArenaNode, spanOf,
+// and similar) -- it is NOT necessarily inside the page-allocator-
+// registered range this same grow call extended via h.pages.grow.
+// heapArena registration (mheap.sysAlloc, rounded up to whole
+// heapArenaBytes chunks) and page-allocator registration (h.pages.grow,
+// rounded only to the much smaller pallocChunkBytes) cover different
+// ranges whenever those two roundings don't coincide -- both when the
+// requested npage itself isn't heapArenaBytes-aligned, and whenever
+// h.curArena[idx].base isn't heapArenaBytes-aligned at the point a new
+// sysAlloc reservation is drawn (common after any contiguous in-place
+// extension of an already-partially-consumed arena). base, being the
+// highest-address newly-registered heapArena, can land in the
+// resulting "reserved but not yet page-allocator-registered" slack. A
+// caller that needs an address inside the page-allocator-registered
+// range itself (e.g. to claim pages via pageAlloc.allocRange) must not
+// use this base for that -- see MCentralGrowAndSpanForTest
+// (export_numa_refill_test.go), which instead reads
+// h.curArena[idx].base immediately after its own grow call for exactly
+// this reason.
+//
 // Run on the system stack, matching every other export in this package
 // that touches mheap_ directly under its lock (see
 // CheckScavengedBitsCleared in export_test.go for the same pattern).
