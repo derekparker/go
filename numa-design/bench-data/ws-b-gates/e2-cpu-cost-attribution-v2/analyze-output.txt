@@ -1,0 +1,14 @@
+group                                                             ON%     OFF%      delta
+spanSet/mcentral/sweep (WS-B routing path)                      1.850    5.180     -3.330
+numa syscall/routing-decision path                              0.020    0.000      0.020
+kernel spinlock contention (native_queued_spin_lock_slowpath)   35.710   23.640     12.070
+other kernel-mode samples ([k], excl. spinlock)                 4.280    4.850     -0.570
+
+sum of measured group deltas (ON-OFF): 8.190 pct pts of ON-arm cycles
+total kernel-mode: ON=39.990% OFF=28.490% delta=11.500
+total user-mode:   ON=59.120% OFF=70.550% delta=-11.430
+
++19.96% user+sys increase = 16.64% of ON-arm cycles (target to explain)
+measured net group delta explains: 8.19 / 16.64 = 49.2% of the target
+spinlock contention alone explains: 12.07 / 16.64 = 72.5% of the target
+unattributed remainder: 16.64 - 8.19 = 8.45 pct pts (50.8% of the target)

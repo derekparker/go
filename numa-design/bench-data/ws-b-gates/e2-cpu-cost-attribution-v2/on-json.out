@@ -1,0 +1,16 @@
+Lowering default frequency rate from 4000 to 1000.
+Please consider tweaking /proc/sys/kernel/perf_event_max_sample_rate.
+pkg: golang.org/x/benchmarks
+goos: linux
+goarch: amd64
+
+2026/08/21 18:46:27 Benchmarking 1 iterations
+2026/08/21 18:46:27 Benchmarking 100 iterations
+2026/08/21 18:46:28 Benchmarking 5000 iterations
+# memprof=/tmp/11.prof.txt
+# cpuprof=/tmp/10.prof.txt
+BenchmarkJSON-256     5000	   2111231 ns/op	  47072840 GC-bytes-from-system	  59515561 STW-ns/GC	    214256 STW-ns/op	   8024049 allocated-bytes/op	     26813 allocs/op	7544784096 bytes-from-system	7392165888 heap-bytes-from-system	  86376088 other-bytes-from-system	7399268352 peak-RSS-bytes	8766861312 peak-VM-bytes	  19169280 stack-bytes-from-system	 183743290 user+sys-ns/op
+[ perf record: Woken up 1224 times to write data ]
+Warning:
+395 out of order events recorded.
+[ perf record: Captured and wrote 430.218 MB /tmp/pb/wsB-e2-v2/perf-on.data (933950 samples) ]
