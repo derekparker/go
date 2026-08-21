@@ -29,12 +29,17 @@ NARMS=${#NAMES[@]}
 
 idle_check() {
     # ps, not uptime: load average decays for hours after 256P runs.
+    # Exclude ps/awk/the pipeline itself: a just-started ps process can
+    # report a spuriously huge %CPU (its own CPU time divided by a
+    # near-zero elapsed time), which previously made idle_check treat its
+    # own self-report as evidence of contention and sleep needlessly
+    # (observed firing dozens of times per sweep on an otherwise-idle box).
     local top
-    top=$(ps aux --sort=-%cpu | awk 'NR==2 {print int($3)}')
+    top=$(ps -eo pcpu,comm --sort=-pcpu | awk '$2 != "ps" && $2 != "awk" {print int($1); exit}')
     while [ "${top:-0}" -gt 50 ]; do
         echo "idle_check: top process at ${top}% CPU; sleeping 30s" >&2
         sleep 30
-        top=$(ps aux --sort=-%cpu | awk 'NR==2 {print int($3)}')
+        top=$(ps -eo pcpu,comm --sort=-pcpu | awk '$2 != "ps" && $2 != "awk" {print int($1); exit}')
     done
 }
 

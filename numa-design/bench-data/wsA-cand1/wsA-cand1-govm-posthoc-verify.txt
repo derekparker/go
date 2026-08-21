@@ -1,0 +1,71 @@
+/tmp/pb/base/garbage: go1.28-devel_c226071c35 Thu Aug 20 10:29:50 2026 -0700
+	path	golang.org/x/benchmarks/garbage
+	mod	golang.org/x/benchmarks	v0.0.0-20260819172200-70693762b6a0	h1:gLYsUQT0P6cI8zmysaoOoVgLhYFuBL6smDcVj/ojtiY=
+	dep	golang.org/x/sys	v0.47.0	h1:o7XGOvZQCADBQQ4Y7VNq2dRWQR7JmOUW8Kxx4ZsNgWs=
+	build	-buildmode=exe
+	build	-compiler=gc
+	build	DefaultGODEBUG=netmarshal=0,tracebacklabels=0,x509sslcertoverrideplatform=0
+	build	CGO_ENABLED=1
+	build	CGO_CFLAGS=
+	build	CGO_CPPFLAGS=
+	build	CGO_CXXFLAGS=
+	build	CGO_LDFLAGS=
+	build	GOARCH=amd64
+	build	GOOS=linux
+	build	GOAMD64=v1
+===
+/tmp/pb/numa/garbage: go1.28-devel_c226071c35 Thu Aug 20 10:29:50 2026 -0700 X:numa
+	path	golang.org/x/benchmarks/garbage
+	mod	golang.org/x/benchmarks	v0.0.0-20260819172200-70693762b6a0	h1:gLYsUQT0P6cI8zmysaoOoVgLhYFuBL6smDcVj/ojtiY=
+	dep	golang.org/x/sys	v0.47.0	h1:o7XGOvZQCADBQQ4Y7VNq2dRWQR7JmOUW8Kxx4ZsNgWs=
+	build	-buildmode=exe
+	build	-compiler=gc
+	build	DefaultGODEBUG=netmarshal=0,tracebacklabels=0,x509sslcertoverrideplatform=0
+	build	CGO_ENABLED=1
+	build	CGO_CFLAGS=
+	build	CGO_CPPFLAGS=
+	build	CGO_CXXFLAGS=
+	build	CGO_LDFLAGS=
+	build	GOARCH=amd64
+	build	GOEXPERIMENT=numa
+	build	GOOS=linux
+	build	GOAMD64=v1
+===
+/tmp/pb/gcpause-base: go1.28-devel_c226071c35 Thu Aug 20 10:29:50 2026 -0700
+	path	gc-pause-bench
+	mod	gc-pause-bench	(devel)	
+	build	-buildmode=exe
+	build	-compiler=gc
+	build	DefaultGODEBUG=netmarshal=0,tracebacklabels=0,x509sslcertoverrideplatform=0
+	build	CGO_ENABLED=1
+	build	CGO_CFLAGS=
+	build	CGO_CPPFLAGS=
+	build	CGO_CXXFLAGS=
+	build	CGO_LDFLAGS=
+	build	GOARCH=amd64
+	build	GOOS=linux
+	build	GOAMD64=v1
+	build	vcs=git
+	build	vcs.revision=c226071c35a69fee3354910643972fd302d747e0
+	build	vcs.time=2026-08-20T17:29:50Z
+	build	vcs.modified=true
+===
+/tmp/pb/gcpause-numa: go1.28-devel_c226071c35 Thu Aug 20 10:29:50 2026 -0700 X:numa
+	path	gc-pause-bench
+	mod	gc-pause-bench	(devel)	
+	build	-buildmode=exe
+	build	-compiler=gc
+	build	DefaultGODEBUG=netmarshal=0,tracebacklabels=0,x509sslcertoverrideplatform=0
+	build	CGO_ENABLED=1
+	build	CGO_CFLAGS=
+	build	CGO_CPPFLAGS=
+	build	CGO_CXXFLAGS=
+	build	CGO_LDFLAGS=
+	build	GOARCH=amd64
+	build	GOEXPERIMENT=numa
+	build	GOOS=linux
+	build	GOAMD64=v1
+	build	vcs=git
+	build	vcs.revision=c226071c35a69fee3354910643972fd302d747e0
+	build	vcs.time=2026-08-20T17:29:50Z
+	build	vcs.modified=true

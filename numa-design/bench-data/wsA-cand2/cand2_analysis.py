@@ -39,12 +39,15 @@ def effective_n(n_rounds, k, icc):
     design_effect = 1 + (k - 1) * max(icc, 0)
     return (n_rounds * k) / design_effect
 
-def exact_mwu(a, b):
-    """Exact Mann-Whitney U test (small n, no ties correction needed beyond
-    standard mid-rank handling), two-sided p-value via exact permutation
-    when feasible (n,m <= 12 each side is exact-enumerable; here n=m=10
-    round-medians -> C(20,10)=184756, enumerate ranks-based U distribution
-    via convolution rather than full permutation for speed)."""
+def normal_approx_mwu(a, b):
+    """Mann-Whitney U with a NORMAL APPROXIMATION (tie-corrected variance,
+    continuity correction), NOT an exact permutation p-value despite this
+    function's earlier name (`exact_mwu`) in prior revisions of this
+    script -- that name was wrong and is corrected here. This estimator is
+    conservative (reports a larger p than the true exact test) for a
+    fully-separated small-n comparison; see exact_mwu_full_enum() below
+    for the true exact p, used to cross-check the primary B-vs-C result
+    in RESULTS.md."""
     all_vals = sorted(a + b)
     ranks = {}
     # average ranks for ties
@@ -92,6 +95,33 @@ def exact_mwu(a, b):
     p = 2 * (1 - 0.5*(1+erf(abs(z)/math.sqrt(2))))
     return u1, u2, p
 
+def exact_mwu_full_enum(a, b):
+    """True exact two-sided Mann-Whitney U p-value via full enumeration of
+    the null U distribution (assumes no ties, true for this session's
+    round-median data at nanosecond precision). Uses the standard
+    recursive count of arrangements achieving each U value; exact and
+    correct for n,m up to a few dozen."""
+    from functools import lru_cache
+    from math import comb
+    n, m = len(a), len(b)
+    @lru_cache(maxsize=None)
+    def count(u, nn, mm):
+        if u < 0:
+            return 0
+        if nn == 0 or mm == 0:
+            return 1 if u == 0 else 0
+        return count(u - mm, nn - 1, mm) + count(u, nn, mm - 1)
+    total = comb(n + m, n)
+    combined = sorted(a + b)
+    ranks = {v: i + 1 for i, v in enumerate(combined)}
+    ra = sum(ranks[v] for v in a)
+    ua = ra - n * (n + 1) / 2
+    ub = n * m - ua
+    umin = min(ua, ub)
+    cum = sum(count(u, n, m) for u in range(0, int(umin) + 1))
+    p_two = min(1.0, 2 * cum / total)
+    return ua, ub, p_two
+
 def cv(vals):
     m = statistics.mean(vals)
     s = statistics.stdev(vals)
@@ -119,22 +149,24 @@ def main():
 
     print()
     print("=== Primary: B vs C (round medians, exact/normal-approx Mann-Whitney U) ===")
-    u1, u2, p = exact_mwu(b_med, c_med)
+    u1, u2, p = normal_approx_mwu(b_med, c_med)
     mb, mc = statistics.median(b_med), statistics.median(c_med)
     print(f"B median-of-round-medians={mb/1e6:.2f}ms  C median-of-round-medians={mc/1e6:.2f}ms  rel={(mc-mb)/mb:+.2%}")
-    print(f"U1={u1} U2={u2} p={p:.4f}  {'SIGNIFICANT' if p<0.05 else 'not significant'}")
+    print(f"normal-approx: U1={u1} U2={u2} p={p:.4f}  {'SIGNIFICANT' if p<0.05 else 'not significant'}")
+    ue1, ue2, pe = exact_mwu_full_enum(b_med, c_med)
+    print(f"exact (full enumeration): U1={ue1} U2={ue2} p={pe:.3e}  {'SIGNIFICANT' if pe<0.05 else 'not significant'}  (cross-check; normal-approx is conservative when fully separated)")
     print(f"CV: B={cv(b_med):.2%} C={cv(c_med):.2%}")
 
     print()
     print("=== Secondary/context: A vs B ===")
-    u1, u2, p = exact_mwu(a_med, b_med)
+    u1, u2, p = normal_approx_mwu(a_med, b_med)
     ma = statistics.median(a_med)
     print(f"A median={ma/1e6:.2f}ms  B median={mb/1e6:.2f}ms  rel(B vs A)={(mb-ma)/ma:+.2%}")
     print(f"U1={u1} U2={u2} p={p:.4f}  {'SIGNIFICANT' if p<0.05 else 'not significant'}")
 
     print()
     print("=== C vs A (raw MWU, context) ===")
-    u1, u2, p = exact_mwu(a_med, c_med)
+    u1, u2, p = normal_approx_mwu(a_med, c_med)
     print(f"A median={ma/1e6:.2f}ms  C median={mc/1e6:.2f}ms  rel(C vs A)={(mc-ma)/ma:+.2%}")
     print(f"U1={u1} U2={u2} p={p:.4f}  {'SIGNIFICANT' if p<0.05 else 'not significant'}")
     print(f"CV: A={cv(a_med):.2%}")

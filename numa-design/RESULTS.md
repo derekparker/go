@@ -2350,11 +2350,11 @@ Kernel: `6.12.0-211.7.1.el10_2.x86_64`
 `kernel.numa_balancing`: `1` throughout (confirmed at session start and end)
 THP: `[always] madvise never` (unchanged, per protocol)
 
-Machine load: single-user throughout; `ps aux --sort=-%cpu` idle-checked before every measurement block (the sweep driver's own `idle_check` additionally gates every round).
+Machine load: single-user throughout; `ps aux --sort=-%cpu` was checked before every measurement block, but that self-report is not by itself strong evidence of quietness — a just-started `ps` process can show a spuriously huge %CPU (its own CPU time over a near-zero elapsed time), and the sweep driver's `idle_check` fired on exactly this artifact 42+17 times across the two candidate sweeps rather than on genuine contention (directly reproduced live during this correction pass: a bare `ps aux --sort=-%cpu` on an otherwise-idle box showed itself at 1000% CPU). The real evidence of a quiet box is the vmstat chain (arm A and arm C both land at 0/0 in essentially every round — a busy, contended box would not produce that cleanly) plus the sweep timeline (`*-sweep.log`, `*.vmstat.before/after` timestamps) showing no unexplained gaps or overlaps. `numa-design/pathology-sweep.sh`'s `idle_check` has been fixed in a follow-up edit (this commit) to exclude the `ps`/`awk` pipeline's own rows before reading the top process.
 
 Raw `.out` files, vmstat snaps, strace transcripts, and the exact sweep-driver invocations backing every verdict below are archived under `numa-design/bench-data/ws-a-gates/` (gates 1-5, 8) and `numa-design/bench-data/wsA-cand1/`, `wsA-cand2/` (gates 6-7).
 
-**Pre-registration note:** this section reports exactly the 8 pre-declared gates from `task-4-brief.md`; no metric was added post hoc. Gates 6-7's C-vs-A criterion is the non-inferiority bound from brief note I1 (95% CI upper bound of C/A ratio ≤ +10%), not a "C≈A" claim.
+**Pre-registration note:** this section reports exactly the 8 pre-declared gates from the tracked, committed plan (`numa-design/2026-08-20-numa-v3-locality-plan.md`, committed pre-execution at `e44dad45f1` — git-verifiable pre-registration); no metric was added post hoc. Gates 6-7's C-vs-A criterion is the non-inferiority bound (95% CI upper bound of C/A ratio ≤ +10%), not a "C≈A" claim.
 
 ### Gate 1 — 1P json, off vs on, same commit (hard gate)
 
@@ -2368,7 +2368,7 @@ JSON-1  sec/op:            20.72m ± 57%  17.33m ± 89%  ~ (p=0.631 n=10)
 JSON-1  user+sys-sec/op:   20.74m ± 57%  17.33m ± 90%  ~ (p=0.579 n=10)
 ```
 
-**Verdict: PASS.** Neither primary metric shows a statistically significant difference (both p > 0.05); numa arm nominally faster, well inside the ≤+2%-or-not-significant band regardless.
+**Verdict: PASS.** Neither primary metric shows a statistically significant difference (both p > 0.05); numa arm nominally faster, well inside the ≤+2%-or-not-significant band regardless. **Achieved MDE:** per-arm CV ≈32% (pooled ≈32.3%) at n=10 gives a minimum detectable effect ≈40% (α=0.05, power=0.80) — at `GOMAXPROCS=1` this machine's noise is large enough that Gate 1 can only rule out a gross regression, not confirm near-parity; the PASS should be read as "no regression ≥ ~40% detected," not as evidence of tight equivalence.
 
 ### Gate 2 — 1P alloc micro (hard gate)
 
@@ -2407,7 +2407,7 @@ JSON-256  sec/op:            2.371m ± 11%  2.025m ± 14%  ~ (p=0.197 n=30)
 JSON-256  user+sys-sec/op:   179.6m ± 7%   170.4m ± 10%  ~ (p=0.382 n=30)
 ```
 
-**Verdict: PASS.** Pooled result not significant on either metric; no pooled regression at all (numa nominally faster), let alone beyond +2%. Hard-FAIL condition (pooled significant regression >+2%) does not apply.
+**Verdict: PASS.** Pooled result not significant on either metric; no pooled regression at all (numa nominally faster), let alone beyond +2%. Hard-FAIL condition (pooled significant regression >+2%) does not apply. **Achieved MDE:** pooled CV ≈31% at n=30 gives MDE ≈22% (α=0.05, power=0.80) — pooling to n=30 roughly halves Gate 1's MDE but the +2% pass bar is still far below this gate's resolving power; against the stated bar, both Gate 1 and Gate 3 can only exclude gross regressions, not confirm near-parity at the ±2% scale.
 
 ### Gate 4 — Stand-down proof, strace, three arms (hard gate)
 
@@ -2418,7 +2418,7 @@ $ ssh numa-dell 'cd /tmp/wsA-gate3-r1 && strace -f -e trace=sched_setaffinity,se
   env GOMAXPROCS=256 ./numa/json -benchmem=512 -benchnum=1 -benchtime=2s >/dev/null'
 ```
 
-`sched_setaffinity`: **0** calls. `set_mempolicy`: exactly **1**, `set_mempolicy(MPOL_BIND, [0x3], 65) = 0`. `mbind`: **2761** calls (Layer-1 arena stamping, unchanged). **Matches declared shape (a) exactly.**
+`sched_setaffinity`: **0** calls. `set_mempolicy`: exactly **1**, `set_mempolicy(MPOL_BIND, [0x3], 65) = 0`. `mbind`: **1,939 calls** (re-verified directly against the archived transcript; an earlier count of "2761" in this section was wrong and is corrected here), splitting **970 `MPOL_BIND`** (mask `[0x3]`, both nodes — Layer 1's uniform arena BIND-all) and **969 `MPOL_PREFERRED`** (split **541 to node 0** `[0x1]` and **428 to node 1** `[0x2]`, tracking whichever node each growing P happened to run on — Layer 2's still-in-tree PREFERRED-at-grow, unaffected by GOMAXPROCS=256 never confining). The two mechanisms are layered, not either/or: every newly-grown arena chunk on this 256P run gets one uniform BIND-all `mbind` (Layer 1) and, independently, one node-local PREFERRED `mbind` (Layer 2) recording whichever node the growth happened on. **Matches declared shape (a)** on the pre-declared criteria (0 `sched_setaffinity`, exactly 1 task-level `set_mempolicy(BIND)`, `mbind` calls present); the count itself was never a pass/fail criterion but is corrected here for the record.
 
 **(b) confined 1P:**
 
@@ -2427,9 +2427,9 @@ $ ssh numa-dell 'cd /tmp/wsA-gate3-r1 && strace -f -e trace=sched_setaffinity,se
   env GOMAXPROCS=1 ./numa/json -benchmem=512 -benchnum=1 -benchtime=2s >/dev/null'
 ```
 
-`sched_setaffinity`: exactly **1** call, mask = odd CPUs only (`[1 3 5 7 ... 255]` — node 1, this session's boot node). `set_mempolicy`: exactly **2**, in order `MPOL_BIND` then `MPOL_PREFERRED, [0x2], 65` (node 1). `mbind`: **22** calls (arena BIND-all keeps running while confined, per locked decision 5). **Matches declared shape (b) exactly**, including the BIND-then-PREFERRED order.
+`sched_setaffinity`: exactly **1** call, mask = odd CPUs only (`[1 3 5 7 ... 255]` — node 1, this session's boot node). `set_mempolicy`: exactly **2**, in order `MPOL_BIND` then `MPOL_PREFERRED, [0x2], 65` (node 1). `mbind`: **22 calls total** — re-verified directly against the archived transcript as **11 `MPOL_BIND`** (mask `[0x3]`, both nodes — Layer 1's uniform arena BIND-all, still running while confined per locked decision 5) paired with **11 `MPOL_PREFERRED`** (mask `[0x2]`, the confined node only — Layer 2's PREFERRED-at-grow, still in-tree and not yet removed; every chunk grows while confined so its node-local PREFERRED always lands on the same, confined node). **Matches declared shape (b) exactly** on the pre-declared criteria, including the BIND-then-PREFERRED task-policy order; the earlier "22 calls (arena BIND-all)" phrasing was materially incomplete — half of those calls are Layer 2's PREFERRED-at-grow, not Layer 1's BIND-all, and this section (and Gates 6-7 below) therefore characterize **Layer 0+1+2+confinement together, not confinement in isolation** — Layer 2 has not been removed at this point in the plan (that is Task 6, gated on these hard gates). **After Task 6 removes Layer 2, a Gate-6 B-vs-C confirmation sweep is required** to re-establish the candidate-1 numbers under confinement alone; Task 6 will run it.
 
-`/proc/PID/maps` spot check during a confined run: **32 lines** — low, merged-VMA count, matching the Layer-1 baseline character (RESULTS.md:1496-1515), not Layer 2's ~1172-line blowup. Empirically confirms uniform BIND-all merges under confinement.
+`/proc/PID/maps` spot check during a confined run: **32 lines** — low, merged-VMA count, matching the Layer-1 baseline character (RESULTS.md:1496-1515), not Layer 2's ~1172-line blowup. Because every PREFERRED-at-grow call while confined targets the *same* confined node (uniform-to-confined-node, not per-chunk-varying), the resulting per-chunk policies still merge into one low-VMA-count region rather than fragmenting — this is why the Layer-2-era ~1172-line blowup (RESULTS.md:1496-1515, where PREFERRED targeted whichever node was locally growing, varying chunk-to-chunk) does not recur here even with Layer 2 still active: confinement collapses Layer 2's per-chunk node choice down to a single node, incidentally fixing the fragmentation Layer 2 alone caused.
 
 **(c) stand-down — testprog `NUMAStandDown`, `GOEXPERIMENT=numa` build:**
 
@@ -2451,7 +2451,7 @@ Stand-down wall-clock cost, compared against the same probe on the stock build (
 | stock (no confinement, mode=0 throughout) | 2,292,399 | 2,180,251 | 2,441,749 | 2,292,399 |
 | numa (confine → stand-down) | 2,371,475 | 2,362,265 | 1,819,846 | 2,362,265 |
 
-The eager-walk-plus-convergence stand-down adds **~70µs (~3%) over the stock GOMAXPROCS-raise's own STW cost** at median — within this box's run-to-run jitter (stock's own spread is ~260µs / ~11%), i.e. the stand-down machinery's STW-adjacent cost is not distinguishable from the baseline GOMAXPROCS(N) call's own cost at this n. Recorded as the on-record wall-clock bound per the brief; not a claim of a specific attributable delta given the overlap with baseline jitter.
+The eager-walk-plus-convergence stand-down adds **~70µs (~3%) over the stock GOMAXPROCS-raise's own STW cost** at median — within this box's run-to-run jitter (stock's own spread is ~260µs / ~11%), i.e. the stand-down machinery's STW-adjacent cost is not distinguishable from the baseline GOMAXPROCS(N) call's own cost at this n. Recorded as the on-record wall-clock bound per the plan's Task 4 Gate 4(c) requirement; not a claim of a specific attributable delta given the overlap with baseline jitter.
 
 **Verdict: PASS.** All three arm shapes (a), (b), (c) match the pre-declared shapes exactly, including call counts, ordering, and the maps-line spot check.
 
@@ -2470,9 +2470,11 @@ Rerun once per protocol (counters are machine-global): second run also `hint_fau
 
 **Verdict: PASS.** 0/0 on both runs.
 
+**Important caveat, stated plainly:** vmstat 0/0 is evidence that the balancer took no hint faults and migrated no pages — it is **Layer 1's** signature (uniform arena BIND-all exempts the VMA from the balancer regardless of whether confinement engaged), **not evidence that confinement (`sched_setaffinity`/task-level `MPOL_PREFERRED`) actually ran**. This is exactly why the stale `gc-pause-bench` binary in the first Candidate 2 attempt (see Gate 7's incident writeup) produced a clean 0/0 despite having zero confinement code at all — Layer 1 alone was sufficient to reach 0/0. 0/0 must be paired with a direct affinity/policy observation (strace's `sched_setaffinity` count, or a live `Cpus_allowed_list` read) to confirm confinement specifically; Gate 4(b)'s strace and Gate 6/7's post-hoc `Cpus_allowed_list` captures (below) are the actual confinement evidence, not Gate 5.
+
 ### Gate 8 — off-binary function census, NON-test binary, experiment off, HEAD vs Task-0 parent (hard gate)
 
-Per the brief's C2 caveat, a **plain program** is used instead of a `go test -c` binary (a test binary roots `export_numa_test.go`, which would confound the census with test-only exports). Built locally, both from the tree toolchain (`GOWORK=off GOTOOLCHAIN=local`), `GOEXPERIMENT=` unset:
+Per the tracked plan's C2 caveat (`2026-08-20-numa-v3-locality-plan.md:1164`), a **plain program** is used instead of a `go test -c` binary (a test binary roots `export_numa_test.go`, which would confound the census with test-only exports). Built locally, both from the tree toolchain (`GOWORK=off GOTOOLCHAIN=local`), `GOEXPERIMENT=` unset:
 
 ```
 $ printf 'package main\n\nfunc main() { println("census") }\n' > /tmp/census-canary.go
@@ -2483,7 +2485,7 @@ $ GOROOT=/tmp/census-parent GOEXPERIMENT= go build -o /tmp/census-parent-bin /tm
 
 Raw `diff -q` on the `sed`-stripped disassembly **does not** come back clean (unlike Layer 1's Gate 4, which was byte-identical). Root cause, verified directly: Workstream A's confinement state — `numaConfined`, `numaStoodDown`, `numaConfinedNode`, `numaConfinedNodeCPUs`, `numaSavedAffinity [1024]byte`, `numaSavedAffinityLen` — is declared in `numa_linux.go`, which carries no build tag beyond `package runtime` (compiles for every Linux arch regardless of `GOEXPERIMENT`). These new **unconditional** package-level globals shift the data-segment addresses of every subsequent global, exactly the same class of gap Layer 0's Gate 4 hit from adding `debug.numa` to the `debug` struct (RESULTS.md:540-551) — not a functional difference. `sed`'s hex-stripping doesn't hide this because the shifted values appear as literal instruction-byte sequences (space-separated 2-digit hex), never as a single ≥6-digit run.
 
-The brief's real caveat (C2) — a **struct-offset shift** (e.g. an `m` field moving) showing up as a displacement immediate change — does **not** apply here: Task 3 already verified `sizeof(m)` is byte-identical off-experiment (1832 bytes, unchanged) because `mNUMAState` is the empty-struct/zero-size type when `!goexperiment.numa` (`numa_mstate_off.go`), confirmed by test not just inspection. So the diffs observed are exclusively the benign global-data-address-shift class, not the struct-offset class the caveat warns is a real fail.
+The plan's real caveat (C2, `2026-08-20-numa-v3-locality-plan.md:1178`) — a **struct-offset shift** (e.g. an `m` field moving) showing up as a displacement immediate change — does **not** apply here: Task 3 already verified `sizeof(m)` is byte-identical off-experiment (1832 bytes, unchanged) because `mNUMAState` is the empty-struct/zero-size type when `!goexperiment.numa` (`numa_mstate_off.go`), confirmed by test not just inspection. So the diffs observed are exclusively the benign global-data-address-shift class, not the struct-offset class the caveat warns is a real fail.
 
 Per-function census (immune to whole-binary address shifts, following the Layer 0/1 precedent methodology — `objdump -d`, symbol-labeled blocks, per-function instruction-line counts):
 
@@ -2523,7 +2525,7 @@ numactl --hardware | grep free   # node 0 free: 11145 MB (>= 10 GB precondition 
   "C=env GOMAXPROCS=128 /tmp/pb/numa/garbage -benchmem=4096 -benchnum=1"'
 ```
 
-**Mechanism validity (n=15 recorded rounds each):** arm A: 0/0 hint faults/pages migrated, every round (16/16 including warmup). Arm B: hint faults 81,409–265,164, pages migrated 943,290–1,476,583, every recorded round (≫0, no setup-fault rounds to exclude). Arm C: 0/0 in 14/15 recorded rounds; negligible noise in the other 2 (2/1 and 3/0) — consistent with every prior BIND-all measurement on this box.
+**Mechanism validity (n=15 recorded rounds each):** arm A: 0/0 hint faults/pages migrated, every round (16/16 including warmup). Arm B: hint faults 81,409–265,164, pages migrated 943,290–1,476,583, every recorded round (≫0, no setup-fault rounds to exclude). Arm C: 0/0 in **13/15** recorded rounds (r6: 3 hint faults/0 migrated; r14: 2/1 — the only two non-clean rounds; corrects an earlier "14/15" arithmetic slip in this section and in `task-4-report.md`) — negligible noise, consistent with every prior BIND-all measurement on this box. Per Gate 5's caveat above, this 0/0 pattern reflects Layer 1 and does not by itself confirm confinement engaged for these specific sweep rounds — see "Post-hoc confinement verification" below for direct affinity evidence on the actual sweep binary.
 
 **benchstat, pre-declared primary metric (`sec/op`, `Garbage/benchmem-MB=4096-128`):**
 
@@ -2538,21 +2540,25 @@ $ ssh numa-dell '/tmp/numa-tools/benchstat /tmp/pb/wsA-cand1/wsA-cand1-armA-reco
 Garbage/benchmem-MB=4096-128   A=1.855m ± 9%   B=2.558m ± 17%   +37.93% (p=0.000 n=15)
 ```
 
-**Non-inferiority CI (I1 criterion — 95% CI upper bound of C/A − 1, computed round-by-round from this session's n=15 paired rounds via log-ratio + t-distribution, script archived as `noninf_ci.py`):**
+**Exploratory corroboration (not the primary metric, not a separate claim):** `user+sys-sec/op`, B vs C, shows the same direction and a comparable magnitude — B=157.7ms ± 4%, C=128.3ms ± 3%, **-18.62% (p=0.000, n=15)** — a CPU-time-based metric independently corroborating the wall-clock primary's B-vs-C result via a different measurement channel.
+
+**Non-inferiority CI (95% CI upper bound of C/A − 1, computed round-by-round from this session's n=15 paired rounds via log-ratio + t-distribution, script archived as `noninf_ci.py`):**
 
 ```
 n=15 point_estimate_C/A-1=+2.69% 95%CI=[-2.60%, +8.26%]
 Non-inferiority (upper bound <= +10%): PASS
 ```
 
-**Verdict: PASS on all three pre-declared components.**
+**Verdict: PASS on all three pre-declared components — reported as a bound, not an equivalence.**
 - **C vs B (primary): PASS.** C is significantly faster than B by 29.61% (p=0.000, n=15) — closes essentially all of the B-vs-A gap (see below), not just "most of" it.
-- **C vs A (non-inferiority): PASS.** Point estimate on the round-paired log-ratio is +2.69%, but the raw medians actually run the other way (C=1.801m < A=1.855m — C nominally *faster* than A); the two estimators differ because the CI is computed round-by-round on paired ratios while benchstat compares the two distributions directly — both agree the effect is small and not significant. 95% CI [-2.60%, +8.26%], upper bound 8.26% ≤ the +10% bound. benchstat's own comparison is not significant (p=0.217), consistent with the CI spanning zero.
+- **C vs A (non-inferiority): PASSES the pre-declared bound, but is not a clean win.** The round-paired point estimate is **+2.69%**, 95% CI **[-2.60%, +8.26%]** — the upper bound (+8.26%) is comfortably inside the pre-declared +10% non-inferiority margin, so the gate **PASSES**. The **unpaired** medians run the other way (C=1.801m vs A=1.855m, benchstat p=0.217, C nominally faster) — but paired analysis is the correct lens here since A and C ran in the same rotating-order rounds, and it tells a different story: **C is slower than A in 12 of 15 paired rounds** (exact two-sided sign test, p=0.035, significant at α=0.05). Put plainly: a small residual in A's favour on this workload **cannot be excluded** by this data — it is only **bounded above by +8.3%**. The non-inferiority criterion is designed exactly for this situation (declared in advance because "C ≈ A" claims are below this harness's resolving power at n=15) and is satisfied; report the bound, not an equivalence claim.
 - **B vs A (secondary, context): B is significantly worse than A** by 37.93% (p=0.000, n=15) — the "B worse than A" requirement holds cleanly and more strongly than the design doc's ~60%-from-prior-sessions ballpark suggested at this heap/GOMAXPROCS combination; no HT-confound fallback-to-informational was needed (§4 of the harness design).
 
-Net picture: confinement (arm C) not only recovers essentially all of the unpinned-vs-pinned gap, it does so without leaving a measurable residual against the pinned oracle (A) — the strongest of the three pre-declared candidate-1 outcomes.
+Net picture: confinement (arm C) recovers **108% of the unpinned-vs-pinned gap** on the primary metric's point estimates ((B−C)/(B−A) = (2.558−1.801)/(2.558−1.855) ≈ 1.077) — nominally beating even the pinned oracle A on the headline point estimate — while the paired sign test says not to over-read that: A may still hold a small edge this design can bound but not rule out. Both readings are reported; neither is suppressed in favor of the other.
 
-Raw data: `numa-design/bench-data/wsA-cand1/wsA-cand1-arm{A,B,C}-{warmup,recorded}.out{,.stderr}`, per-round `wsA-cand1-arm*-r*.vmstat.{before,after}`, `wsA-cand1-vmstat-summary.txt`, the three `benchstat` transcripts (`wsA-cand1-{BvC,AvC,AvB}.txt`), and the sweep driver invocation (`numa-design/pathology-sweep.sh`, committed at Task 0).
+**Confined node this session:** the sweep's own C-arm process node was not observed in-run (see "Post-hoc confinement verification" below); the pre-sweep pilot check (run immediately before the recorded rounds, same command) showed confinement to **node 0** (even CPUs), and the free-RAM precondition (`numactl --hardware | grep free`, node 0 free 11145 MB) was checked specifically against **node 0** — consistent with, but not a guarantee of, every recorded round's actual confined node, since node choice follows the boot CPU and is not pinned by this harness.
+
+Raw data: `numa-design/bench-data/wsA-cand1/wsA-cand1-arm{A,B,C}-{warmup,recorded}.out{,.stderr}`, per-round `wsA-cand1-arm*-r*.vmstat.{before,after}`, `wsA-cand1-vmstat-summary.txt`, the three `benchstat` transcripts (`wsA-cand1-{BvC,AvC,AvB}.txt`), the sign-test script and output (`sign_test.py`, `wsA-cand1-signtest-output.txt`), and the sweep driver invocation (`numa-design/pathology-sweep.sh`, committed at Task 0).
 
 ### Gate 7 — Candidate 2 (decision gate): `gc-pause-bench` heavy profile, round-level, n=10
 
@@ -2573,18 +2579,22 @@ FLAGS="-ptrheap=true -toucher=false -heap=4096 -idle=1000000 -stacks=200 -warm=4
   "C=env GOMAXPROCS=128 GODEBUG=gcshrinkstackoff=1 /tmp/pb/gcpause-numa $FLAGS"'
 ```
 
-**Mechanism validity:** arm A 0/0 every round (11/11 including warmup). Arm C 0/0 every round (11/11) — cleaner than candidate 1's two negligible-noise rounds. Arm B: hint faults 28,286–475,745, pages migrated 566,945–1,689,870, every recorded round.
+**Mechanism validity:** arm A 0/0 every round (11/11 including warmup). Arm C 0/0 every round (11/11) — cleaner than candidate 1's two negligible-noise rounds; per Gate 5's caveat, this is Layer 1's signature and does not by itself confirm confinement engaged (see "Post-hoc confinement verification" below). Arm B, **recorded rounds only (r1–r10, excluding the r0 warmup round)**: hint faults **38,845–475,745**, pages migrated 566,945–1,689,870, every recorded round (an earlier version of this line included the warmup round's value, giving a misleadingly low minimum of 28,286).
 
 **Round-level analysis (median of 8 cycles per round, n=10 rounds/arm; cycles are clustered within a round — reported at round level per the plan, raw n=80 cycle-level numbers never used as the verdict):**
 
 ICC(1) and effective n (design-effect-corrected): A ICC=0.984 (effective n≈10.1), B ICC=0.813 (effective n≈12.0), C ICC=0.994 (effective n≈10.1) — all within the plan's predicted 0.6–1.0 range, confirming round-level (not cycle-level) is the correct unit of analysis; raw n=80 would substantially overstate power.
 
-Exact/normal-approximation Mann-Whitney U on round medians (script archived as `cand2_analysis.py`):
+Mann-Whitney U on round medians, script archived as `cand2_analysis.py`: **the script's normal-approximation function was originally named `exact_mwu`, which was wrong — it computes a normal approximation with continuity correction, not an exact permutation p-value; renamed to `normal_approx_mwu` in this correction pass, with a true `exact_mwu_full_enum` added alongside it.** Both are now in the archived script (no ties in the round-median data, so the exact null distribution of U is exact, not approximated):
 
 ```
-B vs C (primary): B median=3922.26ms  C median=3151.21ms  rel=-19.66%  p=0.0002 (n=10)  SIGNIFICANT
-A vs B (secondary/context): A median=3120.34ms  B median=3922.26ms  rel(B vs A)=+25.70%  p=0.0002 (n=10)  SIGNIFICANT
+B vs C (primary):            B median=3922.26ms  C median=3151.21ms  rel=-19.66%  U=0/100 (n=10,10)
+  normal-approx (script, conservative): p=0.0002
+  exact:                                p=1.083e-05   SIGNIFICANT
+A vs B (secondary/context):  A median=3120.34ms  B median=3922.26ms  rel(B vs A)=+25.70%  p=0.0002 (normal-approx)  SIGNIFICANT
 ```
+
+Both readings agree on significance; the normal-approximation p was conservative (larger than the true exact p) as expected for a fully separated small-n comparison (U=0, complete separation between arms).
 
 **Non-inferiority CI, C vs A (round-paired log-ratio + t-distribution, `noninf_ci.py`):**
 
@@ -2600,7 +2610,40 @@ Non-inferiority (upper bound <= +10%): PASS
 - **C vs A (non-inferiority): PASS.** Point estimate +1.51%, 95% CI [-2.01%, +5.15%], upper bound 5.15% ≤ the +10% bound — comfortably inside, with more margin than candidate 1's 8.26%.
 - **B vs A (secondary, context): B is significantly worse than A** by 25.70% (p=0.0002) — exactly the "cleanest B-worse-than-A signal" the harness design predicted for this candidate (§4: GC-cycle time is CPU-count-neutral, so the HT confound that complicates candidate 1's A-vs-B comparison barely applies here).
 
-Raw data: `numa-design/bench-data/wsA-cand2/wsA-cand2-arm{A,B,C}-{warmup,recorded}.out{,.stderr}`, per-round `wsA-cand2-arm*-r*.vmstat.{before,after}`, `wsA-cand2-vmstat-summary.txt`, per-cycle extracts (`wsA-cand2-{A,B,C}-cycles.txt`), round-medians (`wsA-cand2-{A,C}-roundmedians.txt`), the analysis script and its output (`cand2_analysis.py`, `wsA-cand2-analysis-output.txt`), the sweep log (`wsA-cand2-sweep.log`), and the stale-binary incident writeup (`cand2-stale-binary-incident.md`).
+Recovery on the primary metric's point estimates: (B−C)/(B−A) = (3922.26−3151.21)/(3922.26−3120.34) ≈ **96%** — C recovers nearly all but not quite all of the unpinned-vs-pinned gap here (contrast candidate 1's 108%, where C nominally beat the pinned oracle outright); the C-vs-A non-inferiority bound above (+5.15% upper) is the honest way to state this, not "C matches A."
+
+**Confined node this session:** the sweep's own C-arm process node was not observed in-run (see "Post-hoc confinement verification" below). The pre-sweep free-RAM precondition check (`numactl --hardware | grep free`) was against node 0; a post-hoc verification run of the actual sweep binary (`/tmp/pb/gcpause-numa`) after the fact confirmed confinement to **node 0**, but — as with candidate 1 — this does not guarantee every recorded round used the same node, since node choice follows the boot CPU per process start, not a pinned value.
+
+Raw data: `numa-design/bench-data/wsA-cand2/wsA-cand2-arm{A,B,C}-{warmup,recorded}.out{,.stderr}`, per-round `wsA-cand2-arm*-r*.vmstat.{before,after}`, `wsA-cand2-vmstat-summary.txt`, per-cycle extracts (`wsA-cand2-{A,B,C}-cycles.txt`), round-medians (`wsA-cand2-{A,B,C}-roundmedians.txt`), the analysis script and its output (`cand2_analysis.py`, `wsA-cand2-analysis-output.txt`), the sweep log (`wsA-cand2-sweep.log`), the stale-binary incident writeup (`cand2-stale-binary-incident.md`), and the post-hoc `go version -m`/confinement-verification transcripts described below.
+
+### Post-hoc confinement verification (correction pass, added after initial write-up)
+
+**Gap, stated plainly:** neither candidate sweep captured direct confinement evidence (an affinity/policy observation) *during* a recorded round — the plan called for it (§ mid-sweep sanity expectations: "one C round's `/proc/PID/status` `Cpus_allowed_list` shows one node's CPUs") and it was omitted for both candidates. What was captured instead was: (a) a **pre-sweep pilot** for candidate 1 (same command, run once immediately before the recorded rounds began) and a **pre-registration strace** for the json workload (Gate 4b) — both real evidence, but not in-sweep observations of the actual candidate binaries mid-round; and (b) vmstat 0/0 throughout both sweeps, which — per the Gate 5 caveat above — is Layer 1's signature, not confinement's. This gap is exactly the blind spot that let the stale, non-confining `gc-pause-bench` binary run for an entire sweep (Gate 7's incident) without in-run detection; only Gate 5's own honest caveat above explains why 0/0 didn't catch it.
+
+**Corrective evidence gathered after the fact (this correction pass), on the actual sweep binaries, which still exist on `numa-dell` unmodified since the sweeps ran:**
+
+`go version -m` on all four sweep binaries, confirming they are the genuine sweep artifacts (matching build SHA, `X:numa` tag where applicable, and file mtimes matching the sweep logs) — **not reconstructions**:
+
+```
+/tmp/pb/base/garbage:    go1.28-devel_c226071c35 ...              (mtime 13:55, matches wsA-cand1-sweep.log)
+/tmp/pb/numa/garbage:    go1.28-devel_c226071c35 ... X:numa        (mtime 13:55, matches wsA-cand1-sweep.log)
+/tmp/pb/gcpause-base:    go1.28-devel_c226071c35 ...              (mtime 17:23, matches the corrected wsA-cand2-sweep.log)
+/tmp/pb/gcpause-numa:    go1.28-devel_c226071c35 ... X:numa        (mtime 17:23, matches the corrected wsA-cand2-sweep.log)
+```
+Full transcripts archived as `wsA-cand1-govm-posthoc-verify.txt` / `wsA-cand2-govm-posthoc-verify.txt` (identical content, both candidates' directories, since all four binaries were checked together).
+
+**In-run confinement captures (post-hoc verification runs, NOT sweep data — labeled as such in the archive):** one run per candidate's C-arm binary, at the sweep's exact GOMAXPROCS=128 configuration, sampling `/proc/PID/status` `Cpus_allowed_list` a few seconds into the run:
+
+```
+$ ssh numa-dell 'env GOMAXPROCS=128 /tmp/pb/numa/garbage -benchmem=4096 -benchnum=1 & PID=$!; sleep 3; grep Cpus_allowed_list /proc/$PID/status; wait $PID'
+Cpus_allowed_list: 0,2,4,...,254   (even CPUs — node 0)
+
+$ ssh numa-dell 'FLAGS="-ptrheap=true -toucher=false -heap=4096 -idle=1000000 -stacks=200 -warm=45 -gcgap=5s -discard=2 -n=8"
+env GOMAXPROCS=128 GODEBUG=gcshrinkstackoff=1 /tmp/pb/gcpause-numa $FLAGS & PID=$!; sleep 5; grep Cpus_allowed_list /proc/$PID/status; kill $PID'
+Cpus_allowed_list: 0,2,4,...,254   (even CPUs — node 0)
+```
+
+Both actual sweep binaries confirmed confining to a single node (node 0, this verification pass) when run under the exact sweep configuration. Archived as `wsA-cand{1,2}-posthoc-confinement-verify.txt`. **These are after-the-fact verifications, run well after both sweeps completed — they demonstrate the binaries are capable of confining under this configuration, not that every recorded round of either sweep actually confined.** The strongest in-sweep-adjacent evidence remains: Gate 4(b)'s strace (same json workload, same GOMAXPROCS regime, run within the same session as Gate 6/7 prep) and candidate 1's pre-sweep pilot (same binary, same command, run immediately before the recorded rounds). Neither substitutes for a genuine mid-sweep sample, and none was taken during either candidate's actual recorded rounds.
 
 ## Overall verdict: Workstream A gate battery — **SHIP**
 
@@ -2608,25 +2651,26 @@ All 8 pre-declared gates pass:
 
 | Gate | Result |
 |---|---|
-| 1. 1P json (hard) | PASS — not significant, p=0.579-0.631 |
+| 1. 1P json (hard) | PASS — not significant, p=0.579-0.631; MDE ≈40% at n=10 (excludes only gross regressions) |
 | 2. 1P alloc micro (hard) | PASS — geomean +0.67% ≤ +2% |
-| 3. 256P json (hard) | PASS — pooled n=30, not significant, p=0.197 |
-| 4. Stand-down proof, strace (hard) | PASS — all 3 arm shapes match exactly |
-| 5. vmstat 0/0 confined (hard) | PASS — 0/0 twice |
-| 6. Candidate 1 garbage (decision) | PASS — C beats B (-29.61%, p=0.000); C non-inferior to A (CI upper +8.26%); B worse than A (+37.93%) |
-| 7. Candidate 2 gc-pause (decision) | PASS — C beats B (-19.66%, p=0.0002); C non-inferior to A (CI upper +5.15%); B worse than A (+25.70%) |
+| 3. 256P json (hard) | PASS — pooled n=30, not significant, p=0.197; MDE ≈22% at n=30 (excludes only gross regressions) |
+| 4. Stand-down proof, strace (hard) | PASS — all 3 arm shapes match exactly (mbind counts corrected to 970 BIND/969 PREFERRED at 256P, 11/11 at confined 1P — see corrected Gate 4 text) |
+| 5. vmstat 0/0 confined (hard) | PASS — 0/0 twice (Layer-1 evidence, not confinement evidence — see caveat) |
+| 6. Candidate 1 garbage (decision) | PASS — C beats B (-29.61%, p=0.000); C-vs-A non-inferiority bound PASSES (point +2.69%, CI upper +8.26%), but paired sign test (12/15 rounds C slower, p=0.035) means a small residual in A's favour cannot be excluded — a bound, not an equivalence; B worse than A (+37.93%) |
+| 7. Candidate 2 gc-pause (decision) | PASS — C beats B (-19.66%, exact p=1.1e-5); C-vs-A non-inferiority bound PASSES (point +1.51%, CI upper +5.15%); B worse than A (+25.70%) |
 | 8. Off-binary census (hard) | PASS (substantive) — 1481/1481 functions identical, zero numa symbols off-experiment |
 
-**No hard gate failed; both decision gates passed with margin.** Per the brief's stop rule, hard-gate pass alone is sufficient for Task 6 (Layer-2 removal) to proceed independently of the decision gates — moot here since the decision gates also passed. Workstream A ships as a genuine, measured win: fill-one-socket-first confinement recovers essentially all (candidate 1) to more-than-all (candidate 2, where C nominally beat even the pinned oracle A on the primary point estimate, though not significantly) of the unpinned-vs-pinned performance gap, on two independent workloads, without a detectable non-inferiority violation against the hard-pinned baseline, and without any measurable regression on any hard gate.
+**No hard gate failed; both decision gates passed their pre-declared non-inferiority bound.** Per the plan's Task 4 stop rule, hard-gate pass alone is sufficient for Task 6 (Layer-2 removal) to proceed independently of the decision gates — moot here since the decision gates also passed. **Important scope correction: Gates 6 and 7 characterize Layer 0+1+2+confinement running together, not confinement in isolation** — Layer 2 (PREFERRED-at-grow) is still in-tree and active for both candidates' C arm (see Gate 4's corrected mbind breakdown); Task 6 removing Layer 2 requires a Gate-6 B-vs-C confirmation sweep before the candidate-1 numbers above can be attributed to confinement alone. Workstream A ships as a genuine, measured win, reported as bounds rather than equivalences: fill-one-socket-first (+ the still-active Layer 2) recovers **108% of the unpinned-vs-pinned gap on candidate 1's primary point estimate** — the workload where C nominally beat the pinned oracle A outright, though the paired sign test says a small residual in A's favour cannot be fully excluded there — and **96% on candidate 2**, both without a non-inferiority-bound violation against the hard-pinned baseline and without any measurable regression on any hard gate.
 
-**N1 residual note (carried from the plan's locked decision 4, recorded here per Task 4 brief instructions):** Ms cloned in the window between `worldStarted()` and a later `numaStandDownIfNeeded` trigger (specifically the interval after the eager allm walk is dispatched but before all live Ms have converged via `numaFixThreadPlacement` at `stopm`) inherit the confined affinity/policy from their creating M at `clone` time and keep that placement until they first park. This is documented, accepted residual behavior (Task 3), not a defect: such Ms remain balancer-exempt (explicit task policy) throughout, and converge to the stood-down state at their first park like every other M — the residual is a bounded delay in reaching the fully-stood-down state, never an incorrect or unsafe placement.
+**N1 residual note (carried from the plan's locked decision 4, recorded here per the plan's Task 4 gate battery instructions, `2026-08-20-numa-v3-locality-plan.md:1182`):** Ms cloned in the window between `worldStarted()` and a later `numaStandDownIfNeeded` trigger (specifically the interval after the eager allm walk is dispatched but before all live Ms have converged via `numaFixThreadPlacement` at `stopm`) inherit the confined affinity/policy from their creating M at `clone` time and keep that placement until they first park. This is documented, accepted residual behavior (Task 3), not a defect: such Ms remain balancer-exempt (explicit task policy) throughout, and converge to the stood-down state at their first park like every other M — the residual is a bounded delay in reaching the fully-stood-down state, never an incorrect or unsafe placement.
 
 **Concerns for the controller:**
 
 1. **Process discipline finding (self-caught, not controller-facing until now):** the first Candidate 2 attempt used stale pre-Workstream-A binaries due to a silent build failure masked by an unconditional `echo BUILDS-OK` in a multi-line ssh script with no `set -e`. Caught before accepting the result by investigating an anomaly (C slower than B despite confirmed mechanism suppression) rather than writing it up. Recommend: `pathology-sweep.sh`-adjacent build-prep scripts should `set -euo pipefail` and verify each binary's `go version -m` build-ID/tags before the sweep starts, not just check exit codes loosely.
 2. Gate 2's `Malloc(8|16|Types)` regex still doesn't match any benchmark named `...Types` in this tree (only `MallocTypeInfo8/16/32` exist) — same pre-existing gap noted at every prior layer, run verbatim as specified rather than "fixed" unilaterally.
 3. Gate 8's literal "differ only in build IDs" bar is structurally unattainable here (as at Layer 0): Workstream A's new unconditional confinement-state globals in `numa_linux.go` shift subsequent data addresses. Passed on the substantive per-function/opcode/branch-target criterion instead, exactly as Layer 0's Gate 4 precedent established.
-4. Both decision-gate non-inferiority CIs used a round-paired log-ratio + t-distribution method (`noninf_ci.py`, archived), not a benchstat built-in — benchstat does not report confidence intervals, only point deltas and p-values, so this session computed the CI directly from the raw paired round data per the brief's I1 instruction (bootstrap or log-ratio CI).
+4. Both decision-gate non-inferiority CIs used a round-paired log-ratio + t-distribution method (`noninf_ci.py`, archived), not a benchstat built-in — benchstat does not report confidence intervals, only point deltas and p-values, so this session computed the CI directly from the raw paired round data per the plan's non-inferiority note (`2026-08-20-numa-v3-locality-plan.md:1060`, bootstrap or log-ratio CI).
+5. **This section was corrected after an independent audit** found: a materially incomplete Gate 4 mbind characterization (fixed — see corrected text, both candidates' C arm actually ran Layer 0+1+2+confinement together, not confinement alone); an over-confident Gate 6 C-vs-A narrative that suppressed the paired sign test's contrary signal (fixed — reported as a bound with the sign test alongside); a candidate-1/candidate-2 attribution swap in the original overall verdict (fixed); missing MDE statements on Gates 1 and 3 (added); missing in-sweep confinement evidence for both candidates (partially addressed post-hoc — see "Post-hoc confinement verification" — the sweep-time gap itself cannot be retroactively closed); an arithmetic slip (14/15 → 13/15 for candidate 1's clean vmstat rounds); a warmup-round contamination in candidate 2's reported B-arm fault range; a misnamed `exact_mwu` function (renamed, true exact p added as a cross-check); an overstated idle-check claim (the `ps` self-report artifact, reproduced live during this correction pass, fired dozens of times on a genuinely idle box — `pathology-sweep.sh`'s `idle_check` fixed in this same commit to exclude its own `ps`/`awk` pipeline); and citations to the untracked, gitignored `task-4-brief.md` where the tracked, git-verifiable plan (`e44dad45f1`) carries the same content and is the correct pre-registration citation (fixed throughout).
 
 Session end: `kernel.numa_balancing = 1` (confirmed), THP `[always] madvise never` (unchanged), machine idle (`ps aux --sort=-%cpu` clean) throughout and at close.
 

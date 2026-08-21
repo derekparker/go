@@ -8,7 +8,8 @@ arm C: ICC=0.994 (MSB=1.095e+17 MSW=8.815e+13), effective_n=10.1 (raw n_cycles=8
 
 === Primary: B vs C (round medians, exact/normal-approx Mann-Whitney U) ===
 B median-of-round-medians=3922.26ms  C median-of-round-medians=3151.21ms  rel=-19.66%
-U1=100.0 U2=0.0 p=0.0002  SIGNIFICANT
+normal-approx: U1=100.0 U2=0.0 p=0.0002  SIGNIFICANT
+exact (full enumeration): U1=100.0 U2=0.0 p=1.083e-05  SIGNIFICANT  (cross-check; normal-approx is conservative when fully separated)
 CV: B=5.34% C=3.64%
 
 === Secondary/context: A vs B ===
