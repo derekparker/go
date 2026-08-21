@@ -350,21 +350,51 @@ func TestNUMAWidenCountUnderChurn(t *testing.T) {
 		t.Skip("no sched_setaffinity plumbing on this arch")
 	}
 	before := runtime.NumaWidenCountForTest()
+
+	// Escalating rounds, each round's goroutines staying alive (parked
+	// on <-stop, holding their M) across rounds: found as a real flake
+	// (not hypothetical) when this test first ran inside the FULL
+	// -short runtime suite rather than standalone -- a full suite run
+	// leaves hundreds of idle Ms in the pool from earlier tests'
+	// parallelism, so a modest one-shot batch of LockOSThread'd
+	// goroutines can be serviced entirely by reusing that existing
+	// pool without ever calling newm1 at all. Since each round adds
+	// MORE concurrently-locked goroutines on top of every earlier
+	// round's (still blocked, still holding their M), the cumulative
+	// total grows monotonically and must eventually exceed whatever
+	// idle-M pool existed at the start, forcing at least one genuinely
+	// new M through newm1 -- regardless of how large that starting
+	// pool was.
+	stop := make(chan struct{})
 	var wg sync.WaitGroup
-	for i := 0; i < 128; i++ {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			runtime.LockOSThread()
-			defer runtime.UnlockOSThread()
-			time.Sleep(5 * time.Millisecond)
-		}()
+	defer wg.Wait()
+	defer close(stop)
+
+	spawn := func(n int) {
+		for i := 0; i < n; i++ {
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				runtime.LockOSThread()
+				defer runtime.UnlockOSThread()
+				<-stop
+			}()
+		}
 	}
-	wg.Wait()
-	after := runtime.NumaWidenCountForTest()
-	if after <= before {
-		t.Fatalf("numaWidenCount did not increase during M-creation churn (before=%d after=%d): the newm1/newosproc/cgo widen path (review C1/NEW-1) did not fire", before, after)
+
+	total := 0
+	for batch := 128; total < 4096; batch *= 2 {
+		spawn(batch)
+		total += batch
+		// Give the scheduler a moment to actually create the Ms this
+		// round's demand requires before checking.
+		time.Sleep(100 * time.Millisecond)
+		if runtime.NumaWidenCountForTest() > before {
+			return // success
+		}
 	}
+	t.Fatalf("numaWidenCount did not increase after spawning %d concurrently-locked goroutines (before=%d after=%d): the newm1/newosproc/cgo widen path (review C1/NEW-1) did not fire",
+		total, before, runtime.NumaWidenCountForTest())
 }
 
 func parsePlacement(t *testing.T, out, label string) (aff int, mode int) {
