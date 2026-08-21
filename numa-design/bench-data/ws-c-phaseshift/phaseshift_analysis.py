@@ -273,8 +273,12 @@ def main():
     print(f"B: min={min(bgb):.1f} max={max(bgb):.1f} mean={statistics.mean(bgb):.1f}")
     print(f"C: min={min(cgb):.1f} max={max(cgb):.1f} mean={statistics.mean(cgb):.1f}")
     print(f"Reference single-controller ceiling (arm A, original candidate 3 pilot): ~31.0 GB/s")
-    print(f"B rounds at/below 31.5 GB/s (near-ceiling): {sum(1 for v in bgb if v <= 31.5)}/{n}")
-    print(f"C rounds at/below 31.5 GB/s (near-ceiling): {sum(1 for v in cgb if v <= 31.5)}/{n}")
+    print(f"B rounds strictly above 31.0 GB/s ceiling: {sum(1 for v in bgb if v > 31.0)}/{n}")
+    print(f"C rounds strictly above 31.0 GB/s ceiling: {sum(1 for v in cgb if v > 31.0)}/{n}")
+    print(f"B rounds at/below 31.5 GB/s (near-ceiling, a looser descriptive band, NOT 'at/below the ceiling'): "
+          f"{sum(1 for v in bgb if v <= 31.5)}/{n}")
+    print(f"C rounds at/below 31.5 GB/s (near-ceiling, a looser descriptive band, NOT 'at/below the ceiling'): "
+          f"{sum(1 for v in cgb if v <= 31.5)}/{n}")
 
     # migration-traffic-vs-bandwidth budget, arm B, using vmstat summary if given
     vsum_path = os.path.join(outdir, "wsC-phase-vmstat-summary.txt")
@@ -345,20 +349,26 @@ def analyze_capture(capture_dir):
         by_key.setdefault((arm, rnd, phase), {})[tag] = nb
     for arm in ("B", "C"):
         deltas = []
+        deltas_123 = []
         for (a, rnd, phase), tags in sorted(by_key.items()):
             if a != arm:
                 continue
             if "start" in tags and "end" in tags and tags["start"] is not None and tags["end"] is not None:
                 d = tags["end"] - tags["start"]
                 deltas.append(d)
-                print(f"  arm={arm} round={rnd} phase={phase}: start={tags['start']:.4f} "
-                      f"end={tags['end']:.4f} delta={d:+.4f}")
+                if phase in (1, 2, 3):
+                    deltas_123.append(d)
+                print(f"  arm={arm} round={rnd} phase={phase}: start={tags['start']:.6f} "
+                      f"end={tags['end']:.6f} delta={d:+.6f}")
         if deltas:
             toward_skew = sum(1 for d in deltas if d < 0)
             toward_spread = sum(1 for d in deltas if d > 0)
+            ties = sum(1 for d in deltas if d == 0)
             print(f"  arm={arm}: {toward_skew}/{len(deltas)} phases moved toward consolidation "
                   f"(end < start), {toward_spread}/{len(deltas)} moved toward spread, "
-                  f"mean delta={statistics.mean(deltas):+.4f}")
+                  f"{ties}/{len(deltas)} exact ties (sums to {toward_skew+toward_spread+ties}/{len(deltas)}), "
+                  f"mean delta (all phases)={statistics.mean(deltas):+.4f}, "
+                  f"mean delta (phases 1-3 only)={statistics.mean(deltas_123):+.4f}")
 
     # descriptive: overall node-balance distribution, all snapshots and the
     # pre-registered phases-1-3-only subset (phase 0's "start" snapshot is
@@ -399,6 +409,34 @@ def analyze_capture(capture_dir):
               f"not read as decisive on its own.")
     else:
         print("  (fewer than 2 capture rounds with both placement and ns/read data -- cannot correlate)")
+
+    # Exploratory, NOT pre-registered (added per audit review): pool both
+    # arms' round-level points (n=6) for a better-powered version of the
+    # same correlation, and check whether it holds within arm B alone.
+    # These were not declared before the sweep ran -- reported as
+    # exploratory, kept separate from the primary n=3 test above.
+    print("\n--- exploratory (NOT pre-registered): pooled both-arms + within-B Spearman ---")
+    b_points = []
+    for rnd in sorted({r for a, r, p, t, tot, nb in rows if a == "B"}):
+        vals = [nb for a, r2, p, t, tot, nb in rows if a == "B" and r2 == rnd and p in (1, 2, 3) and nb is not None]
+        ns = read_capture_ns(capture_dir, "B", rnd)
+        if vals and ns is not None:
+            b_points.append((rnd, statistics.mean(vals), ns))
+            print(f"  arm=B round={rnd}: mean node-balance (phases 1-3)={statistics.mean(vals):.4f}  ns/read={ns:.4f}")
+    if len(round_points) == 3 and len(b_points) == 3:
+        pooled_bal = [p[1] for p in b_points] + [p[1] for p in round_points]
+        pooled_ns = [p[2] for p in b_points] + [p[2] for p in round_points]
+        rho_pool, p_pool = spearman(pooled_bal, pooled_ns)
+        print(f"  pooled (n=6, B+C): rho={rho_pool:+.4f}  exact p={p_pool:.4g}")
+        b_bal = [p[1] for p in b_points]
+        b_ns = [p[2] for p in b_points]
+        rho_b, p_b = spearman(b_bal, b_ns)
+        print(f"  within B alone (n=3): rho={rho_b:+.4f}  "
+              f"exact p={'n/a' if p_b is None else f'{p_b:.4g}'}")
+        print("  Framing (per audit): B's within-run instability and B's lower time-averaged "
+              "spread are not separable in this design -- they are two descriptions of the same "
+              "balancer-driven process. This pooled/within-B result is exploratory, not "
+              "pre-registered, and is reported as such.")
 
 
 if __name__ == "__main__":

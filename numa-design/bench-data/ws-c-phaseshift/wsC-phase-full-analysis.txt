@@ -13,12 +13,14 @@ Implied bandwidth (GB/s = 64/ns_per_read):
 B: min=33.1 max=44.5 mean=38.1
 C: min=31.5 max=58.0 mean=50.9
 Reference single-controller ceiling (arm A, original candidate 3 pilot): ~31.0 GB/s
-B rounds at/below 31.5 GB/s (near-ceiling): 0/20
-C rounds at/below 31.5 GB/s (near-ceiling): 1/20
+B rounds strictly above 31.0 GB/s ceiling: 20/20
+C rounds strictly above 31.0 GB/s ceiling: 20/20
+B rounds at/below 31.5 GB/s (near-ceiling, a looser descriptive band, NOT 'at/below the ceiling'): 0/20
+C rounds at/below 31.5 GB/s (near-ceiling, a looser descriptive band, NOT 'at/below the ceiling'): 1/20
 
 Arm B migration-traffic budget: mean pages_migrated/round=4802548 -> 0.328 GB/s two-way migration traffic (0.86% of B's own mean demand bandwidth)
 
-=== Mechanism: numa_maps capture rounds (/tmp/wsC-capture-pull/wsC-phase-capture) ===
+=== Mechanism: numa_maps capture rounds (numa-design/bench-data/ws-c-phaseshift) ===
 arm round  phase  tag    N0        N1        balance   
 B   1      0      end    1381084   294372    0.1757
 B   1      0      mid    734427    940515    0.4385
@@ -94,32 +96,32 @@ C   3      3      mid    772834    903074    0.4611
 C   3      3      start  772322    903074    0.4610
 
 --- descriptive: start-vs-end node-balance movement per arm/phase ---
-  arm=B round=1 phase=0: start=0.1319 end=0.1757 delta=+0.0438
-  arm=B round=1 phase=1: start=0.0587 end=0.1018 delta=+0.0432
-  arm=B round=1 phase=2: start=0.1012 end=0.0370 delta=-0.0642
-  arm=B round=1 phase=3: start=0.0342 end=0.1088 delta=+0.0746
-  arm=B round=2 phase=0: start=0.4906 end=0.0165 delta=-0.4741
-  arm=B round=2 phase=1: start=0.0168 end=0.1092 delta=+0.0923
-  arm=B round=2 phase=2: start=0.1067 end=0.3668 delta=+0.2601
-  arm=B round=2 phase=3: start=0.3674 end=0.1088 delta=-0.2586
-  arm=B round=3 phase=0: start=0.4764 end=0.0467 delta=-0.4297
-  arm=B round=3 phase=1: start=0.0470 end=0.1135 delta=+0.0665
-  arm=B round=3 phase=2: start=0.1126 end=0.0272 delta=-0.0855
-  arm=B round=3 phase=3: start=0.0253 end=0.1178 delta=+0.0925
-  arm=B: 5/12 phases moved toward consolidation (end < start), 7/12 moved toward spread, mean delta=-0.0533
-  arm=C round=1 phase=0: start=0.3051 end=0.3051 delta=+0.0000
-  arm=C round=1 phase=1: start=0.3051 end=0.3050 delta=-0.0001
-  arm=C round=1 phase=2: start=0.3050 end=0.3049 delta=-0.0001
-  arm=C round=1 phase=3: start=0.3049 end=0.3048 delta=-0.0001
-  arm=C round=2 phase=0: start=0.2528 end=0.2528 delta=-0.0000
-  arm=C round=2 phase=1: start=0.2528 end=0.2530 delta=+0.0002
-  arm=C round=2 phase=2: start=0.2530 end=0.2529 delta=-0.0001
-  arm=C round=2 phase=3: start=0.2529 end=0.2528 delta=-0.0001
-  arm=C round=3 phase=0: start=0.4609 end=0.4611 delta=+0.0002
-  arm=C round=3 phase=1: start=0.4611 end=0.4610 delta=-0.0001
-  arm=C round=3 phase=2: start=0.4610 end=0.4610 delta=+0.0000
-  arm=C round=3 phase=3: start=0.4610 end=0.4611 delta=+0.0002
-  arm=C: 7/12 phases moved toward consolidation (end < start), 4/12 moved toward spread, mean delta=+0.0000
+  arm=B round=1 phase=0: start=0.131860 end=0.175697 delta=+0.043837
+  arm=B round=1 phase=1: start=0.058675 end=0.101837 delta=+0.043162
+  arm=B round=1 phase=2: start=0.101230 end=0.036992 delta=-0.064238
+  arm=B round=1 phase=3: start=0.034239 end=0.108836 delta=+0.074597
+  arm=B round=2 phase=0: start=0.490632 end=0.016512 delta=-0.474119
+  arm=B round=2 phase=1: start=0.016814 end=0.109150 delta=+0.092337
+  arm=B round=2 phase=2: start=0.106704 end=0.366777 delta=+0.260074
+  arm=B round=2 phase=3: start=0.367382 end=0.108803 delta=-0.258579
+  arm=B round=3 phase=0: start=0.476442 end=0.046721 delta=-0.429721
+  arm=B round=3 phase=1: start=0.047027 end=0.113548 delta=+0.066521
+  arm=B round=3 phase=2: start=0.112631 end=0.027157 delta=-0.085474
+  arm=B round=3 phase=3: start=0.025325 end=0.117784 delta=+0.092459
+  arm=B: 5/12 phases moved toward consolidation (end < start), 7/12 moved toward spread, 0/12 exact ties (sums to 12/12), mean delta (all phases)=-0.0533, mean delta (phases 1-3 only)=+0.0245
+  arm=C round=1 phase=0: start=0.305079 end=0.305096 delta=+0.000017
+  arm=C round=1 phase=1: start=0.305096 end=0.305003 delta=-0.000094
+  arm=C round=1 phase=2: start=0.305003 end=0.304910 delta=-0.000093
+  arm=C round=1 phase=3: start=0.304910 end=0.304816 delta=-0.000094
+  arm=C round=2 phase=0: start=0.252757 end=0.252751 delta=-0.000006
+  arm=C round=2 phase=1: start=0.252751 end=0.252979 delta=+0.000228
+  arm=C round=2 phase=2: start=0.252979 end=0.252902 delta=-0.000077
+  arm=C round=2 phase=3: start=0.252903 end=0.252825 delta=-0.000077
+  arm=C round=3 phase=0: start=0.460944 end=0.461121 delta=+0.000177
+  arm=C round=3 phase=1: start=0.461120 end=0.460979 delta=-0.000141
+  arm=C round=3 phase=2: start=0.460979 end=0.460979 delta=+0.000000
+  arm=C round=3 phase=3: start=0.460979 end=0.461143 delta=+0.000165
+  arm=C: 7/12 phases moved toward consolidation (end < start), 4/12 moved toward spread, 1/12 exact ties (sums to 12/12), mean delta (all phases)=+0.0000, mean delta (phases 1-3 only)=-0.0000
 
 --- descriptive: node-balance distribution ---
   [all phases (0-3)] arm=B: n=36 mean=0.1605 min=0.0165 max=0.4918 stdev=0.1462
@@ -134,3 +136,11 @@ C   3      3      start  772322    903074    0.4610
   Spearman(node-balance, ns/read): rho=-1.0000  exact p=0.3333  n=3
   H-bandwidth predicts rho<0 (higher balance -> lower ns/read, i.e. faster). Observed rho=-1.0000: consistent with H-bandwidth direction.
   Disclosed limitation (pre-registered): n=3 gives essentially no power (a two-tailed exact test at n=3 cannot reach p<0.05 even at |rho|=1); reported as pre-declared, not read as decisive on its own.
+
+--- exploratory (NOT pre-registered): pooled both-arms + within-B Spearman ---
+  arm=B round=1: mean node-balance (phases 1-3)=0.0887  ns/read=1.6833
+  arm=B round=2: mean node-balance (phases 1-3)=0.2034  ns/read=1.4734
+  arm=B round=3: mean node-balance (phases 1-3)=0.1213  ns/read=1.7015
+  pooled (n=6, B+C): rho=-0.9429  exact p=0.01667
+  within B alone (n=3): rho=-0.5000  exact p=1
+  Framing (per audit): B's within-run instability and B's lower time-averaged spread are not separable in this design -- they are two descriptions of the same balancer-driven process. This pooled/within-B result is exploratory, not pre-registered, and is reported as such.
