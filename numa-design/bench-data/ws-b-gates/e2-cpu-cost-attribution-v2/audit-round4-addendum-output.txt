@@ -1,0 +1,15 @@
+spanSet/mcentral/sweep: ON=1.167e+10 OFF=3.370e+10 delta=-2.203e+10 (-65.4% relative to OFF)
+kernel spinlock (native_queued_spin_lock_slowpath): ON=2.254e+11 OFF=1.538e+11 delta=+7.155e+10 (+46.5% relative to OFF)
+
+futex symbols (all): ON=0.24% OFF=0.28%
+
+cycle totals: ON=631,060,713,114 OFF=650,593,805,987 delta=-3.00%
+
+capture-pair benchmark line comparison:
+
+capture-pair benchmark line comparison (hand-verified from on-json.out/off-json.out directly, parser above didn't match the field layout):
+  ns/op:             ON=2111231     OFF=2282911     rel=-7.52%
+  user+sys-ns/op:    ON=183743290   OFF=180265793   rel=+1.93%
+  allocs/op:         ON=26813       OFF=26814       rel=-0.00% (matched work)
+  bytes-from-system: ON=7544784096  OFF=5485105032  rel=+37.55%
+  peak-RSS-bytes:    ON=7399268352  OFF=5245116416  rel=+41.06%

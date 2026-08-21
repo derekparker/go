@@ -3771,33 +3771,107 @@ GOMAXPROCS=128: 65.6762%, 59.8418%, 61.6445%   -> median local 61.64% (remote 38
 GOMAXPROCS=256: 56.3606%, 57.1520%, 60.1380%   -> median local 57.15% (remote 42.85%)
 ```
 
-**This is a materially different, and much more informative, curve.**
-Remote traffic is present at **every** GOMAXPROCS value once confinement
-is genuinely out of the picture — not a step function that only appears
-at 256. The GOMAXPROCS=2 point alone shows the underlying variance
-clearly: 99.99% in round 1 (both Ms happened to land on, and stay on,
-the same node) vs. 75.05%/69.27% in rounds 2-3 (a coin-flip outcome —
-with only 2 Ms, whether they land on the same node or split is close to
-50/50, and once split, this small-thread-count regime is dominated by
-which single M happens to serve which goroutine). From GOMAXPROCS=8
-upward, the median settles into a **53-75% local (25-47% remote) band**
-that does not show a strong, clean monotonic trend with thread count —
-consistent with the goroutine-migration hypothesis (remote traffic
-present broadly, not scaling cleanly with M count) rather than a pure
-M-placement-randomness story (which would predict remote share climbing
-smoothly toward 50% as M count grows, not already sitting in a
-comparable band at GOMAXPROCS=8 as at GOMAXPROCS=256). **What this adds
-to the Step 5 verdict's leading candidate:** the mechanism is not
-specific to high thread counts or to GOMAXPROCS exceeding node capacity
-(that was round 1's confounded artifact) — it is present as soon as
-more than one M exists and those Ms are not externally pinned, matching
-a picture where goroutines move across whichever Ps/Ms are available
-regardless of node, and soft affinity's per-M narrowing (which does
-demonstrably work — see the `GODEBUG` evidence above) does not by
-itself keep memory access node-local once more than a couple of
-independently-narrowed Ms are in play. Archived `e1-unconfined-v2/`
-(15 raw `.out` files with full `GODEBUG=numa=1` output embedded, plus
-the harness source).
+**This is a materially different curve than round 1** — remote traffic
+is present at every GOMAXPROCS value once confinement is genuinely out
+of the picture, not a step function that only appears at 256. **The
+interpretation drawn from it (below) was itself corrected in a further
+audit round — see "E1 interpretation corrected" immediately after this
+subsection.** Archived `e1-unconfined-v2/` (15 raw `.out` files with full
+`GODEBUG=numa=1` output embedded, plus the harness source).
+
+**Withdrawn interpretation (kept as history, corrected below):** an
+earlier draft of this section read the GOMAXPROCS=2 point's 99.99%
+outlier as "both Ms happened to land on, and stay on, the same node,"
+and read the overall curve as "consistent with the goroutine-migration
+hypothesis... rather than a pure M-placement-randomness story." Both
+readings were wrong; see the correction immediately below, which
+replaces this paragraph's conclusions without deleting the record of
+having drawn them.
+
+### E1 interpretation corrected (third audit pass)
+
+**(1) By the pre-registered rule, this data does not support "goroutine-
+migration implicated."** The pre-registration stated plainly: migration
+predicts remote stays roughly **flat near 50%** regardless of thread
+count; M-placement-randomness predicts remote **falls** at low
+GOMAXPROCS. Observed remote share (100−local): **24.95% (2), 26.60% (8),
+46.92% (32), 38.36% (128), 42.85% (256)**. Remote **does fall** at the
+two lowest points (2, 8) relative to the three higher ones (32, 128,
+256) — the opposite of "flat near 50%," and directionally the shape the
+pre-registration assigned to the M-placement alternative, not to
+migration. Read strictly against the pre-registered rule, **this favors
+the M-placement alternative, or at best is non-discriminating** — it
+does **not** support the migration reading the round-2 write-up drew.
+Withdrawn.
+
+**(2) The redo did not actually test the low-M regime it was designed
+to test.** `routing-probe-unconfined.go` boots with the default
+`NumCPU()=256` (256 Ps live from `schedinit`), and `runtime.GOMAXPROCS(n)`
+only caps **scheduling concurrency** afterward — it does not shrink the
+number of Ms that come into existence over a run's lifetime, and
+`numaNoteSchedule` narrows **every M** that passes through `schedule()`,
+regardless of the current GOMAXPROCS value. Directly counted from the
+archived `GODEBUG=numa=1` output (`numa: soft affinity narrowed M to
+node 0/1` lines per run):
+
+| point | round 1 | round 2 | round 3 |
+|---|---|---|---|
+| GOMAXPROCS=2 | node0=44 node1=25 (69) | node0=31 node1=37 (68) | node0=48 node1=21 (69) |
+| GOMAXPROCS=8 | node0=56 node1=12 (68) | node0=38 node1=31 (69) | node0=41 node1=29 (70) |
+| GOMAXPROCS=32 | node0=42 node1=29 (71) | node0=36 node1=34 (70) | node0=31 node1=38 (69) |
+
+**~68-71 distinct Ms were narrowed, spread across both nodes, at every
+one of GOMAXPROCS=2/8/32** — essentially the same M count as at
+GOMAXPROCS=128/256. The "low thread count" points never actually ran at
+low thread count; they tested the same large, ambient M population (GC
+workers, sysmon, netpoller, and Ms spun up for blocking work) under a
+lower **scheduling concurrency cap**, not a lower M population. This
+experiment, as built, cannot discriminate M-count effects at all —
+withdrawn as a test of "does remote share depend on M count."
+
+**(3) The GOMAXPROCS=2 round-1 explanation is withdrawn, unexplained.**
+That run (99.99% local) logs **44/25 narrowings split across both
+nodes** — the same both-nodes-active pattern as every other run, not a
+"both Ms stayed on one node" outcome as originally claimed. Why span
+refills were still ~100% local despite ~69 Ms narrowed across both
+nodes in that specific run is **not explained by this data** and is
+left as a genuinely open, unresolved observation, not confabulated
+further.
+
+**(4) Per-point dispersion (range, computed from the archived raw
+values):**
+
+| GOMAXPROCS | median local% | range (pp) |
+|---|---:|---:|
+| 2 | 75.05 | 30.72 |
+| 8 | 73.40 | 5.47 |
+| 32 | 53.08 | 13.99 |
+| 128 | 61.64 | 5.83 |
+| 256 | 57.15 | 3.78 |
+
+Dispersion itself is highest exactly where the M-count confound (2) is
+most severe, consistent with (2)'s own finding that these points are
+not cleanly testing what they were designed to test.
+
+**What E1 actually establishes, honestly:** confinement is genuinely off
+at every point (proven, `GODEBUG` evidence, 15/15); soft affinity is
+genuinely active and narrows Ms across both nodes at every point
+(proven, same evidence); and **25-47% of span refills are remote at
+every unpinned GOMAXPROCS tested, with no clean, interpretable
+dependence on thread count established by this experiment** — i.e.
+node-routed refill does not deliver strong locality without external
+pinning, full stop, independent of any M-count story. **A further
+caveat on the metric itself, not just this run's design:** span-refill
+local/remote share is a **supply-side** condition — it reflects which
+node's spanSet happened to serve a given refill, which conflates several
+distinct mechanisms this experiment cannot separate: genuine goroutine
+migration across nodes, M-narrowing imbalance within a run (e.g. the
+56/12 node-0-heavy split logged at `procs8-round1`, which by itself
+would bias that round's refills toward node 0 regardless of any
+goroutine behavior), arena-homing imbalance from Task 8's own address-
+ordered growth, and GC-sweep-driven span redistribution across the
+per-node sets. This experiment measures the aggregate outcome of all of
+these together; it does not and cannot isolate which one dominates.
 
 ### E2 — CPU-cost attribution at 256P (Gate 2c's own config)
 
@@ -3889,99 +3963,198 @@ sweeps used.
 | **total kernel-mode (`[k]`)** | **39.990** | **28.490** | **+11.500** |
 | **total user-mode (`[.]`)** | **59.120** | **70.550** | **−11.430** |
 
-**Top-line finding, corrected: the cost is dominated by kernel-mode
-spinlock contention, not userspace spanSet code, and not the syscall
-path.** `native_queued_spin_lock_slowpath` — the kernel's contended-lock
-path, entered when a userspace futex-backed lock has to actually block —
-is present substantially in **both** arms (23.64% OFF, real GC/scheduler
-lock contention exists in stock Go too, matching `strace`'s own
-`futex`-dominant finding above, now confirmed with kernel-level
-resolution rather than dismissed as noise), but is **12.07 percentage
-points higher in the ON arm** (35.71% vs 23.64%) — the single largest
-attributable contributor found by this experiment, and the correct
-resolution of `strace`'s 81.95%-`futex` finding: not "generic, not
-attributable" as round 1 concluded, but genuinely higher under
-Workstream B. Meanwhile the spanSet/mcentral/sweep-path **user-mode**
-code is actually **lower** as a share of ON-arm cycles (1.85%) than the
-same symbols' share of OFF-arm cycles (5.18%, since these functions —
-simplified to a single index — exist off-experiment too) — consistent
-with cycles shifting from *doing* spanSet work to *waiting* for a
-spanSet-adjacent lock inside the kernel, not with the per-node spanSet
-code itself running hot. The NUMA syscall/routing-decision path remains
+**Top-line finding, corrected further (fourth audit pass): the cost is
+dominated by kernel-mode spinlock contention (a real, measured, absolute
+increase), not userspace spanSet code — but the mechanism is NOT
+`futex` and the "% of the +19.96% target" arithmetic below was withdrawn
+because this specific capture pair does not reproduce that target at
+all.** `native_queued_spin_lock_slowpath` is present substantially in
+**both** arms (23.64% OFF — real, generic kernel-spinlock contention
+exists in stock Go too) but **12.07 percentage points higher in the ON
+arm** (35.71% vs 23.64%). Meanwhile spanSet/mcentral/sweep-path
+**user-mode** code is a *lower* share of ON-arm cycles (1.85% vs 5.18%
+OFF) — cycles shifted from *doing* spanSet work to *waiting* on a
+kernel-mode lock. The NUMA syscall/routing-decision path stays
 negligible in both arms (0.02% ON, 0.00% OFF).
 
-**Requested arithmetic — how much of the +19.96% is explained:**
+**Correction: `native_queued_spin_lock_slowpath` is NOT futex-specific —
+withdraw the earlier "strace futex finding confirmed" sentence.** It is
+the generic kernel qspinlock slow path, entered by *any* contended
+`raw_spin_lock`/`raw_spin_lock_irqsave` in the kernel (page tables, run
+queues, `sighand`, zone locks, and more) — conflating it with `futex(2)`
+specifically was wrong. Directly checked: kernel `futex_*`/
+`runtime.futex*` symbols sum to **0.24% ON vs 0.28% OFF** — flat,
+slightly *lower* under Workstream B, not the dominant mechanism at all.
+`strace`'s own 81.95%-`futex`-call-count finding (round 1) reflected
+syscall *volume* inflated by ptrace tracing overhead, not real cycles in
+the futex path specifically — see the lock-identification finding below
+for what the spinlock time is actually spent on.
+
+**Correction: the capture pair's own numbers do not reproduce the
++19.96% target — disclosed, not previously stated.** Read directly from
+the archived `on-json.out`/`off-json.out` (the actual benchmark output
+lines for this specific pair of runs, not the pooled Gate 2c sweep):
 
 ```
-+19.96% user+sys-sec/op increase = 16.64% of ON-arm cycles (target to explain)
-  [ delta/ON_total = 0.1996/1.1996 ]
-
-measured, netted group deltas explain: 8.19 / 16.64 = 49.2% of the target
-kernel spinlock contention ALONE explains: 12.07 / 16.64 = 72.5% of the target
-  (largest single named contributor; partially offset by spanSet's own
-  -3.33pp and other-kernel's -0.57pp, netting to the 49.2% figure above)
-unattributed remainder: 16.64 - 8.19 = 8.45 pct pts (50.8% of the target)
+                  ON            OFF           delta
+ns/op:            2,111,231     2,282,911     -7.52%  (ON is FASTER here)
+user+sys-ns/op:   183,743,290   180,265,793   +1.93%
+allocs/op:        26,813        26,814        matched work (essentially identical)
+total cycles:     631.06e9      650.59e9      -3.00%  (perf event count, both arms)
 ```
 
-Read plainly: **kernel spinlock contention alone would explain nearly
-three-quarters of the measured cost if nothing else were happening; net
-of the (real, measured) offsetting decrease in spanSet's own user-mode
-share, the named groups together explain about half of the target, and
-roughly half remains unattributed to any specific named symbol** — most
-plausibly distributed across many small increases in ordinary
-application/runtime code as kernel-mode lock-wait time crowds out
-user-mode work time (consistent with user-mode's own −11.43pp shift),
-not further broken down by this one-run capture. **Caveat, stated
-plainly:** these are relative profile-share percentages (fraction of
-each arm's own total sampled cycles), not absolute cycle counts;
-`-benchtime=10s` fixes wall-clock duration, not total work done, so
-converting between "percentage-point delta of profile share" and
-"percentage of the measured wall-clock cost" assumes total captured
-cycles scale with completed work comparably between arms — a reasonable
-but unverified assumption for a single-run attribution experiment, not
-a statistical claim. Archived `e2-cpu-cost-attribution-v2/` (`perf-on-full.txt`,
-`perf-off-full.txt`, `on-json.out`, `off-json.out`, `analyze.py`,
-`analyze-output.txt`; raw `perf.data` files, ~1GB each, deliberately not
-archived — repo hygiene; the full text reports are sufficient to
-reproduce every number above).
+**This pair does not reproduce Gate 2c's pooled (n=30) +19.96% finding —
+it shows essentially the opposite sign on wall-clock and a much smaller,
+different-sign-adjacent delta on CPU time.** Two real reasons, both
+disclosed rather than papered over: (a) different config from the pooled
+sweep — this capture used a direct one-shot `-benchnum=1 -benchtime=10s`
+invocation (5000 iterations here) vs. `gate-json.sh`'s own
+`BENCHNUM=10` wrapping (2000-iteration runs, pooled across 30 total
+rounds); (b) this is **n=1 per arm** against benchmarks with an
+established 26-32% CV (see Gate 2c's own MDE analysis, I5) — a single
+pair landing within that noise band, on the opposite side of the pooled
+median, is expected, not anomalous. **The withdrawn arithmetic below
+computed "how much of +19.96% this pair's profile explains" — that
+question is void, since this pair's own headline numbers don't show a
++19.96% to explain in the first place.**
 
-**Plausible mechanism (explicitly labeled speculative, not established by
-this one-run experiment):** the per-node `mcentral` spanSet design
-(Task 9) splits what was one spine lock per span class into up to
-`numaMaxHeapNodes` (8, statically) per class — but this machine has only
-2 physical nodes, so the real split in play here is 2-way, not 8-way, and
-`cacheSpan`'s local-first-then-fallback-to-other-nodes search (Task 9's
-own documented design) means a refill that misses locally now acquires
-**more than one** lock in sequence rather than one. Under GOMAXPROCS=256
-with genuinely limited node-local headroom (per E1's own finding that
-substantial cross-node goroutine activity exists even at low thread
-counts), this could plausibly increase total lock-acquisition volume
-enough to raise contention despite finer-grained locking normally
-reducing it. Not verified here — a lock-hold/wait-time profile (not just
-a cycle-sample profile) would be needed to confirm this specific
-mechanism.
+**Supportable replacement statement, framed on absolute cycles under
+matched work (not a percentage of a target this pair didn't produce):**
+converting each group's percentage share to absolute cycles (group% ×
+each arm's own total event count, from the perf headers: ON
+631,060,713,114, OFF 650,593,805,987):
 
-### What E1/E2 (corrected) change about the Step 5 verdict
+```
+spanSet/mcentral/sweep:  ON 11.67e9  OFF 33.70e9  delta -22.03e9  (-65.4% relative to OFF)
+kernel spinlock (native_queued_spin_lock_slowpath):
+                         ON 225.35e9 OFF 153.82e9 delta +71.53e9 (+46.5% relative to OFF)
+```
+
+**Under matched work (allocs/op essentially identical), Workstream B
+shifts ~72e9 cycles (+46.6%, rounding) from user-mode spanSet work into
+kernel-mode spinlock wait — while total CPU across the whole run is
+flat-to-slightly-down (-3.0%) in this specific pair.** This is real,
+measured, absolute-cycle evidence of a genuine shift in *where* cycles
+go, decoupled from any claim about the pooled +19.96% figure, which this
+pair simply does not speak to. Archived `e2-cpu-cost-attribution-v2/`
+(`perf-on-full.txt`, `perf-off-full.txt`, `on-json.out`, `off-json.out`,
+`analyze.py`, `analyze-output.txt`; raw `perf.data` files, ~1GB each,
+deliberately not archived — repo hygiene).
+
+**New signal: page-supply (memory-footprint) difference, from the same
+capture pair's own benchmark output.** `clear_page_erms` (the kernel's
+page-zeroing routine, entered on fresh page allocation) is **1.05% ON
+vs 0.48% OFF (2.2×)**. `bytes-from-system` is **7.54GB ON vs 5.49GB OFF
+(+37%)**; `peak-RSS-bytes` is **7.40GB ON vs 5.25GB OFF (+41%)** — a
+real, substantial footprint difference under otherwise-matched work
+(same `allocs/op`). Per-node arena streams (Task 8) mean the heap grows
+into up to `numaMaxHeapNodes` separate address ranges rather than one,
+plausibly demanding more distinct fresh pages from the kernel even at
+matched logical allocation volume. **This heap-footprint difference is
+itself a confound for the whole ON-vs-OFF comparison** — a larger
+resident set means more page faults, more TLB pressure, and more page-
+table/zone-adjacent kernel work independent of anything about span
+routing specifically; it is not controlled for in this attribution
+experiment.
+
+**Methodology caveat, disclosed:** both captures were auto-throttled by
+`perf` from the requested 4000Hz sampling rate down to 1000Hz
+(`Lowering default frequency rate from 4000 to 1000`, present in both
+`on-json.out` and `off-json.out` — a shared, not ON/OFF-differential,
+limitation of this host's `kernel.perf_event_max_sample_rate`), lowering
+temporal resolution for both arms equally. This is a shared caveat, not
+an ON/OFF asymmetry.
+
+### Lock-class identification (n=1 attribution evidence)
+
+**Method:** `perf report -g` callee-direction call-graph on the retained
+ON-arm `perf.data` (still on `numa-dell`, not re-recorded), filtered to
+`native_queued_spin_lock_slowpath`'s own callers.
+
+**Finding: the dominant caller path is NOT the runqueue/wake path, NOT
+zone-lock/page-allocator, and NOT `mmap_lock` — it is `sighand->siglock`
+contention during POSIX CPU-timer signal delivery.** 58.89% of
+`native_queued_spin_lock_slowpath`'s own time (≈21.0 percentage points
+of *all* ON-arm cycles) resolves through:
+
+```
+native_queued_spin_lock_slowpath
+  -> _raw_spin_lock_irqsave
+    -> __lock_task_sighand           (58.89% of the spinlock's own time)
+      -> posix_cpu_timers_work
+        -> task_work_run
+          -> irqentry_exit_to_user_mode
+            -> asm_sysvec_apic_timer_interrupt
+              -> runtime.sigtramp.abi0 / various encoding/json code being interrupted
+```
+
+This is the kernel delivering a pending POSIX CPU-interval-timer signal
+to a thread (taking the process-wide `sighand->siglock` to do so) —
+consistent with the `x/benchmarks` harness's own built-in CPU profiler
+(`# cpuprof=/tmp/10.prof.txt`, visible in **both** arms' own benchmark
+output — this machinery is not Workstream-B-specific) delivering
+`SIGPROF`-class signals across up to 256 threads. **This is very
+plausibly a benchmark-harness artifact (CPU profiling signal delivery),
+not a Workstream B mechanism** — but it does not explain *why* the ON
+arm has more of it (+12.07pp absolute); a larger active thread/M
+population, more frequent GC interruption, or the heap-footprint
+confound above are all still-open candidates for that specific
+asymmetry. A much smaller branch (0.71% of the spinlock's own time) goes
+through page-table-lock contention during a GC-triggered copy-on-write
+page fault (`_raw_spin_lock` → `__pte_offset_map_lock` → `wp_page_copy`
+→ `runtime.greyobject`/`scanSpan`) — closer to the "page-supply/zone
+lock" hypothesis, but a minor contributor next to the signal-delivery
+path, not the dominant one. **The zone-lock/page-allocator hypothesis
+this section originally proposed as "the leading candidate" is not
+supported by this callgraph** — reported honestly rather than forced to
+fit. Not fully enumerated (the remaining ~41% of the spinlock's own time
+across other call sites is not broken down further here); this is
+attribution evidence from one run, not a statistical claim. Raw
+`perf.data` for both arms remains on `numa-dell` at
+`/tmp/pb/wsB-e2-v2/perf-{on,off}.data` (not archived to git — size).
+
+### What E1/E2 (twice-corrected) change about the Step 5 verdict — final honest summary
 
 **Nothing changes the verdict** (still: Workstream B does not ship
-as-is) — these remain attribution experiments, not gates. What changes
-from the round-1 write-up: E1's "step function at node capacity" reading
-is withdrawn (it was `numaShouldConfine`'s own threshold, not a
-Workstream B finding); the corrected, genuinely-unconfined curve shows
-remote traffic present at every GOMAXPROCS value, which more directly
-supports the goroutine-migration candidate than round 1's data did. E2's
-"cost is in-runtime, not syscall-bound, ~5.29% ceiling from spanSet code"
-reading is also withdrawn in its specifics: with a proper OFF-arm
-baseline and kernel cycles included, the dominant, attributable,
-increasing cost is **kernel-mode spinlock contention** (+12.07pp,
-explaining ~73% of the target increase on its own), not spanSet's own
-user-mode code (which actually shows a *lower* ON-arm share). Both
-corrections point toward the same broad area (per-node spanSet/mcentral
-locking) but locate the cost differently within it — in lock contention,
-not in the routing logic's own instruction count. Roughly half the
-measured cost remains genuinely unattributed by this one-run capture.
-Both are useful, now more accurate, inputs for whatever follow-up work
-the controller decides on.
+as-is) — these remain attribution experiments, not gates, and after two
+rounds of correction the supportable findings are narrower than either
+round 1 or round 2 claimed:
+
+- **E1, honestly:** confinement is genuinely off and soft affinity is
+  genuinely active at every GOMAXPROCS tested (proven). Remote span-
+  refill share sits at 25-47% at every point (real). **What it does
+  *not* establish:** any clean dependence on thread count, or a
+  discrimination between the goroutine-migration and M-placement-
+  randomness hypotheses — the experiment's own design (Ms don't scale
+  down with a lowered `GOMAXPROCS` cap) never actually varied M count,
+  and where the pre-registered rule *can* be applied to the data as
+  measured, it points toward the M-placement alternative (or is
+  non-discriminating), not toward migration. The round-1 "step function"
+  and round-2 "goroutine migration implicated" readings are both
+  withdrawn.
+- **E2, honestly:** under matched work, Workstream B measurably shifts
+  ~72e9 cycles (+46.6% relative to the OFF-arm's own spinlock time) from
+  user-mode spanSet work into kernel-mode spinlock contention, with
+  total CPU roughly flat in this specific captured pair — a real,
+  absolute, non-trivial shift. **What it does *not* establish:** that
+  this explains Gate 2c's pooled +19.96% finding (this n=1 pair doesn't
+  reproduce that finding at all — different config, different sign),
+  that the mechanism is `futex`-specific (it isn't — generic qspinlock
+  slow path), or that zone-lock/page-allocator contention is the cause
+  (the actual dominant caller, by direct call-graph evidence, is
+  `sighand->siglock` contention during CPU-profiling-signal delivery, a
+  mechanism present in both arms' benchmark harness and not yet
+  explained *why* it's worse under Workstream B). A genuine, disclosed
+  memory-footprint difference (peak RSS +41%, `bytes-from-system` +37%)
+  is a real confound not controlled for.
+
+Both experiments narrowed from "what we thought we found" to "what the
+evidence actually supports" across two audit rounds — the honest
+residue is smaller and less conclusive than either earlier draft
+claimed, which is itself the correct outcome of following this file's
+own correction discipline rather than a failure of the experiments.
+Whatever follow-up work the controller decides on should start from
+these narrower, twice-verified claims, not the earlier, withdrawn ones.
 
 Session end: `kernel.numa_balancing = 1` (confirmed), `kernel.perf_event_paranoid`
 and `kernel.kptr_restrict` both restored to their pre-experiment values

@@ -1,0 +1,52 @@
+Lock-class identification (n=1 attribution evidence), audit round 4.
+
+Method: perf report -g (callee-direction call graph) on the retained
+ON-arm perf.data (numa-dell:/tmp/pb/wsB-e2-v2/perf-on.data), filtered to
+native_queued_spin_lock_slowpath's own callers. kernel.kptr_restrict
+temporarily lowered to 0 to resolve kernel symbol names, restored to 1
+immediately after.
+
+Command:
+  sudo perf report -f -i /tmp/pb/wsB-e2-v2/perf-on.data --stdio \
+    -g fractal,0.5,callee --no-children -s sym
+
+Finding: 58.89% of native_queued_spin_lock_slowpath's own time
+(~21.0 percentage points of ALL on-arm cycles) resolves through:
+
+  native_queued_spin_lock_slowpath
+    -> _raw_spin_lock_irqsave
+      -> __lock_task_sighand            (58.89% of the spinlock's own time)
+        -> posix_cpu_timers_work
+          -> task_work_run
+            -> irqentry_exit_to_user_mode
+              -> asm_sysvec_apic_timer_interrupt
+                -> runtime.sigtramp.abi0 / encoding/json/* code being interrupted
+
+This is sighand->siglock contention during POSIX CPU-timer signal
+delivery -- NOT the runqueue/wake path, NOT zone-lock/page-allocator,
+NOT mmap_lock, as originally hypothesized. Consistent with the
+x/benchmarks harness's own built-in CPU profiler (# cpuprof=... visible
+in BOTH arms' own benchmark stdout) delivering SIGPROF-class signals
+across up to 256 threads -- a benchmark-harness mechanism, not
+Workstream-B-specific, though it does not by itself explain why the ON
+arm has ~12pp more spinlock time than OFF.
+
+A much smaller branch (0.71% of the spinlock's own time) goes through
+page-table-lock contention during a GC-triggered copy-on-write page
+fault:
+  native_queued_spin_lock_slowpath -> _raw_spin_lock
+    -> __pte_offset_map_lock -> wp_page_copy -> __handle_mm_fault
+      -> runtime.greyobject / runtime.scanSpan (GC mark path)
+
+Closer to the "page-supply/zone-lock" hypothesis, but a minor
+contributor next to the signal-delivery path -- not the dominant one.
+The zone-lock/page-allocator hypothesis proposed as "the leading
+candidate" is NOT supported by this callgraph as the dominant
+mechanism.
+
+Remaining ~41% of the spinlock's own time (other call sites) not
+further broken down in this pass. Full raw output archived as
+lock-callers-on.txt (first 100 lines; command above is reproducible
+against the retained perf.data on numa-dell for deeper analysis).
+
+This is n=1 attribution evidence, not a statistical claim.

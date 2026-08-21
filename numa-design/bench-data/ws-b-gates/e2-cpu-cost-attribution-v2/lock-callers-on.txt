@@ -1,0 +1,104 @@
+Warning:
+395 out of order events recorded.
+# To display the perf.data header info, please use --header/--header-only options.
+#
+#
+# Total Lost Samples: 0
+#
+# Samples: 933K of event 'cycles:P'
+# Event count (approx.): 631060713114
+#
+# Overhead  Symbol                                                                                                                                                                                                                                                                                                                                                                                                   
+# ........  .........................................................................................................................................................................................................................................................................................................................................................................................................
+#
+    35.71%  [k] native_queued_spin_lock_slowpath
+            |          
+            |--100.00%--native_queued_spin_lock_slowpath
+            |          |          
+            |          |--58.89%--_raw_spin_lock_irqsave
+            |          |          |          
+            |          |          |--78.53%--__lock_task_sighand
+            |          |          |          |          
+            |          |          |          |--96.80%--posix_cpu_timers_work
+            |          |          |          |          task_work_run
+            |          |          |          |          |          
+            |          |          |          |          |--67.94%--irqentry_exit_to_user_mode
+            |          |          |          |          |          |          
+            |          |          |          |          |          |--96.35%--asm_sysvec_apic_timer_interrupt
+            |          |          |          |          |          |          |          
+            |          |          |          |          |          |          |--23.16%--runtime.sigtramp.abi0
+            |          |          |          |          |          |          |          |          
+            |          |          |          |          |          |          |          |--8.49%--encoding/json/v2.makeStructArshaler.func3
+            |          |          |          |          |          |          |          |          encoding/json/v2.makePointerArshaler.func3
+            |          |          |          |          |          |          |          |          |          
+            |          |          |          |          |          |          |          |          |--99.96%--encoding/json/v2.makeSliceArshaler.func3
+            |          |          |          |          |          |          |          |          |          encoding/json/v2.makeStructArshaler.func3
+            |          |          |          |          |          |          |          |          |          encoding/json/v2.makePointerArshaler.func3
+            |          |          |          |          |          |          |          |          |          encoding/json/v2.makeSliceArshaler.func3
+            |          |          |          |          |          |          |          |          |          encoding/json/v2.makeStructArshaler.func3
+            |          |          |          |          |          |          |          |          |          encoding/json/v2.makePointerArshaler.func3
+            |          |          |          |          |          |          |          |          |          |          
+            |          |          |          |          |          |          |          |          |          |--99.95%--encoding/json/v2.makeSliceArshaler.func3
+            |          |          |          |          |          |          |          |          |          |          encoding/json/v2.makeStructArshaler.func3
+            |          |          |          |          |          |          |          |          |          |          encoding/json/v2.makePointerArshaler.func3
+            |          |          |          |          |          |          |          |          |          |          |          
+            |          |          |          |          |          |          |          |          |          |          |--99.41%--encoding/json/v2.makeSliceArshaler.func3
+            |          |          |          |          |          |          |          |          |          |          |          encoding/json/v2.makeStructArshaler.func3
+            |          |          |          |          |          |          |          |          |          |          |          encoding/json/v2.makePointerArshaler.func3
+            |          |          |          |          |          |          |          |          |          |          |          |          
+            |          |          |          |          |          |          |          |          |          |          |          |--96.14%--encoding/json/v2.makeSliceArshaler.func3
+            |          |          |          |          |          |          |          |          |          |          |          |          encoding/json/v2.makeStructArshaler.func3
+            |          |          |          |          |          |          |          |          |          |          |          |          encoding/json/v2.makePointerArshaler.func3
+            |          |          |          |          |          |          |          |          |          |          |          |          |          
+            |          |          |          |          |          |          |          |          |          |          |          |          |--92.57%--encoding/json/v2.makeSliceArshaler.func3
+            |          |          |          |          |          |          |          |          |          |          |          |          |          encoding/json/v2.makeStructArshaler.func3
+            |          |          |          |          |          |          |          |          |          |          |          |          |          encoding/json/v2.makePointerArshaler.func3
+            |          |          |          |          |          |          |          |          |          |          |          |          |          |          
+            |          |          |          |          |          |          |          |          |          |          |          |          |          |--95.51%--encoding/json/v2.makeSliceArshaler.func3
+            |          |          |          |          |          |          |          |          |          |          |          |          |          |          encoding/json/v2.makeStructArshaler.func3
+            |          |          |          |          |          |          |          |          |          |          |          |          |          |          encoding/json/v2.makePointerArshaler.func3
+            |          |          |          |          |          |          |          |          |          |          |          |          |          |          |          
+            |          |          |          |          |          |          |          |          |          |          |          |          |          |          |--97.44%--encoding/json/v2.makeSliceArshaler.func3
+            |          |          |          |          |          |          |          |          |          |          |          |          |          |          |          encoding/json/v2.makeStructArshaler.func3
+            |          |          |          |          |          |          |          |          |          |          |          |          |          |          |          encoding/json/v2.makePointerArshaler.func3
+            |          |          |          |          |          |          |          |          |          |          |          |          |          |          |          |          
+            |          |          |          |          |          |          |          |          |          |          |          |          |          |          |          |--99.02%--encoding/json/v2.makeSliceArshaler.func3
+            |          |          |          |          |          |          |          |          |          |          |          |          |          |          |          |          encoding/json/v2.makeStructArshaler.func3
+            |          |          |          |          |          |          |          |          |          |          |          |          |          |          |          |          encoding/json/v2.makePointerArshaler.func3
+            |          |          |          |          |          |          |          |          |          |          |          |          |          |          |          |          |          
+            |          |          |          |          |          |          |          |          |          |          |          |          |          |          |          |          |--98.45%--encoding/json/v2.makeSliceArshaler.func3
+            |          |          |          |          |          |          |          |          |          |          |          |          |          |          |          |          |          encoding/json/v2.makeStructArshaler.func3
+            |          |          |          |          |          |          |          |          |          |          |          |          |          |          |          |          |          encoding/json/v2.makePointerArshaler.func3
+            |          |          |          |          |          |          |          |          |          |          |          |          |          |          |          |          |          |          
+            |          |          |          |          |          |          |          |          |          |          |          |          |          |          |          |          |          |--84.56%--encoding/json/v2.makeSliceArshaler.func3
+            |          |          |          |          |          |          |          |          |          |          |          |          |          |          |          |          |          |          encoding/json/v2.makeStructArshaler.func3
+            |          |          |          |          |          |          |          |          |          |          |          |          |          |          |          |          |          |          encoding/json/v2.makePointerArshaler.func3
+            |          |          |          |          |          |          |          |          |          |          |          |          |          |          |          |          |          |          |          
+            |          |          |          |          |          |          |          |          |          |          |          |          |          |          |          |          |          |          |--64.32%--encoding/json/v2.makeStructArshaler.func3
+            |          |          |          |          |          |          |          |          |          |          |          |          |          |          |          |          |          |          |          encoding/json/v2.unmarshalDecode
+            |          |          |          |          |          |          |          |          |          |          |          |          |          |          |          |          |          |          |          encoding/json/v2.Unmarshal
+            |          |          |          |          |          |          |          |          |          |          |          |          |          |          |          |          |          |          |          main.benchmarkN.func1
+            |          |          |          |          |          |          |          |          |          |          |          |          |          |          |          |          |          |          |          golang.org/x/benchmarks/driver.Parallel.func1
+            |          |          |          |          |          |          |          |          |          |          |          |          |          |          |          |          |          |          |          runtime.goexit.abi0
+            |          |          |          |          |          |          |          |          |          |          |          |          |          |          |          |          |          |          |          
+            |          |          |          |          |          |          |          |          |          |          |          |          |          |          |          |          |          |           --35.68%--encoding/json/v2.makeSliceArshaler.func3
+            |          |          |          |          |          |          |          |          |          |          |          |          |          |          |          |          |          |                     encoding/json/v2.makeStructArshaler.func3
+            |          |          |          |          |          |          |          |          |          |          |          |          |          |          |          |          |          |                     encoding/json/v2.makePointerArshaler.func3
+            |          |          |          |          |          |          |          |          |          |          |          |          |          |          |          |          |          |                     |          
+            |          |          |          |          |          |          |          |          |          |          |          |          |          |          |          |          |          |                     |--92.36%--encoding/json/v2.makeStructArshaler.func3
+            |          |          |          |          |          |          |          |          |          |          |          |          |          |          |          |          |          |                     |          encoding/json/v2.unmarshalDecode
+            |          |          |          |          |          |          |          |          |          |          |          |          |          |          |          |          |          |                     |          encoding/json/v2.Unmarshal
+            |          |          |          |          |          |          |          |          |          |          |          |          |          |          |          |          |          |                     |          main.benchmarkN.func1
+            |          |          |          |          |          |          |          |          |          |          |          |          |          |          |          |          |          |                     |          golang.org/x/benchmarks/driver.Parallel.func1
+            |          |          |          |          |          |          |          |          |          |          |          |          |          |          |          |          |          |                     |          runtime.goexit.abi0
+            |          |          |          |          |          |          |          |          |          |          |          |          |          |          |          |          |          |                     |          
+            |          |          |          |          |          |          |          |          |          |          |          |          |          |          |          |          |          |                      --7.64%--encoding/json/v2.makeSliceArshaler.func3
+            |          |          |          |          |          |          |          |          |          |          |          |          |          |          |          |          |          |                                encoding/json/v2.makeStructArshaler.func3
+            |          |          |          |          |          |          |          |          |          |          |          |          |          |          |          |          |          |                                encoding/json/v2.makePointerArshaler.func3
+            |          |          |          |          |          |          |          |          |          |          |          |          |          |          |          |          |          |                                |          
+            |          |          |          |          |          |          |          |          |          |          |          |          |          |          |          |          |          |                                |--93.74%--encoding/json/v2.makeStructArshaler.func3
+            |          |          |          |          |          |          |          |          |          |          |          |          |          |          |          |          |          |                                |          encoding/json/v2.unmarshalDecode
+
+[... truncated to first 100 lines for archive size; full command reproducible via:
+ sudo perf report -f -i /tmp/pb/wsB-e2-v2/perf-on.data --stdio -g fractal,0.5,callee --no-children -s sym
+ on numa-dell, with kernel.kptr_restrict temporarily set to 0 to resolve kernel symbols]
