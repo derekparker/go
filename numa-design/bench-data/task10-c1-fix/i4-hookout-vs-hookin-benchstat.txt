@@ -1,0 +1,33 @@
+goos: linux
+goarch: amd64
+pkg: runtime
+cpu: INTEL(R) XEON(R) PLATINUM 8592+
+                                 │ /tmp/bench_hookout.txt │      /tmp/bench_i4_on_full.txt      │
+                                 │         sec/op         │    sec/op     vs base               │
+PingPongHog-256                              1.157µ ± ∞ ¹   1.205µ ± ∞ ¹        ~ (p=0.421 n=5)
+CreateGoroutinesParallel-256                 204.9n ± ∞ ¹   120.5n ± ∞ ¹  -41.19% (p=0.008 n=5)
+WakeupParallelSpinning/0s-256                13.24µ ± ∞ ¹   12.73µ ± ∞ ¹        ~ (p=0.151 n=5)
+WakeupParallelSpinning/1µs-256               18.38µ ± ∞ ¹   17.80µ ± ∞ ¹   -3.17% (p=0.032 n=5)
+WakeupParallelSpinning/2µs-256               23.19µ ± ∞ ¹   22.79µ ± ∞ ¹        ~ (p=0.151 n=5)
+WakeupParallelSpinning/5µs-256               36.09µ ± ∞ ¹   35.63µ ± ∞ ¹        ~ (p=0.151 n=5)
+WakeupParallelSpinning/10µs-256              58.08µ ± ∞ ¹   57.23µ ± ∞ ¹        ~ (p=0.151 n=5)
+WakeupParallelSpinning/20µs-256             102.08µ ± ∞ ¹   98.02µ ± ∞ ¹   -3.97% (p=0.008 n=5)
+WakeupParallelSpinning/50µs-256              221.9µ ± ∞ ¹   222.0µ ± ∞ ¹        ~ (p=0.548 n=5)
+WakeupParallelSpinning/100µs-256             406.8µ ± ∞ ¹   393.3µ ± ∞ ¹   -3.32% (p=0.032 n=5)
+WakeupParallelSyscall/0s-256                 208.6µ ± ∞ ¹   195.2µ ± ∞ ¹        ~ (p=0.056 n=5)
+WakeupParallelSyscall/1µs-256                204.9µ ± ∞ ¹   191.6µ ± ∞ ¹        ~ (p=0.151 n=5)
+WakeupParallelSyscall/2µs-256                209.1µ ± ∞ ¹   187.6µ ± ∞ ¹  -10.32% (p=0.008 n=5)
+WakeupParallelSyscall/5µs-256                212.6µ ± ∞ ¹   187.3µ ± ∞ ¹  -11.90% (p=0.008 n=5)
+WakeupParallelSyscall/10µs-256               222.0µ ± ∞ ¹   215.5µ ± ∞ ¹        ~ (p=0.151 n=5)
+WakeupParallelSyscall/20µs-256               240.9µ ± ∞ ¹   225.2µ ± ∞ ¹        ~ (p=0.310 n=5)
+WakeupParallelSyscall/50µs-256               308.2µ ± ∞ ¹   272.1µ ± ∞ ¹  -11.69% (p=0.032 n=5)
+WakeupParallelSyscall/100µs-256              397.9µ ± ∞ ¹   397.4µ ± ∞ ¹        ~ (p=0.690 n=5)
+Matmult-256                                  3.283n ± ∞ ¹   2.590n ± ∞ ¹        ~ (p=0.421 n=5)
+ProcYield/1-256                              29.58n ± ∞ ¹   29.80n ± ∞ ¹   +0.74% (p=0.008 n=5)
+ProcYield/10-256                             217.2n ± ∞ ¹   217.1n ± ∞ ¹        ~ (p=0.706 n=5)
+ProcYield/30-256                             632.6n ± ∞ ¹   632.7n ± ∞ ¹        ~ (p=0.556 n=5)
+ProcYield/100-256                            2.086µ ± ∞ ¹   2.087µ ± ∞ ¹        ~ (p=0.794 n=5)
+ProcYield/1000-256                           20.78µ ± ∞ ¹   20.80µ ± ∞ ¹        ~ (p=0.310 n=5)
+OSYield-256                                  362.1n ± ∞ ¹   363.0n ± ∞ ¹        ~ (p=0.579 n=5)
+geomean                                      14.23µ         13.40µ         -5.82%
+¹ need >= 6 samples for confidence interval at level 0.95
