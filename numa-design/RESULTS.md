@@ -2686,3 +2686,125 @@ All 8 pre-declared gates pass:
 
 Session end: `kernel.numa_balancing = 1` (confirmed), THP `[always] madvise never` (unchanged), machine idle (`ps aux --sort=-%cpu` clean) throughout and at close.
 
+## Layer 2 removal + confirmation sweep (2026-08-20)
+
+Removal SHA: `4b13232e3c` ("runtime: remove superseded Layer 2 PREFERRED-at-grow"). Parent: `3fa14a90ee` (Task 5, the Workstream A gate battery tree). Task 6 per the tracked plan: contingent only on Task 4's hard gates (1-5, 8), all of which passed — see the gate battery's overall verdict above. `numaBindArena` (`src/runtime/numa_linux.go`) now issues exactly one `MPOL_BIND` `mbind` per grown chunk; the `getcpu(2)` call, node guard, `MPOL_PREFERRED` mask build, second `mbind`, and the `numaPreferredCalls` counter are gone, along with `NumaPreferredBindCalls` (`export_numa_test.go`) and `TestNUMAPreferredBindOnGrow` (`numa_linux_test.go`). `numaGetCPUNode`/`numaCurrentNode` and `_MPOL_PREFERRED` are kept — Layer 0 diagnostics and fill-one-socket-first confinement's node choice and task policy still use them. Stale Layer-2 references in the two `getcpu` wrapper files' doc comments (`numa_linux_getcpu.go`, `numa_linux_getcpu_other.go`) were also updated; grepped the tree for `PREFERRED`/`PreferredBind` afterward — every remaining hit is confinement's own use of `MPOL_PREFERRED`, not a Layer-2 leftover.
+
+### Removal verification battery
+
+- `gofmt -l` on the five touched files: clean.
+- `go vet runtime`, `GOEXPERIMENT=numa go vet runtime`: both clean.
+- `./make.bash` (off, tree toolchain): succeeds.
+- All-arch link sweep (house convention, Task 1's method), `GOOS=linux`, `{amd64,arm64,riscv64,arm,386,ppc64le,s390x,loong64} × {off,numa}`: **16/16 link OK**.
+- Local `GOEXPERIMENT=numa go test runtime -run TestNUMA -count=1 -v`: 8 tests run (single-node local box; most confinement tests skip with "not multi-node", same as every prior layer), all PASS. `TestNUMAPreferredBindOnGrow` correctly absent.
+- **Off-binary objdump vs parent, function-level census** (same methodology as Gate 8 above — a plain `package main` canary linked against the tree toolchain, `GOEXPERIMENT=` unset, one build from the removal commit and one from a `git worktree` at the parent `3fa14a90ee`): **1481/1481 functions identical, zero per-function instruction-count diffs, zero remaining `numa`-related symbols in the off-binary disassembly.** Off codegen is byte-identical at the function-census level — stronger than every prior layer's result (which always showed a small global-data-offset shift from new package-level state) because this change is a pure deletion inside a function whose call sites (`mheap.go`, both `numaBindArena` call sites) are already gated by `if goexperiment.Numa`, so the whole file dead-code-eliminates in the off build with nothing left to shift addresses. Canary programs and worktree discarded after the check; not archived (trivially reproducible, unlike the sweep data below).
+- Remote (`numa-dell`, `make push && make build`, SHA `4b13232e3c` confirmed via `git log -1` on both sides): `make test-numa RUN='TestNUMA'` — **8/8 PASS** (`TestNUMATopologyDiscovery`, `TestNUMAGetcpu`, `TestNUMABindAllTaskPolicy`, `TestNUMASetThreadAffinitySelf`, `TestNUMAFillOneSocketConfined`, `TestNUMAConfineSkipsNarrowedAffinity`, `TestNUMAStandDownOnGOMAXPROCSGrowth`, `TestNUMAStandDownOnSetDefaultGOMAXPROCS`) — down from 9 in the last full remote run (Task 3/4 era), exactly the expected 1-test drop from removing `TestNUMAPreferredBindOnGrow`. No other test's outcome changed.
+
+**Gate 1 + Gate 2 insurance re-run on the removal commit** (`BENCHNUM=10`, `GOMAXPROCS=1`):
+
+```
+$ ssh numa-dell 'cd /home/deparker/go-numa && GOROOT=$PWD GOMAXPROCS=1 BENCHNUM=10 OUT=/tmp/t6-gate1 ./numa-design/gate-json.sh'
+$ ssh numa-dell '/tmp/numa-tools/benchstat /tmp/t6-gate1/baseline.out /tmp/t6-gate1/numa.out'
+JSON-1  sec/op:            16.79m ± 97%  17.08m ± 88%  ~ (p=0.579 n=10)
+JSON-1  user+sys-sec/op:   16.82m ± 97%  17.09m ± 88%  ~ (p=0.529 n=10)
+```
+
+```
+$ ssh numa-dell 'cd /home/deparker/go-numa && export GOROOT=$PWD PATH=$PWD/bin:$PATH GOTOOLCHAIN=local
+GOMAXPROCS=1 go test runtime -run=NONE -bench="Malloc(8|16|Types)" -count=10 >/tmp/t6-alloc-base.out
+GOMAXPROCS=1 GOEXPERIMENT=numa go test runtime -run=NONE -bench="Malloc(8|16|Types)" -count=10 >/tmp/t6-alloc-numa.out
+/tmp/numa-tools/benchstat /tmp/t6-alloc-base.out /tmp/t6-alloc-numa.out'
+Malloc8    7.006n ± 100%   6.941n ± 1%  -0.91% (p=0.000 n=10)
+Malloc16   11.34n ±   0%   11.31n ± 0%  -0.31% (p=0.002 n=10)
+geomean    8.915n          8.860n       -0.61%
+```
+
+**Verdict: both PASS.** Gate 1 not significant on either metric (consistent with every prior layer at `GOMAXPROCS=1`'s ≈40% MDE). Gate 2 geomean -0.61%, well inside the ±2% pass bar (and, if anything, a hair better than the -0.61%-vs-prior-layers' generally-positive deltas — noise, not a claimed improvement). No regression from the removal on either hard gate. Removal cleanly verified; proceeding to the required Gate-6 B-vs-C confirmation sweep below.
+
+### Gate-6 B-vs-C confirmation sweep (the audit's hard requirement)
+
+**Why this sweep exists:** the Workstream A gate battery's Gate 6/7 decision-gate numbers (candidate 1 -29.61%, candidate 2 -19.66%) characterized Layer 0+1+2+confinement running *together* — Layer 2 was still in-tree for both candidates' C arm (Gate 4(b)'s corrected mbind breakdown: 11 `MPOL_BIND` + 11 `MPOL_PREFERRED` per chunk while confined). The independent audit made re-establishing candidate 1's win under confinement *alone* (Layer 2 removed) a hard requirement before this removal could be considered fully justified, not just IMC-gate-justified. This sweep is that re-establishment: same workload (`x/benchmarks/garbage`), same flags, same `GOMAXPROCS=128`, same n=15, but only **B** (stock, unpinned) vs **C** (post-removal numa build, unpinned, self-confines) — arm A (pinned oracle) is not needed here since the question is specifically whether B-vs-C survives Layer 2's removal, not a fresh non-inferiority bound against A.
+
+**Pre-flight, binaries verified fresh before sweeping (the stale-binary lesson from Gate 7's incident):**
+
+```
+$ ssh numa-dell 'export GOROOT=/home/deparker/go-numa PATH=/home/deparker/go-numa/bin:$PATH GOTOOLCHAIN=local
+rm -rf /tmp/pb/base /tmp/pb/numa && mkdir -p /tmp/pb/base /tmp/pb/numa
+GOBIN=/tmp/pb/base go install golang.org/x/benchmarks/garbage@v0.0.0-20260819172200-70693762b6a0
+GOBIN=/tmp/pb/numa GOEXPERIMENT=numa go install golang.org/x/benchmarks/garbage@v0.0.0-20260819172200-70693762b6a0'
+$ ssh numa-dell '/home/deparker/go-numa/bin/go version -m /tmp/pb/base/garbage; /home/deparker/go-numa/bin/go version -m /tmp/pb/numa/garbage'
+/tmp/pb/base/garbage:  go1.28-devel_4b13232e3c ...
+/tmp/pb/numa/garbage:  go1.28-devel_4b13232e3c ... X:numa
+```
+
+Both binaries confirmed built from the removal commit `4b13232e3c` (same `x/benchmarks` pin `v0.0.0-20260819172200-70693762b6a0` as every prior sweep), mtimes ~20:33:40/42, immediately before the sweep started at 20:34. `numactl --hardware` free memory: node 0 11145→**12279 MB free at sweep start** (recovered further since the last session, no leak carried over); `kernel.numa_balancing=1`, THP `[always] madvise never`, box idle (`ps aux --sort=-%cpu` clean) confirmed before starting.
+
+**Sweep** (single session, rotating B/C order via `numa-design/pathology-sweep.sh` — the Task 0 driver, `idle_check` fix already in place per the prior correction pass — one warmup round + 15 recorded, vmstat snap per run):
+
+```
+$ ssh numa-dell 'cd /home/deparker/go-numa
+./numa-design/pathology-sweep.sh ws-a-l2removal 15 /tmp/pb/ws-a-l2removal \
+  "B=env GOMAXPROCS=128 /tmp/pb/base/garbage -benchmem=4096 -benchnum=1" \
+  "C=env GOMAXPROCS=128 /tmp/pb/numa/garbage -benchmem=4096 -benchnum=1"'
+```
+
+32 runs total (16 rounds × 2 arms), ~26 minutes wall clock.
+
+**Mechanism validity (n=15 recorded rounds each, from `ws-a-l2removal-vmstat-summary.txt`):** arm B: hint faults 54,117–467,312, pages migrated 660,508–1,878,996, every recorded round (≫0, no exclusions needed). Arm C: **0/0 in all 16 rounds, including the warmup round** — cleaner than the original Gate 6 sweep's 13/15 clean rounds. Per the Gate 5 caveat established earlier in this document, 0/0 is Layer 1's signature (uniform BIND-all VMA policy, unaffected by this removal) and does not by itself prove confinement engaged for these rounds — see the in-sweep `Cpus_allowed_list` capture and the strace below for that.
+
+**In-sweep confinement observation (the specific gap the audit flagged — neither Gate 6 nor Gate 7's original sweeps captured this live):** polled for the actual sweep C-arm process during the live sweep and read `/proc/PID/status` a few seconds into a real recorded round, not a separate pilot run:
+
+```
+$ ssh numa-dell 'readlink /proc/2086376/exe; grep Cpus_allowed_list /proc/2086376/status'
+/tmp/pb/numa/garbage
+Cpus_allowed_list: 0,2,4,6,...,254   (128 even CPUs — node 0)
+```
+
+PID 2086376 was confirmed to be the actual sweep binary (`readlink /proc/PID/exe` → `/tmp/pb/numa/garbage`, matching the sweep's own C-arm command), sampled ~3s after that round's launch, mid-run — not a pre/post-sweep pilot. This closes the exact gap the audit called out in the Workstream A "Post-hoc confinement verification" section above.
+
+**benchstat, pre-declared primary metric (`sec/op`, `Garbage/benchmem-MB=4096-128`):**
+
+```
+$ ssh numa-dell '/tmp/numa-tools/benchstat /tmp/pb/ws-a-l2removal/ws-a-l2removal-armB-recorded.out /tmp/pb/ws-a-l2removal/ws-a-l2removal-armC-recorded.out'
+Garbage/benchmem-MB=4096-128   B=2.920m ± 8%   C=1.953m ± 1%   -33.13% (p=0.000 n=15)
+```
+
+**Exploratory corroboration (not the primary metric):** `user+sys-sec/op`, B=153.2m ± 3%, C=124.7m ± 1%, **-18.64% (p=0.000, n=15)** — a CPU-time-based metric independently corroborating the wall-clock primary, and nearly identical to the original Gate 6 sweep's -18.62% on the same metric.
+
+**Verdict: the win reproduces and, on this session's numbers, is nominally slightly larger than the original Gate 6 result (-33.13% here vs -29.61% with Layer 2 still active).** The two point estimates are close enough (both sessions' B arms show 8-17% run-to-run variance) that "slightly larger" should not be read as Layer 2 having been mildly harmful — the honest reading, consistent with the IMC gate FAIL and the three-arm C-full-vs-C-L1 result (p=0.838) that motivated this removal, is that Layer 2 was inert and the two sessions' deltas differ by ordinary between-session noise on `garbage`'s B arm (unpinned baseline variance dominates both point estimates' spread). Either way, the pre-declared, pre-registered requirement — **does the candidate-1 win survive Layer 2's removal** — is unambiguously **YES**: C beats B by a wide, highly significant margin (p=0.000) with clean mechanism validity (16/16 rounds 0/0) and a direct in-sweep confinement observation, on binaries independently verified fresh via `go version -m` before the sweep started.
+
+**strace, one dedicated post-sweep C-run** (`GOMAXPROCS=128`, same command as the sweep's C arm, run once outside the recorded data to avoid strace overhead skewing the timed rounds — same methodology as Gate 4(b)):
+
+```
+$ ssh numa-dell 'strace -c -f -e trace=sched_setaffinity,set_mempolicy,mbind -o t6-strace-count.txt \
+  env GOMAXPROCS=128 /tmp/pb/numa/garbage -benchmem=4096 -benchnum=1 >/dev/null'
+calls     syscall
+--------  ------------------
+    1713  mbind
+       2  set_mempolicy
+       1  sched_setaffinity
+```
+
+A second full (non-`-c`) trace of the same command, filtered to strip `strace -f`'s per-thread `SIGURG` noise (Go's async-preemption signal fires heavily at `GOMAXPROCS=128` under GC pressure — 233,336 of the raw trace's 235,861 lines were `SIGURG` deliveries, irrelevant to this evidence; the filtered, archived version keeps only the `mbind`/`set_mempolicy`/`sched_setaffinity` lines) gives the mode breakdown `-c` can't:
+
+```
+sched_setaffinity(0, 1024, [1 3 5 ... 255]) = 0                              — 1 call, odd CPUs (node 1, this run's boot node)
+set_mempolicy(MPOL_BIND, [0x3], 65) = 0                                      — task policy, Layer 1 (numaSetProcessBindAll, schedinit)
+set_mempolicy(MPOL_PREFERRED, [0x2], 65) = 0                                 — task policy, confinement (numaConfine, REPLACES the BIND-all above)
+mbind(...): 1738 calls total, ALL MPOL_BIND, ZERO MPOL_PREFERRED
+```
+
+(The `-c` summary's 1713 vs the full trace's 1738 completed `mbind` calls is a small, known `strace -f` counting artifact under heavy thread churn — same class of discrepancy Gate 4 documented and corrected for the 256P count; the full-trace count, cross-checked by grepping distinct `mbind(`-prefixed call-open lines, is the more reliable figure and is what the mode breakdown above is built from.)
+
+**This is the direct evidence the removal did what it claims:** every arena `mbind` is now `MPOL_BIND` — zero `MPOL_PREFERRED` reaches the arena path — while confinement's own, separate, task-level `set_mempolicy(MPOL_PREFERRED, ...)` call is untouched and still fires exactly once, distinguishing the two mechanisms cleanly (arena VMA policy via `mbind`, task policy via `set_mempolicy`) exactly as the removal's doc comment in `numa_linux.go` describes.
+
+Session end: node 0 free memory 12279→12366 MB (recovered, no leak), `kernel.numa_balancing=1` (confirmed), THP unchanged, box idle throughout and at close.
+
+Raw data archived under `numa-design/bench-data/ws-a-l2removal/`: per-round `.vmstat.{before,after}` (32 pairs), `ws-a-l2removal-arm{B,C}-{warmup,recorded}.out{,.stderr}`, `ws-a-l2removal-vmstat-summary.txt`, `sweep.log`, the in-sweep `Cpus_allowed_list` capture (`insweep-cpus-allowed.txt`), the benchstat transcript (`t6-benchstat-BvC.txt`), the strace count summary (`t6-strace-count.txt`) and the filtered full-trace mode breakdown (`t6-strace-full-filtered.txt` — `SIGURG` noise stripped, syscall lines only, 180K vs the 23M raw capture), and the `go version -m`/`ls` freshness transcript (`t6-govm-freshness.txt`). `numa-design/pathology-sweep.sh` itself was committed at Task 0 and is unchanged by this task.
+
+**Concerns for the controller:**
+
+1. The two Gate-6-family sessions' B-arm point estimates differ enough (2.558ms in the original Workstream A sweep vs 2.920ms here) that the resulting deltas (-29.61% vs -33.13%) aren't directly comparable as a before/after measurement of Layer 2's own effect — that would require a same-session three-arm design (C-full vs C-L1), which is exactly what the earlier three-arm sweep already did and found inert (p=0.838). This sweep's job was narrower and is answered cleanly: does the win survive removal, on its own terms, in a fresh single session. It does.
+2. `strace -c`'s summary count (1713 mbind) and the full-trace completed-call count (1738) disagree by 25; not investigated further than noting the same class of `-f`-under-thread-churn artifact Gate 4 already diagnosed and corrected for. Does not affect the qualitative finding (100% BIND, 0% PREFERRED in either count).
+3. `bind-all-policy.md` (Task 5) still describes the confined-1P Gate-4 mbind breakdown as "11 BIND + 11 PREFERRED — Layer 2 still in-tree at report time" — accurate when written, now stale now that Layer 2 is removed. Not touched by this task (out of its stated file scope); flagged per Task 5's own report, which anticipated exactly this follow-up.
+

@@ -1,0 +1,48 @@
+ws-a-l2removal-armB-r0: hint_faults=208754 pages_migrated=1395761
+hint_faults=208754 pages_migrated=1395761
+ws-a-l2removal-armB-r10: hint_faults=111291 pages_migrated=1110053
+hint_faults=111291 pages_migrated=1110053
+ws-a-l2removal-armB-r11: hint_faults=230118 pages_migrated=1372733
+hint_faults=230118 pages_migrated=1372733
+ws-a-l2removal-armB-r12: hint_faults=112114 pages_migrated=967683
+hint_faults=112114 pages_migrated=967683
+ws-a-l2removal-armB-r13: hint_faults=221471 pages_migrated=1684635
+hint_faults=221471 pages_migrated=1684635
+ws-a-l2removal-armB-r14: hint_faults=185446 pages_migrated=1519861
+hint_faults=185446 pages_migrated=1519861
+ws-a-l2removal-armB-r15: hint_faults=105625 pages_migrated=1188063
+hint_faults=105625 pages_migrated=1188063
+ws-a-l2removal-armB-r1: hint_faults=170194 pages_migrated=1389220
+hint_faults=170194 pages_migrated=1389220
+ws-a-l2removal-armB-r2: hint_faults=83906 pages_migrated=1055425
+hint_faults=83906 pages_migrated=1055425
+ws-a-l2removal-armB-r3: hint_faults=86507 pages_migrated=818653
+hint_faults=86507 pages_migrated=818653
+ws-a-l2removal-armB-r4: hint_faults=92786 pages_migrated=1185421
+hint_faults=92786 pages_migrated=1185421
+ws-a-l2removal-armB-r5: hint_faults=82501 pages_migrated=1203077
+hint_faults=82501 pages_migrated=1203077
+ws-a-l2removal-armB-r6: hint_faults=128908 pages_migrated=660508
+hint_faults=128908 pages_migrated=660508
+ws-a-l2removal-armB-r7: hint_faults=54117 pages_migrated=1160062
+hint_faults=54117 pages_migrated=1160062
+ws-a-l2removal-armB-r8: hint_faults=467312 pages_migrated=1878996
+hint_faults=467312 pages_migrated=1878996
+ws-a-l2removal-armB-r9: hint_faults=296970 pages_migrated=1869147
+hint_faults=296970 pages_migrated=1869147
+ws-a-l2removal-armC-r0: hint_faults=0 pages_migrated=0
+ws-a-l2removal-armC-r10: hint_faults=0 pages_migrated=0
+ws-a-l2removal-armC-r11: hint_faults=0 pages_migrated=0
+ws-a-l2removal-armC-r12: hint_faults=0 pages_migrated=0
+ws-a-l2removal-armC-r13: hint_faults=0 pages_migrated=0
+ws-a-l2removal-armC-r14: hint_faults=0 pages_migrated=0
+ws-a-l2removal-armC-r15: hint_faults=0 pages_migrated=0
+ws-a-l2removal-armC-r1: hint_faults=0 pages_migrated=0
+ws-a-l2removal-armC-r2: hint_faults=0 pages_migrated=0
+ws-a-l2removal-armC-r3: hint_faults=0 pages_migrated=0
+ws-a-l2removal-armC-r4: hint_faults=0 pages_migrated=0
+ws-a-l2removal-armC-r5: hint_faults=0 pages_migrated=0
+ws-a-l2removal-armC-r6: hint_faults=0 pages_migrated=0
+ws-a-l2removal-armC-r7: hint_faults=0 pages_migrated=0
+ws-a-l2removal-armC-r8: hint_faults=0 pages_migrated=0
+ws-a-l2removal-armC-r9: hint_faults=0 pages_migrated=0

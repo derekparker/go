@@ -1,0 +1,35 @@
+/tmp/pb/base/garbage: go1.28-devel_4b13232e3c Thu Aug 20 17:25:18 2026 -0700
+	path	golang.org/x/benchmarks/garbage
+	mod	golang.org/x/benchmarks	v0.0.0-20260819172200-70693762b6a0	h1:gLYsUQT0P6cI8zmysaoOoVgLhYFuBL6smDcVj/ojtiY=
+	dep	golang.org/x/sys	v0.47.0	h1:o7XGOvZQCADBQQ4Y7VNq2dRWQR7JmOUW8Kxx4ZsNgWs=
+	build	-buildmode=exe
+	build	-compiler=gc
+	build	DefaultGODEBUG=netmarshal=0,tracebacklabels=0,x509sslcertoverrideplatform=0
+	build	CGO_ENABLED=1
+	build	CGO_CFLAGS=
+	build	CGO_CPPFLAGS=
+	build	CGO_CXXFLAGS=
+	build	CGO_LDFLAGS=
+	build	GOARCH=amd64
+	build	GOOS=linux
+	build	GOAMD64=v1
+---
+/tmp/pb/numa/garbage: go1.28-devel_4b13232e3c Thu Aug 20 17:25:18 2026 -0700 X:numa
+	path	golang.org/x/benchmarks/garbage
+	mod	golang.org/x/benchmarks	v0.0.0-20260819172200-70693762b6a0	h1:gLYsUQT0P6cI8zmysaoOoVgLhYFuBL6smDcVj/ojtiY=
+	dep	golang.org/x/sys	v0.47.0	h1:o7XGOvZQCADBQQ4Y7VNq2dRWQR7JmOUW8Kxx4ZsNgWs=
+	build	-buildmode=exe
+	build	-compiler=gc
+	build	DefaultGODEBUG=netmarshal=0,tracebacklabels=0,x509sslcertoverrideplatform=0
+	build	CGO_ENABLED=1
+	build	CGO_CFLAGS=
+	build	CGO_CPPFLAGS=
+	build	CGO_CXXFLAGS=
+	build	CGO_LDFLAGS=
+	build	GOARCH=amd64
+	build	GOEXPERIMENT=numa
+	build	GOOS=linux
+	build	GOAMD64=v1
+---
+-rwxr-xr-x. 1 deparker deparker 5064109 2026-08-20 20:33:40.927487420 -0400 /tmp/pb/base/garbage
+-rwxr-xr-x. 1 deparker deparker 5087338 2026-08-20 20:33:42.377484167 -0400 /tmp/pb/numa/garbage
