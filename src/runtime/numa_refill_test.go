@@ -14,11 +14,12 @@ import (
 
 // TestNUMASpanRefillMetrics is task 9's red test (design §12.4):
 // mcentral's per-node refill routing must be visible through the
-// /numa/span-refills:local and :remote runtime/metrics counters (the
-// in-vivo locality proxy the design calls for between perf-counter
-// runs), and the routing itself must keep each node's spanSet
-// node-pure (mcentral.uncacheSpan routes by the span's home node, not
-// the freeing thread's node -- see its doc comment).
+// /numa/span-refills/local:spans and /numa/span-refills/remote:spans
+// runtime/metrics counters (the in-vivo locality proxy the design
+// calls for between perf-counter runs), and the routing itself must
+// keep each node's spanSet node-pure (mcentral.uncacheSpan routes by
+// the span's home node, not the freeing thread's node -- see its doc
+// comment).
 func TestNUMASpanRefillMetrics(t *testing.T) {
 	t.Run("ChurnIncrementsCounters", testSpanRefillCountersIncrement)
 	t.Run("OneProcLocalSanity", testSpanRefillOneProcLocalSanity)
@@ -132,16 +133,26 @@ func testSpanRefillNodePureRouting(t *testing.T) {
 	arena1 := growUntilNewArena(t, 1)
 	base1 := runtime.MCentralSpanAtForTest(spc, arena1, spanNPages)
 
-	const searchLimit = 1 << 16
+	// Matches searchSpanSetForTest's fixed-size backing array (review
+	// M5) -- comfortably more than this test ever needs to walk
+	// through in practice.
+	const searchLimit = 4096
 
 	// The node-0 span must be findable in node 0's partial-swept set...
-	if !runtime.MCentralUncacheAndFindForTest(spc, base0, 0, searchLimit) {
+	if runtime.MCentralUncacheAndFindForTest(spc, base0, 0, searchLimit) {
+		// Review C1: free it back (the exact inverse of
+		// MCentralSpanAtForTest's accounting) now that the probe is
+		// done with it, rather than leaving it a permanent leak.
+		runtime.MCentralFreeSpanForTest(base0)
+	} else {
 		t.Errorf("span homed to node 0 not found in node 0's partial-swept set after uncacheSpan")
 	}
 	// ...and the node-1 span must be findable in node 1's, not node 0's
 	// (the actual node-purity property: routing by home node, not by
 	// whichever set we happen to look in).
-	if !runtime.MCentralUncacheAndFindForTest(spc, base1, 1, searchLimit) {
+	if runtime.MCentralUncacheAndFindForTest(spc, base1, 1, searchLimit) {
+		runtime.MCentralFreeSpanForTest(base1)
+	} else {
 		t.Errorf("span homed to node 1 not found in node 1's partial-swept set after uncacheSpan")
 	}
 }
@@ -153,8 +164,8 @@ type spanRefillCounts struct {
 func readSpanRefillCounters(t *testing.T) spanRefillCounts {
 	t.Helper()
 	samples := []metrics.Sample{
-		{Name: "/numa/span-refills:local"},
-		{Name: "/numa/span-refills:remote"},
+		{Name: "/numa/span-refills/local:spans"},
+		{Name: "/numa/span-refills/remote:spans"},
 	}
 	metrics.Read(samples)
 	for i := range samples {

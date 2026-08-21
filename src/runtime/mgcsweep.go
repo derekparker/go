@@ -97,15 +97,19 @@ func (s sweepClass) split() (spc spanClass, full bool) {
 // The background sweeper doesn't route by node the way cacheSpan does
 // (design §12.4) -- it just needs to drain every unswept span
 // eventually, so it tries every node's set for a given span class
-// before moving on. With the experiment off, numaMaxHeapNodes == 1
-// (I5) and this inner loop always runs exactly once.
+// before moving on, up to numaGrowLoopBound (review I3): streams above
+// that have never been grown into and are therefore provably empty, so
+// there's nothing to skip by walking further. With the experiment off,
+// numaGrowLoopBound is always 0 (I5) and this inner loop always runs
+// exactly once.
 func (h *mheap) nextSpanForSweep() *mspan {
 	sg := h.sweepgen
+	hwm := numaGrowLoopBound()
 	for sc := sweep.centralIndex.load(); sc < numSweepClasses; sc++ {
 		spc, full := sc.split()
 		c := &h.central[spc].mcentral
 		var s *mspan
-		for node := int32(0); node < numaMaxHeapNodes; node++ {
+		for node := int32(0); node <= hwm; node++ {
 			if full {
 				s = c.fullUnswept(sg, node).pop()
 			} else {

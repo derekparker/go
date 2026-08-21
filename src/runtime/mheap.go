@@ -815,7 +815,21 @@ func numaArenaNode(p uintptr) int32 {
 	if ha == nil {
 		return 0
 	}
-	return heapArenaNode(ha)
+	n := heapArenaNode(ha)
+	// I4: heapArenaNode returns whatever heapArena.node was tagged
+	// with, a uint8-range value (0-255) with no compile-time bound
+	// tying it to numaMaxHeapNodes. Every caller of numaArenaNode
+	// today (task 9) uses its result to index a
+	// [numaMaxHeapNodes]spanSet array -- uncacheSpan and every other
+	// mcentral push site -- so an out-of-range value here would be a
+	// runtime index-out-of-range panic downstream, not merely a
+	// logic bug. This is therefore a hard invariant this function
+	// must uphold, not just defensive style: numaArenaNode's result
+	// is always a valid spanSet index.
+	if n < 0 || n >= numaMaxHeapNodes {
+		return 0
+	}
+	return n
 }
 
 // numaArenaSetNode tags ha with its home node (design §12.3), called
@@ -1768,6 +1782,13 @@ func (h *mheap) grow(npage uintptr, node int32) (uintptr, bool) {
 	idx := int32(0)
 	if goexperiment.Numa && node >= 0 {
 		idx = node
+	}
+	if goexperiment.Numa {
+		// I3: record that stream idx has now genuinely been touched,
+		// so cacheSpan's remote-fallback loop and the background
+		// sweeper's per-node loop can skip streams that provably
+		// never have (see numaGrowLoopBound).
+		numaGrowHighWaterNodeUpdate(idx)
 	}
 
 	// firstGrow gates the extra base-address randomization below, which

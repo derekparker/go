@@ -23,10 +23,16 @@
 
 package runtime
 
-// MCentralSpanAtForTest constructs a minimal, valid mspan for
-// spanClass spc covering npages pages starting at base, and returns
-// its base address (== base, for symmetry with other exports in this
-// file).
+import (
+	"internal/runtime/atomic"
+	"unsafe"
+)
+
+// MCentralSpanAtForTest constructs a fully-accounted mspan for
+// spanClass spc covering npages pages starting at base, marks exactly
+// one object in it allocated, and returns base (for symmetry with
+// other exports in this file: callers pass it straight through to
+// MCentralUncacheAndFindForTest / MCentralFreeSpanForTest).
 //
 // base MUST already be genuinely free, unclaimed address space that
 // this test controls exclusively -- e.g. the base of a brand new
@@ -50,6 +56,29 @@ package runtime
 // page-alignment path uses) before building the span, so this is safe
 // against concurrent allocation elsewhere in the process -- it is NOT
 // safe to call with a base this test does not exclusively own yet.
+//
+// Review C1 fix: bypassing allocSpan's entry path also bypasses its
+// HaveSpan accounting block (sysUsed for scavenged pages,
+// gcController.heapReleased/heapFree/heapInUse, and the consistent
+// memstats.heapStats deltas) -- an earlier version of this function
+// left those untouched, so every span this probe built was invisible
+// to ReadMemStats/gcController bookkeeping despite genuinely claiming
+// real address space and pages from the page allocator, corrupting
+// heap accounting (a reviewer-reproduced TestReadMemStats failure
+// under `-count=2`, since each run's two spans -- one per node --
+// leaked this way). This function now mirrors that accounting block
+// exactly (h.initSpan itself is unchanged and still called the same
+// way); MCentralFreeSpanForTest below is the exact inverse via
+// mheap.freeSpan, which reverses precisely this same block.
+//
+// Review C1 fix, other half: the earlier version also fabricated
+// "allocCount = 1" as a bare field write, with no corresponding
+// allocCache/freeindex advance -- i.e. no real "alloc bit" set,
+// leaving allocCount inconsistent with every other piece of the
+// span's free-slot bookkeeping. This function now marks the one
+// object allocated via nextFreeFast itself (the exact function
+// mallocgc's own fast path uses), which is the only way to advance
+// allocCount, freeindex, and allocCache together consistently.
 func MCentralSpanAtForTest(spc uint8, base, npages uintptr) uintptr {
 	systemstack(func() {
 		lock(&mheap_.lock)
@@ -57,18 +86,55 @@ func MCentralSpanAtForTest(spc uint8, base, npages uintptr) uintptr {
 		s := mheap_.allocMSpanLocked()
 		unlock(&mheap_.lock)
 		mheap_.initSpan(s, spanAllocHeap, spanClass(spc), base, npages, scav)
+
+		// Mirrors allocSpan's HaveSpan accounting block exactly (typ
+		// is always spanAllocHeap here, so the typ-switches below are
+		// simplified to that one case).
+		nbytes := npages * pageSize
+		if scav != 0 {
+			sysUsed(unsafe.Pointer(base), nbytes, scav)
+			gcController.heapReleased.add(-int64(scav))
+		}
+		gcController.heapFree.add(-int64(nbytes - scav))
+		gcController.heapInUse.add(int64(nbytes))
+		stats := memstats.heapStats.acquire()
+		atomic.Xaddint64(&stats.committed, int64(scav))
+		atomic.Xaddint64(&stats.released, -int64(scav))
+		atomic.Xaddint64(&stats.inHeap, int64(nbytes))
+		memstats.heapStats.release()
+
+		// Mark exactly one object allocated -- see the doc comment
+		// above. The returned pointer is unused; this probe never
+		// actually touches the object, only the span's bookkeeping.
+		if nextFreeFast(s) == 0 {
+			throw("MCentralSpanAtForTest: nextFreeFast failed on a freshly-initialized span")
+		}
 	})
 	return base
 }
 
+// MCentralFreeSpanForTest is the exact inverse of MCentralSpanAtForTest
+// (review C1): clears the one fabricated allocation (freeSpanLocked
+// requires allocCount == 0 and sweepgen == h.sweepgen for an in-use
+// span, so both are reset here immediately before freeing) and returns
+// the span to the heap via mheap.freeSpan, which reverses precisely
+// the accounting block MCentralSpanAtForTest mirrored. Callers must
+// hold exclusive ownership of the span at base (e.g. having just
+// popped it out of mcentral via MCentralUncacheAndFindForTest) --
+// nothing else may be concurrently touching it.
+func MCentralFreeSpanForTest(base uintptr) {
+	s := spanOf(base)
+	s.allocCount = 0
+	s.sweepgen = mheap_.sweepgen
+	mheap_.freeSpan(s)
+}
+
 // MCentralUncacheAndFindForTest simulates the tail of one refill round
 // trip for a span this test already built via MCentralSpanAtForTest at
-// base: marks it allocated (as a real cache/uncache cycle would have
-// left it) and runs it through the real uncacheSpan, then searches
-// spanClass spc's partial sets for exactly wantNode (no fallback to
-// any other node -- unlike cacheSpan, this is a direct, single-node
-// probe of uncacheSpan's home-node routing, design §12.4) for a span
-// at base.
+// base: runs it through the real uncacheSpan, then searches spanClass
+// spc's partial sets for exactly wantNode (no fallback to any other
+// node -- unlike cacheSpan, this is a direct, single-node probe of
+// uncacheSpan's home-node routing, design §12.4) for a span at base.
 //
 // Both of wantNode's partial roles (swept and unswept -- see
 // mcentral's partial field doc comment) are searched, not just
@@ -83,15 +149,13 @@ func MCentralSpanAtForTest(spc uint8, base, npages uintptr) uintptr {
 // regardless of how many cycles elapsed in between, since there are
 // only ever two underlying slots for a given node.
 //
-// The search drains up to limit spans from each role looking for
-// base, pushing back everything else it finds so it doesn't disturb
-// the set for any other concurrent user of this spanclass+node -- this
-// makes the probe tolerant of a busy set without needing exclusive
-// access to mcentral.
+// On success, the target span is left popped out of mcentral (owned
+// exclusively by the caller, ready for MCentralFreeSpanForTest);
+// every OTHER span the search happens to pop while looking is pushed
+// back immediately, so this doesn't disturb the set for any other
+// concurrent user of this spanclass+node.
 func MCentralUncacheAndFindForTest(spc uint8, base uintptr, wantNode int32, limit int) bool {
 	s := spanOf(base)
-	s.allocCount = 1
-	s.sweepgen = mheap_.sweepgen
 	mheap_.central[spc].mcentral.uncacheSpan(s)
 
 	sg := mheap_.sweepgen
@@ -103,8 +167,26 @@ func MCentralUncacheAndFindForTest(spc uint8, base uintptr, wantNode int32, limi
 // searchSpanSetForTest drains up to limit spans from set looking for
 // one based at base, pushing back everything else it finds. See
 // MCentralUncacheAndFindForTest.
+//
+// Review M5: the spans popped while searching (and not yet
+// identified as the target) are held in a fixed-size array, not an
+// append-grown slice. An append here would risk a reentrant mallocgc
+// call while this probe is directly manipulating mcentral/spanSet
+// state -- not actually unsafe in this specific calling context (no
+// lock is held across the pop/push calls below, and this runs on a
+// normal goroutine stack), but avoiding a reentrant allocation
+// entirely is the simpler, more defensible choice for a white-box
+// allocator test. limit is capped at the array's capacity, which is
+// far more than this test ever needs to walk through in practice
+// (a freshly-built, mostly-empty probe span in a small region of the
+// set).
 func searchSpanSetForTest(set *spanSet, base uintptr, limit int) bool {
-	var others []*mspan
+	const maxOthers = 4096
+	if limit > maxOthers {
+		limit = maxOthers
+	}
+	var others [maxOthers]*mspan
+	n := 0
 	found := false
 	for i := 0; i < limit; i++ {
 		got := set.pop()
@@ -115,10 +197,11 @@ func searchSpanSetForTest(set *spanSet, base uintptr, limit int) bool {
 			found = true
 			break
 		}
-		others = append(others, got)
+		others[n] = got
+		n++
 	}
-	for _, o := range others {
-		set.push(o)
+	for i := 0; i < n; i++ {
+		set.push(others[i])
 	}
 	return found
 }

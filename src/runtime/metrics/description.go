@@ -433,14 +433,14 @@ var allDesc = []Description{
 		Kind:        KindUint64,
 	},
 	{
-		Name: "/numa/span-refills:local",
+		Name: "/numa/span-refills/local:spans",
 		Description: "Count of mcentral span refills served from the NUMA node the requesting goroutine was running on. " +
 			"Only meaningful with GOEXPERIMENT=numa; always zero otherwise.",
 		Kind:       KindUint64,
 		Cumulative: true,
 	},
 	{
-		Name: "/numa/span-refills:remote",
+		Name: "/numa/span-refills/remote:spans",
 		Description: "Count of mcentral span refills served from a NUMA node other than the one the requesting goroutine was running on. " +
 			"Only meaningful with GOEXPERIMENT=numa; always zero otherwise.",
 		Kind:       KindUint64,
