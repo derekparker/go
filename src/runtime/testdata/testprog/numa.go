@@ -25,7 +25,6 @@ func init() {
 	register("NUMAStandDown", NUMAStandDown)
 	register("NUMAStandDownDefaultGOMAXPROCS", NUMAStandDownDefaultGOMAXPROCS)
 	register("NUMASoftAffinity", NUMASoftAffinity)
-	register("NUMASoftAffinityForkChild", NUMASoftAffinityForkChild)
 	register("NUMASoftAffinityForkParent", NUMASoftAffinityForkParent)
 }
 
@@ -328,14 +327,38 @@ func probeThreadAffinity(nodeOf map[int]int) (narrowed, total int, distinctNodes
 // worker goroutines; see that function's M1 doc note) M to be
 // soft-affinity-narrowed to some node (polls its own affinity popcount
 // until it is below the online CPU count), then forks+execs a child
-// (os/exec, re-invoking this same binary as NUMASoftAffinityForkChild)
 // while still narrowed, and reports the child's own affinity popcount.
-// If numaWidenBeforeClone's pre-fork widen did not run, the child would
-// inherit the parent's narrowed mask via fork(2)/clone(2) affinity
-// inheritance and report a popcount well below the online CPU count,
-// same as syscall_runtime_BeforeFork's own os/exec case -- this test
-// isolates the same mechanism directly rather than depending on a
-// GOEXPERIMENT=numa child re-declining confinement as its symptom.
+//
+// The child is deliberately NOT a re-invocation of this same Go binary.
+// An earlier version of this probe did exactly that (re-exec'd as
+// NUMASoftAffinityForkChild) and it is subtly wrong: a re-exec'd
+// GOEXPERIMENT=numa child, having inherited GOMAXPROCS from this
+// process's own environment, is itself eligible for soft affinity --
+// its own main goroutine's first schedule() pass can narrow IT before
+// its own probe code ever runs, since reaching any Go code at all
+// requires going through the scheduler at least once. Under a plain
+// (non-race) build this race usually resolved in the probe's favor
+// (fast enough to read its own affinity before its own first
+// numaNoteSchedule pass), which is why it passed originally -- but
+// under -race (much slower per-instruction execution), the child's own
+// self-narrowing reliably won the race instead, and the probe then
+// reported a narrowed popcount that had nothing to do with any leaked
+// mask from the parent. This is a test design flaw, not a bug in
+// numaWidenBeforeClone (confirmed by direct hardware inspection: under
+// -race, numaCurrentNode's own getcpu readings consistently matched
+// wherever the OS kernel had genuinely scheduled every M -- entirely
+// one node or the other, flipping between runs -- because -race's own
+// synchronization overhead apparently never gives the kernel's load
+// balancer a reason to spread work across both nodes, not because any
+// mask was narrowed by inheritance).
+//
+// Using a plain shell command reading /proc/self/status instead avoids
+// this confound entirely: a shell (and the coreutils it execs) has no
+// Go scheduler, no soft affinity of its own, nothing to self-narrow --
+// its Cpus_allowed_list is exactly whatever it inherited via fork(2)/
+// clone(2) affinity inheritance, unmodified by anything after that.
+// This isolates the fork/clone leak mechanism specifically, which is
+// what I3 asks for.
 //
 // Prints one line: "forkchild parentpop=<N> childpop=<M> online=<P>".
 func NUMASoftAffinityForkParent() {
@@ -356,29 +379,25 @@ func NUMASoftAffinityForkParent() {
 		fmt.Println("forkchild SKIP parent never narrowed")
 		return
 	}
-	out, err := exec.Command(os.Args[0], "NUMASoftAffinityForkChild").CombinedOutput()
+	out, err := exec.Command("/bin/sh", "-c", "grep Cpus_allowed_list: /proc/self/status").CombinedOutput()
 	if err != nil {
 		fmt.Printf("forkchild ERR exec failed: %v: %s\n", err, out)
 		return
 	}
-	childPop := -1
-	for _, line := range strings.Split(string(out), "\n") {
-		if rest, ok := strings.CutPrefix(line, "childpop="); ok {
-			fmt.Sscanf(rest, "%d", &childPop)
-		}
-	}
+	childPop := parseCpusAllowedListPopcount(string(out))
 	fmt.Printf("forkchild parentpop=%d childpop=%d online=%d\n", parentPop, childPop, online)
 }
 
-// NUMASoftAffinityForkChild prints its own affinity popcount as
-// "childpop=<N>"; invoked as a subprocess by NUMASoftAffinityForkParent.
-func NUMASoftAffinityForkChild() {
-	pop, ok := ownAffinityPopcount()
-	if !ok {
-		fmt.Println("childpop=-1")
-		return
+// parseCpusAllowedListPopcount parses a single "Cpus_allowed_list:\t..."
+// line (the format /proc/*/status uses) and returns the number of CPUs
+// it lists, or -1 if the line could not be parsed.
+func parseCpusAllowedListPopcount(out string) int {
+	for _, line := range strings.Split(out, "\n") {
+		if rest, ok := strings.CutPrefix(strings.TrimSpace(line), "Cpus_allowed_list:"); ok {
+			return len(parseCPUList(strings.TrimSpace(rest)))
+		}
 	}
-	fmt.Printf("childpop=%d\n", pop)
+	return -1
 }
 
 // ownAffinityPopcount returns the popcount of the calling process's

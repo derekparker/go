@@ -1,0 +1,3 @@
+numa: nodes 2 allowed 2
+numa: confinement declined: GOMAXPROCS exceeds node
+softaffinity narrowed=406 total=406 gomaxprocs=256
