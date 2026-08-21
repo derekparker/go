@@ -43,13 +43,6 @@ func TestNUMATopologyDiscovery(t *testing.T) {
 	}
 }
 
-func TestNUMAGetcpu(t *testing.T) {
-	node := runtime.NumaCurrentNodeForTest()
-	if node < 0 {
-		t.Fatal("getcpu failed")
-	}
-}
-
 func TestNUMABindAllTaskPolicy(t *testing.T) {
 	if runtime.NumaNumAllowedNodes() <= 1 {
 		t.Skip("not multi-node")

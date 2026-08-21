@@ -44,6 +44,7 @@
 #define SYS_clock_gettime	5222
 #define SYS_brk			5012
 #define SYS_pipe2		5287
+#define SYS_getcpu		5271
 
 TEXT runtime·exit(SB),NOSPLIT|NOFRAME,$0-4
 	MOVW	code+0(FP), R4
@@ -603,6 +604,17 @@ TEXT runtime·sched_getaffinity(SB),NOSPLIT|NOFRAME,$0
 	BEQ	R7, 2(PC)
 	SUBVU	R2, R0, R2	// caller expects negative errno
 	MOVW	R2, ret+24(FP)
+	RET
+
+TEXT runtime·getcpu(SB),NOSPLIT|NOFRAME,$0
+	MOVV	cpu+0(FP), R4
+	MOVV	node+8(FP), R5
+	MOVV	$0, R6
+	MOVV	$SYS_getcpu, R2
+	SYSCALL
+	BEQ	R7, 2(PC)
+	SUBVU	R2, R0, R2	// caller expects negative errno
+	MOVW	R2, ret+16(FP)
 	RET
 
 // func sbrk0() uintptr

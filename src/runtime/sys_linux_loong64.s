@@ -45,6 +45,7 @@
 #define SYS_timer_create	107
 #define SYS_timer_settime	110
 #define SYS_timer_delete	111
+#define SYS_getcpu		168
 
 // func exit(code int32)
 TEXT runtime·exit<ABIInternal>(SB),NOSPLIT,$0
@@ -653,6 +654,13 @@ TEXT runtime·osyield<ABIInternal>(SB),NOSPLIT,$0
 // func sched_getaffinity(pid, len uintptr, buf *uintptr) int32
 TEXT runtime·sched_getaffinity<ABIInternal>(SB),NOSPLIT,$0
 	MOVV	$SYS_sched_getaffinity, R11
+	SYSCALL
+	RET
+
+// func getcpu(cpu, node *uint32) int32
+TEXT runtime·getcpu<ABIInternal>(SB),NOSPLIT,$0
+	MOVV	$0, R6	// tcache, must be NULL
+	MOVV	$SYS_getcpu, R11
 	SYSCALL
 	RET
 

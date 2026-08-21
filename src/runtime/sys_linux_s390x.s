@@ -39,6 +39,7 @@
 #define SYS_timer_delete        258
 #define SYS_clock_gettime       260
 #define SYS_pipe2		325
+#define SYS_getcpu              311
 
 TEXT runtime·exit(SB),NOSPLIT|NOFRAME,$0-4
 	MOVW	code+0(FP), R2
@@ -614,6 +615,15 @@ TEXT runtime·sched_getaffinity(SB),NOSPLIT|NOFRAME,$0
 	MOVW	$SYS_sched_getaffinity, R1
 	SYSCALL
 	MOVW	R2, ret+24(FP)
+	RET
+
+TEXT runtime·getcpu(SB),NOSPLIT|NOFRAME,$0
+	MOVD	cpu+0(FP), R2
+	MOVD	node+8(FP), R3
+	MOVD	$0, R4
+	MOVW	$SYS_getcpu, R1
+	SYSCALL
+	MOVW	R2, ret+16(FP)
 	RET
 
 // func sbrk0() uintptr

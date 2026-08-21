@@ -2,22 +2,21 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-//go:build linux && (amd64 || arm64)
+//go:build linux
 
 package runtime
 
 // numaGetCPUNode returns the id of the NUMA node the calling thread is
 // currently running on, via the getcpu(2) syscall.
 //
-// This wrapper exists so that numa_linux.go -- built for every GOOS=linux
-// architecture -- never references runtime.getcpu directly. getcpu only
-// has an assembly implementation on amd64 and arm64 (see
-// sys_linux_amd64.s, sys_linux_arm64.s). Without this split, a direct
-// getcpu call from numaCurrentNode (reachable from schedinit's
-// confinement decision in any ordinary GOEXPERIMENT=numa binary, not just
-// tests) would fail to *link* on every other Linux architecture with
-// "relocation target runtime.getcpu not defined" -- see
-// numa_linux_getcpu_other.go for the fallback used there.
+// getcpu has an assembly implementation on every GOOS=linux architecture
+// (see the getcpu wrapper in each sys_linux_*.s), so this file no longer
+// needs an "_other.go" fallback complement the way it once did when
+// getcpu was amd64/arm64-only -- numaGetCPUNode links unconditionally on
+// every linux/GOARCH now. The wrapper itself is kept as a separate
+// function (rather than inlining getcpu's call into numa_linux.go)
+// purely so numa_linux.go, which is built for every GOOS=linux
+// architecture, never has to reference runtime.getcpu directly.
 //
 // ok is false if the getcpu syscall itself fails.
 //
