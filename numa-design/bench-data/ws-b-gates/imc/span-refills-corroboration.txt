@@ -1,0 +1,16 @@
+In-vivo span-refills proxy for IMC ON arm (GOMAXPROCS=256, unpinned, routing-probe -totalmb=16384):
+gomaxprocs=256 local=393104 remote=325764 total=718868 local_share=54.6838% (remote share 45.32%)
+
+Comparison to perf ground truth (same GOMAXPROCS=256 config, json workload):
+  perf-measured numa-arm remote share (median of 5): 46.32%
+  span-refills in-vivo remote share (routing-probe, single run): 45.32%
+  Agreement: within ~1 percentage point, close agreement between the
+  runtime's own routing telemetry and the hardware-measured remote-DRAM-
+  miss share. This corroborates that the routing mechanism (ingredients a+b)
+  is doing genuinely correct, measurable work at GOMAXPROCS=256 unpinned --
+  the shortfall against the pre-registered >=10% relative-drop bar is not
+  explained by 'routing is broken' (Gate 1 already ruled that out under
+  external pinning at 99.5-100% local); it reflects that unpinned execution
+  at this GOMAXPROCS still leaves roughly 45-55% of span refills landing on
+  the node the growing/refilling thread was NOT most recently touching from,
+  a large gap from Gate 1's ~99-100% pinned-local figure.

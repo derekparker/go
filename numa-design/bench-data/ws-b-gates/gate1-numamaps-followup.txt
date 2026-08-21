@@ -1,0 +1,20 @@
+Gate 1 follow-up: /proc/self/numa_maps N0=/N1= corroboration of heapArena.node
+placement (proxy for the routing-probe workload, since no exported
+test-only accessor exists to sample heapArena.node directly).
+
+node0-pin sample (numactl --cpunodebind=0, GOMAXPROCS=128, -totalmb=16384):
+  N0=8397 N1=409  (95.35% resident heap pages on the pinned node)
+  span-refills: gomaxprocs=128 local=725090 remote=0 total=725090 local_share=100.0000%
+
+node1-pin sample (numactl --cpunodebind=1, GOMAXPROCS=128, -totalmb=16384):
+  N0=0 N1=11496  (100.00% resident heap pages on the pinned node)
+  span-refills: gomaxprocs=128 local=723544 remote=1080 total=724624 local_share=99.8510%
+
+Both samples corroborate Gate 1's span-refill-based routing-correctness
+finding via an independent measurement channel (physical page residency,
+not the runtime's own refill counters). The node0 sample's 4.65% residual
+on node1 is consistent with the same pre-topology-discovery fallback
+window documented for Gate 1's span-refill counters, plus numa_maps
+counting all VMAs (not only the per-node heap streams) -- unrelated
+regions (thread stacks, kernel-adjacent allocations) are not routed by
+this mechanism at all and can land on either node.

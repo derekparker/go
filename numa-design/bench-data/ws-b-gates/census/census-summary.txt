@@ -1,0 +1,47 @@
+head functions: 1482
+parent functions: 1481
+only in head: [runtime.(*mcentral).cacheSpanFromNode]
+only in parent: []
+functions with differing instruction-line counts: 11
+  runtime.(*mheap).grow: head=198 parent=218 delta=-20
+  runtime.(*mheap).alloc.func1: head=40 parent=48 delta=-8
+  runtime.mallocinit: head=236 parent=224 delta=12
+  runtime.(*mheap).nextSpanForSweep: head=135 parent=118 delta=17
+  runtime.(*mcentral).grow: head=58 parent=52 delta=6
+  runtime.(*mheap).allocSpan: head=464 parent=447 delta=17
+  runtime.(*mheap).sysAlloc: head=424 parent=423 delta=1
+  runtime.(*mcentral).cacheSpan: head=234 parent=331 delta=-97
+  runtime.(*mheap).alloc: head=58 parent=65 delta=-7
+  runtime.(*mcache).allocLarge: head=131 parent=130 delta=1
+  runtime.(*mheap).init: head=170 parent=141 delta=29
+numa-related symbols in HEAD off-binary: [runtime.numaHeapStreamsEnabled (B, +8B BSS, disclosed/accepted Task 8 review round 1)]
+fast-path spot checks: main.main 28/28, runtime.schedinit 353/353, runtime.mallocgc 131/131 (byte-identical)
+size: head .text=1188509 parent .text=1172307 delta=+16202B; .data/.bss +8B (numaHeapStreamsEnabled)
+head go version -m:
+head-off: go1.28-devel_3b102094cd Fri Aug 21 10:17:45 2026 -0700
+	path	command-line-arguments
+	build	-buildmode=exe
+	build	-compiler=gc
+	build	DefaultGODEBUG=netmarshal=0
+	build	CGO_ENABLED=1
+	build	CGO_CFLAGS=
+	build	CGO_CPPFLAGS=
+	build	CGO_CXXFLAGS=
+	build	CGO_LDFLAGS=
+	build	GOARCH=amd64
+	build	GOOS=linux
+	build	GOAMD64=v1
+parent go version -m:
+parent-off: go1.28-devel_53d631efd7 Thu Aug 20 18:13:26 2026 -0700
+	path	command-line-arguments
+	build	-buildmode=exe
+	build	-compiler=gc
+	build	DefaultGODEBUG=netmarshal=0
+	build	CGO_ENABLED=1
+	build	CGO_CFLAGS=
+	build	CGO_CPPFLAGS=
+	build	CGO_CXXFLAGS=
+	build	CGO_LDFLAGS=
+	build	GOARCH=amd64
+	build	GOOS=linux
+	build	GOAMD64=v1

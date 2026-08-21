@@ -1,0 +1,120 @@
+=== json baseline ===
+/tmp/wsB-gate3-r1/baseline/json: go1.28-devel_ce4b564d8f Fri Aug 21 09:40:09 2026 -0700
+	path	golang.org/x/benchmarks/json
+	mod	golang.org/x/benchmarks	v0.0.0-20260819172200-70693762b6a0	h1:gLYsUQT0P6cI8zmysaoOoVgLhYFuBL6smDcVj/ojtiY=
+	dep	golang.org/x/sys	v0.47.0	h1:o7XGOvZQCADBQQ4Y7VNq2dRWQR7JmOUW8Kxx4ZsNgWs=
+	build	-buildmode=exe
+	build	-compiler=gc
+	build	DefaultGODEBUG=netmarshal=0,tracebacklabels=0,x509sslcertoverrideplatform=0
+	build	CGO_ENABLED=1
+	build	CGO_CFLAGS=
+	build	CGO_CPPFLAGS=
+	build	CGO_CXXFLAGS=
+	build	CGO_LDFLAGS=
+	build	GOARCH=amd64
+	build	GOOS=linux
+	build	GOAMD64=v1
+=== json numa ===
+/tmp/wsB-gate3-r1/numa/json: go1.28-devel_ce4b564d8f Fri Aug 21 09:40:09 2026 -0700 X:numa
+	path	golang.org/x/benchmarks/json
+	mod	golang.org/x/benchmarks	v0.0.0-20260819172200-70693762b6a0	h1:gLYsUQT0P6cI8zmysaoOoVgLhYFuBL6smDcVj/ojtiY=
+	dep	golang.org/x/sys	v0.47.0	h1:o7XGOvZQCADBQQ4Y7VNq2dRWQR7JmOUW8Kxx4ZsNgWs=
+	build	-buildmode=exe
+	build	-compiler=gc
+	build	DefaultGODEBUG=netmarshal=0,tracebacklabels=0,x509sslcertoverrideplatform=0
+	build	CGO_ENABLED=1
+	build	CGO_CFLAGS=
+	build	CGO_CPPFLAGS=
+	build	CGO_CXXFLAGS=
+	build	CGO_LDFLAGS=
+	build	GOARCH=amd64
+	build	GOEXPERIMENT=numa
+	build	GOOS=linux
+	build	GOAMD64=v1
+=== garbage base ===
+/tmp/pb/wsB-cand1-base/garbage: go1.28-devel_ce4b564d8f Fri Aug 21 09:40:09 2026 -0700
+	path	golang.org/x/benchmarks/garbage
+	mod	golang.org/x/benchmarks	v0.0.0-20260819172200-70693762b6a0	h1:gLYsUQT0P6cI8zmysaoOoVgLhYFuBL6smDcVj/ojtiY=
+	dep	golang.org/x/sys	v0.47.0	h1:o7XGOvZQCADBQQ4Y7VNq2dRWQR7JmOUW8Kxx4ZsNgWs=
+	build	-buildmode=exe
+	build	-compiler=gc
+	build	DefaultGODEBUG=netmarshal=0,tracebacklabels=0,x509sslcertoverrideplatform=0
+	build	CGO_ENABLED=1
+	build	CGO_CFLAGS=
+	build	CGO_CPPFLAGS=
+	build	CGO_CXXFLAGS=
+	build	CGO_LDFLAGS=
+	build	GOARCH=amd64
+	build	GOOS=linux
+	build	GOAMD64=v1
+=== garbage numa ===
+/tmp/pb/wsB-cand1-numa/garbage: go1.28-devel_ce4b564d8f Fri Aug 21 09:40:09 2026 -0700 X:numa
+	path	golang.org/x/benchmarks/garbage
+	mod	golang.org/x/benchmarks	v0.0.0-20260819172200-70693762b6a0	h1:gLYsUQT0P6cI8zmysaoOoVgLhYFuBL6smDcVj/ojtiY=
+	dep	golang.org/x/sys	v0.47.0	h1:o7XGOvZQCADBQQ4Y7VNq2dRWQR7JmOUW8Kxx4ZsNgWs=
+	build	-buildmode=exe
+	build	-compiler=gc
+	build	DefaultGODEBUG=netmarshal=0,tracebacklabels=0,x509sslcertoverrideplatform=0
+	build	CGO_ENABLED=1
+	build	CGO_CFLAGS=
+	build	CGO_CPPFLAGS=
+	build	CGO_CXXFLAGS=
+	build	CGO_LDFLAGS=
+	build	GOARCH=amd64
+	build	GOEXPERIMENT=numa
+	build	GOOS=linux
+	build	GOAMD64=v1
+=== gcpause base ===
+/tmp/pb/wsB-cand2-base: go1.28-devel_ce4b564d8f Fri Aug 21 09:40:09 2026 -0700
+	path	gc-pause-bench
+	mod	gc-pause-bench	(devel)	
+	build	-buildmode=exe
+	build	-compiler=gc
+	build	DefaultGODEBUG=netmarshal=0,tracebacklabels=0,x509sslcertoverrideplatform=0
+	build	CGO_ENABLED=1
+	build	CGO_CFLAGS=
+	build	CGO_CPPFLAGS=
+	build	CGO_CXXFLAGS=
+	build	CGO_LDFLAGS=
+	build	GOARCH=amd64
+	build	GOOS=linux
+	build	GOAMD64=v1
+	build	vcs=git
+	build	vcs.revision=3b102094cda89e58d733e0ba3ce01c2049e74713
+	build	vcs.time=2026-08-21T17:17:45Z
+	build	vcs.modified=true
+=== gcpause numa ===
+/tmp/pb/wsB-cand2-numa: go1.28-devel_ce4b564d8f Fri Aug 21 09:40:09 2026 -0700 X:numa
+	path	gc-pause-bench
+	mod	gc-pause-bench	(devel)	
+	build	-buildmode=exe
+	build	-compiler=gc
+	build	DefaultGODEBUG=netmarshal=0,tracebacklabels=0,x509sslcertoverrideplatform=0
+	build	CGO_ENABLED=1
+	build	CGO_CFLAGS=
+	build	CGO_CPPFLAGS=
+	build	CGO_CXXFLAGS=
+	build	CGO_LDFLAGS=
+	build	GOARCH=amd64
+	build	GOEXPERIMENT=numa
+	build	GOOS=linux
+	build	GOAMD64=v1
+	build	vcs=git
+	build	vcs.revision=3b102094cda89e58d733e0ba3ce01c2049e74713
+	build	vcs.time=2026-08-21T17:17:45Z
+	build	vcs.modified=true
+=== routing-probe on ===
+/tmp/pb/routing-probe/probe-on: go1.28-devel_ce4b564d8f Fri Aug 21 09:40:09 2026 -0700 X:numa
+	path	command-line-arguments
+	build	-buildmode=exe
+	build	-compiler=gc
+	build	DefaultGODEBUG=netmarshal=0
+	build	CGO_ENABLED=1
+	build	CGO_CFLAGS=
+	build	CGO_CPPFLAGS=
+	build	CGO_CXXFLAGS=
+	build	CGO_LDFLAGS=
+	build	GOARCH=amd64
+	build	GOEXPERIMENT=numa
+	build	GOOS=linux
+	build	GOAMD64=v1

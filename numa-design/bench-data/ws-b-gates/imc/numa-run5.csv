@@ -1,0 +1,4 @@
+# started on Fri Aug 21 15:32:01 2026
+
+70788953,,mem_load_l3_miss_retired.local_dram:u,3350906127847,100.00,,
+61592956,,mem_load_l3_miss_retired.remote_dram:u,3350906127847,100.00,,

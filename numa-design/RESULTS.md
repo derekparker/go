@@ -3017,85 +3017,518 @@ This rerun also produced the strongest, least fragile version of the phase-shift
 
 **Combining the three sweeps — relabeled per audit as "cross-configuration," not a single-effect-size estimate:** the three phase-shift sweeps differ in build (original: Layer 0+1+2; L1-only: a scratch L1-only patch; this rerun: post-Task-6 HEAD, genuinely Layer 0+1), `GOMAXPROCS` (128/128/256), and phase-loop code (this rerun added `-numamaps`, which the primary set structurally excludes, but the phase-timing loop itself changed shape to accommodate it). Fisher's method combining the three sweeps' primary Mann-Whitney U p-values (original p=0.0288, L1-only p=0.0232, this rerun p=8.176×10⁻⁶): χ²(df=6) = 38.05, combined p = **1.10×10⁻⁶** (closed-form regularized incomplete gamma for even df, not scipy — this host has none, matching every other exact-test computation in this file). **What this combination actually establishes is narrower than "the shipping configuration's effect is this certain": it answers "a C-faster-than-B effect exists in at least one of these three configurations," not a single pooled effect-size claim across a heterogeneous set.** This rerun alone carries the overwhelming majority of that combined evidence — **23.4 of the total 38.05 χ²** — and is independently conclusive on its own (p=8.18×10⁻⁶, all four robustness tests significant, GOMAXPROCS=256/Layer-0+1-only, the configuration closest to what would actually ship) without leaning on the other two sweeps at all. One further caveat, present in all three sweeps equally and not resolved by combining them: all three share the same benchmark program, whose own perfect-locality reference arm (arm A, `numactl --cpunodebind=0 --membind=0`, established in the original sweep) is the *slowest* of all three arms at a flat single-controller ceiling — a benchmark-specific artifact of this design (readers and memory both confined to one controller for the whole run), not evidence about locality in general. Three sweeps of the same benchmark corroborate that this benchmark's C-vs-B effect is real and repeatable; they do not, by themselves, generalize the finding beyond this specific synthetic workload.
 
-## Workstream B gate battery (PARTIAL — paused by user)
+## Workstream B gate battery — 2026-08-21
 
 Task 11 (plan `2026-08-20-numa-v3-locality-plan.md:1334`), the unit's single
-verdict, started at HEAD `ce4b564d8f` (local and remote in sync, remote tree
-already built at this SHA). **Session paused by the user after Step 1
-completed; Steps 2-4 (hard gates, IMC decision gate, pathology reruns) have
-not run.** This section records only what actually ran; nothing below is
-extrapolated or predicted for the remaining steps. Resume from Task 11 Step
-2. Raw evidence archived under `numa-design/bench-data/ws-b-gates/` (see
-`PARTIAL-STATE.md` there for exact resume instructions and remote-host
-state).
+verdict. Started at HEAD `3b102094cd` (Gate 1 only, first sitting), this
+sitting resumed and completed the battery with source unchanged throughout
+(local and remote in sync, remote tree already built at `ce4b564d8f` —
+source-identical to HEAD for runtime purposes, since every commit after
+`ce4b564d8f` touched only `RESULTS.md`/`bench-data`/docs, confirmed by
+`git log --stat`; no rebuild was needed). `go version` (remote, tree
+toolchain): `go1.28-devel_ce4b564d8f Fri Aug 21 09:40:09 2026 -0700
+linux/amd64`. Kernel: `6.12.0-211.7.1.el10_2.x86_64`. `x/benchmarks`:
+`v0.0.0-20260819172200-70693762b6a0` (same pin as every prior layer/
+workstream run; confirmed via `go version -m` on every binary used, full
+transcript archived `numa-design/bench-data/ws-b-gates/go-version-m-all-binaries.txt`).
+`kernel.numa_balancing`: `1` throughout. Machine idle before every
+measurement block (`ps -eo pcpu,comm --sort=-pcpu`, excluding the known
+`ps`/`pgrep` self-report artifact documented in the Workstream A gate
+battery's own idle_check fix).
 
-### Step 1 — pinned routing proof (design §12.4; gates everything else)
+**Session history:** this battery ran in two sittings. The first sitting
+completed only Step 1 (pinned routing proof) before a user-requested pause;
+that PARTIAL state was committed (see the git history for the commit that
+introduced "Workstream B gate battery (PARTIAL — paused by user)" — this
+section supersedes it in place, per instruction to keep the pause as
+history rather than deleting it from the record). The second sitting
+resumed from Step 2 through the full battery, recorded below.
 
-Per the plan's mandatory validation order: prove routing correctness with
-externally pinned threads before any unpinned measurement. Harness:
-`numa-design/bench-data/ws-b-gates/routing-probe.go`, a standalone
-single-file program (no go.mod, built directly with `go build`, same
-technique as the Workstream A gate battery's off-binary census canary) —
-`GOMAXPROCS` goroutines each allocate-and-touch (write + read-back XOR
-checksum, forcing genuine read/write DRAM traffic, not allocate-and-drop) a
-stream of 4/8/16/32 KiB objects for a fixed total volume (objects are not
-retained past one loop iteration, so live-set/RSS stays small regardless of
-total volume while still exercising `mheap.grow` and `mcentral` refill at a
-realistic rate), then reads `/numa/span-refills/{local,remote}:spans` via
-`runtime/metrics` at exit and prints the local share.
+Raw `.out`/`.csv` files, benchstat/analysis-script transcripts, sweep-driver
+invocations, and `go version -m` transcripts are archived under
+`numa-design/bench-data/ws-b-gates/` (subdirectories per gate: `gate2-1p/`,
+`gate3-256p/`, `census/`, `imc/`, `cand1-128p/`, `cand2-gcpause/`,
+`cand1-256p-exploratory/`, plus `gate1-numamaps-followup.txt` and
+`routing-probe.go`/`PARTIAL-STATE.md` from the first sitting).
 
-Built with `GOEXPERIMENT=numa` from the in-sync `ce4b564d8f` tree
-(`go version -m`: `go1.28-devel_ce4b564d8f Fri Aug 21 09:40:09 2026 -0700
-X:numa`, archived `probe-on-govm.txt`). Run as two halves, `numactl
---cpunodebind=0` and `--cpunodebind=1` (no `--membind` — memory placement is
-exactly what this probe measures), `GOMAXPROCS=128`, `-totalmb=2048`:
+**Pre-registration note:** the primary metric (IMC remote-DRAM-miss share,
+≥10% relative drop) was pre-registered in "Workstream B go/no-go (Task 7)"
+above, before any Workstream B code landed. No metric below was added
+post hoc; every number reported is from an actual run, none extrapolated.
+
+### Step 1 — pinned routing proof (design §12.4; gates everything else): **PASS**
+
+(Carried from the first sitting, unchanged.) Externally pinned via
+`numactl --cpunodebind={0,1}` (no `--membind`), `GOMAXPROCS=128`, harness
+`numa-design/bench-data/ws-b-gates/routing-probe.go` (standalone
+single-file program, `GOEXPERIMENT=numa` build, reads
+`/numa/span-refills/{local,remote}:spans` via `runtime/metrics` at exit):
+
+- node 0 half: `local=93329 remote=0 total=93329 local_share=100.0000%`
+- node 1 half: `local=94346 remote=432 total=94778 local_share=99.5442%`
+
+Both ≥95% (the gate requirement). **Follow-up captured this sitting** (the
+`heapArena.node`/`numa_maps` corroboration deferred at pause): a
+`/proc/self/numa_maps` N0=/N1= sample taken mid-run of the same harness at
+a larger volume (`-totalmb=16384`, sampled ~0.3-0.5s after start),
+archived `gate1-numamaps-followup.txt`:
+
+- node 0 pin: `N0=8397 N1=409` (95.35% of resident heap pages on the
+  pinned node); span-refills for that same run: `local_share=100.0000%`
+- node 1 pin: `N0=0 N1=11496` (100.00% on the pinned node); span-refills:
+  `local_share=99.8510%`
+
+Independent corroboration via a different measurement channel (physical
+page residency vs. the runtime's own refill counters), consistent with
+Step 1's original finding. **Step 1 verdict unchanged: PASS.**
+
+### Step 2 — hard gates
+
+#### 2a. 1P json (`BENCHNUM=10`): **PASS**
 
 ```
-$ ssh numa-dell 'numactl --cpunodebind=0 env GOMAXPROCS=128 /tmp/pb/routing-probe/probe-on -totalmb=2048'
-gomaxprocs=128 local=93329 remote=0 total=93329 local_share=100.0000%
-
-$ ssh numa-dell 'numactl --cpunodebind=1 env GOMAXPROCS=128 /tmp/pb/routing-probe/probe-on -totalmb=2048'
-gomaxprocs=128 local=94346 remote=432 total=94778 local_share=99.5442%
+$ ssh numa-dell 'GOROOT=$PWD GOMAXPROCS=1 BENCHNUM=10 OUT=/tmp/wsB-gate2-json ./numa-design/gate-json.sh'
+$ ssh numa-dell '/tmp/numa-tools/benchstat /tmp/wsB-gate2-json/baseline.out /tmp/wsB-gate2-json/numa.out'
+JSON-1  sec/op:            31.97m ± 46%  32.35m ± 49%  ~ (p=0.393 n=10)
+JSON-1  user+sys-sec/op:   32.00m ± 46%  32.40m ± 49%  ~ (p=0.393 n=10)
 ```
 
-**Requirement:** local share ≥95% in each half. **Result: node 0 half
-100.0000%, node 1 half 99.5442% — both PASS**, well clear of the bar. The
-node 1 half's 432 remote refills (out of 94,778, 0.46%) are consistent with
-the documented pre-topology-discovery fallback window (`mheap.go:166`:
-`numaGrowNode`/`numaCurrentNode` return node 0 before topology discovery
-completes — a brief boot-time window on a node-1-pinned process would
-misroute a handful of very early refills to node 0, read back as "remote"
-against the node-1-pinned process), not a routing defect; node 0's 0 remote
-count is consistent with that same fallback since node 0 is also the
-fallback default, so a node-0-pinned process's pre-discovery allocations are
-never misclassified.
+Neither primary metric significant; both nominally +1.2%/+1.3%, well
+inside noise. **PASS.** Archived `gate2-1p/baseline.out`, `gate2-1p/numa.out`.
 
-**heapArena.node distribution corroboration:** not captured this session
-(no exported test-only accessor exists for external sampling outside the
-runtime test binary — see `src/runtime/export_numa_test.go`, which has no
-`NumaArenaNode`-shaped export; adding one would be a code change, out of
-scope for a pure-validation task). The `/numa/span-refills` counters above
-are the routing-correctness evidence actually gathered; a `/proc/self/numa_maps`
-N0=/N1= placement cross-check (the technique Task 12's phase-shift study
-used) was planned as a substitute corroboration but not yet run — carried to
-the resumed session.
+#### 2b. 1P alloc micro (`Malloc(8|16|Types)`, `-count=10`): **FAIL**
 
-**Verdict: PASS.** Routing is correct under external pinning in both
-directions. Per the plan's stop rule ("FAIL → fix routing before any
-unpinned measurement"), this clears the gate for Step 2 to proceed once
-work resumes.
+```
+$ ssh numa-dell 'export GOROOT=$PWD PATH=$PWD/bin:$PATH GOTOOLCHAIN=local
+GOMAXPROCS=1 go test runtime -run=NONE -bench="Malloc(8|16|Types)" -count=10 >baseline.out
+GOMAXPROCS=1 GOEXPERIMENT=numa go test runtime -run=NONE -bench="Malloc(8|16|Types)" -count=10 >numa.out
+/tmp/numa-tools/benchstat baseline.out numa.out'
+Malloc8    7.149n ± 0%   7.404n ± 0%  +3.57% (p=0.000 n=10)
+Malloc16   11.56n ± 0%   12.01n ± 0%  +3.89% (p=0.000 n=10)
+geomean    9.091n        9.430n      +3.73%
+```
 
-### Steps 2-4 — not started
+(`MallocTypes` still doesn't match anything in this tree — the same
+pre-existing regex gap noted at every prior layer/workstream — so this is
+`Malloc8`/`Malloc16` only, matching every prior gate's own caveat.)
 
-Hard gates (1P json, 1P alloc micro, 256P json, RSS, vmstat 0/0, off-binary
-census), the IMC decision gate (the plan's pre-registered primary,
-`2026-08-20-numa-v3-locality-plan.md:1340` / "Workstream B go/no-go (Task
-7)" above), and the pathology candidate reruns have not run. No numbers,
-verdicts, or predictions for these are recorded here or anywhere else —
-per this plan's own discipline against fabricating or extrapolating
-unmeasured results.
+**Verdict: FAIL.** Geomean +3.73% exceeds the ≤+2% hard-gate bar. This is
+not a noisy reading: CV ≈0% at n=10 for both benchmarks, p=0.000 both, a
+tight and reproducible signal, not a borderline miss. This is a real,
+small but consistent per-allocation overhead on the fastest possible
+malloc path even at `GOMAXPROCS=1` (where refill-time `getcpu` routing and
+soft affinity are both essentially inert — one P, no node changes to
+narrow on). The likely source is fixed per-call bookkeeping now present
+in the mcache/mcentral fast path (additional branches/field reads that
+exist regardless of whether a refill or a node-change actually occurs),
+not a routing- or scheduling-frequency cost — consistent with the
+`(*mcentral).cacheSpan`/`cacheSpanFromNode` split the off-binary census
+below shows structurally changed even in the off build. Archived
+`gate2-1p/wsB-gate2-alloc-base.out`, `gate2-1p/wsB-gate2-alloc-numa.out`.
 
-Session end (paused, not a natural stopping point in the plan): `kernel.numa_balancing = 1`
-(confirmed), no orphaned processes left on `numa-dell`, remote tree
-unmodified and in sync with local HEAD at `ce4b564d8f`.
+### Step 2c-e. 256P json (hard) + RSS + vmstat wrap
 
+Per the Workstream A Gate 3 precedent (hand-rolled per-session medians at
+256P sign-flip at n=10; pooling across 3 unconditional sessions is the
+pre-declared remedy), three sessions ran unconditionally, idle re-checked
+between each:
+
+```
+$ ssh numa-dell 'GOROOT=$PWD GOMAXPROCS=256 BENCHNUM=10 OUT=/tmp/wsB-gate3-r{1,2,3} ./numa-design/gate-json.sh'  # x3
+```
+
+Per-session hand-rolled medians (informational, not the verdict): r1
+ns/op −5.4%/user+sys +7.9%; r2 −6.9%/+17.9%; r3 +61.4%/+55.0% — the
+sign-flipping pattern the precedent predicts; pooling is the remedy.
+
+Pooled (n=30, `cat` of all three `baseline.out`/`numa.out`):
+
+```
+$ ssh numa-dell '/tmp/numa-tools/benchstat /tmp/wsB-gate3-pooled-baseline.out /tmp/wsB-gate3-pooled-numa.out'
+JSON-256  sec/op:            2.203m ± 18%  2.337m ± 38%  ~ (p=0.358 n=30)
+JSON-256  user+sys-sec/op:   174.9m ± 11%  209.8m ± 17%  +19.96% (p=0.025 n=30)
+JSON-256  peak-RSS-bytes:    6.379Gi ± 47%  5.690Gi ± 49%  ~ (p=0.254 n=30)
+```
+
+**Verdict: FAIL** on `user+sys-sec/op` (+19.96%, p=0.025, pooled n=30 —
+statistically significant, not a noise artifact like Gates 1/3's own MDE
+caveats elsewhere in this file). Wall-clock `sec/op` is **not** significant
+(p=0.358) — real elapsed time is not distinguishably worse, but CPU time
+is a real, measured cost at 256P too, consistent with Gate 2b's finding at
+1P. **RSS: PASS**, not systematically fatter — nominally *lower* for the
+numa arm, not significant (p=0.254); per-node spanSets stranding memory
+was the theoretical risk this sub-gate exists to catch, and it did not
+materialize here.
+
+vmstat 0/0 wrap (run twice per protocol, counters are machine-global):
+
+```
+$ ssh numa-dell './numa-design/gate-vmstat.sh snap before; env GOMAXPROCS=256 <numa json> -benchmem=512 -benchnum=1 -benchtime=3s; ./numa-design/gate-vmstat.sh snap after; ./numa-design/gate-vmstat.sh diff before after'
+hint_faults=0 pages_migrated=0    # both runs
+```
+
+**Verdict: PASS.** Archived `gate3-256p/{r1,r2,r3}-{baseline,numa}.out`,
+`gate3-256p/wsB-gate3-pooled-{baseline,numa}.out`, `gate3-256p/wsB-gate3-vmstat{,2}.{before,after}`.
+
+### Step 2f. Off-binary function census (workstream-once)
+
+Built locally (tree toolchain, `GOWORK=off GOTOOLCHAIN=local`,
+`GOEXPERIMENT=` unset), following the Workstream A Gate 8 methodology
+exactly: a trivial `println`-only canary, HEAD (`3b102094cd`) vs. the
+pre-Workstream-B parent `53d631efd7` (the Task 7 go/no-go SHA, immediately
+before Task 8's first line of code), each built in its own worktree with
+its own fresh `make.bash`:
+
+```
+head functions: 1482   parent functions: 1481
+only in head: [runtime.(*mcentral).cacheSpanFromNode]
+only in parent: []
+functions with differing instruction-line counts: 11
+  runtime.(*mheap).grow:              head=198 parent=218 delta=-20
+  runtime.(*mheap).alloc.func1:       head=40  parent=48  delta=-8
+  runtime.mallocinit:                 head=236 parent=224 delta=+12
+  runtime.(*mheap).nextSpanForSweep:  head=135 parent=118 delta=+17
+  runtime.(*mcentral).grow:           head=58  parent=52  delta=+6
+  runtime.(*mheap).allocSpan:         head=464 parent=447 delta=+17
+  runtime.(*mheap).sysAlloc:          head=424 parent=423 delta=+1
+  runtime.(*mcentral).cacheSpan:      head=234 parent=331 delta=-97
+  runtime.(*mheap).alloc:             head=58  parent=65  delta=-7
+  runtime.(*mcache).allocLarge:       head=131 parent=130 delta=+1
+  runtime.(*mheap).init:              head=170 parent=141 delta=+29
+numa-related symbols in HEAD off-binary: [runtime.numaHeapStreamsEnabled (B, +8B BSS)]
+fast-path spot checks: main.main 28/28, runtime.schedinit 353/353, runtime.mallocgc 131/131 (byte-identical)
+size: head .text=1,188,509  parent .text=1,172,307  delta=+16,202B
+```
+
+Both deviations from a literal "zero new symbols" bar are **previously
+disclosed and accepted**, not new findings: `numaHeapStreamsEnabled` was
+Task 8's own review-round fix (I4/C1/C2, "+8B BSS... all directly
+attributable to the review's own fixes"), and `cacheSpanFromNode` matches
+Task 9's own recorded ruling (7): "cumulative off-build cacheSpan .text
++~700B disclosed under substantive bar (shared-code restructure, upstream's
+own fast-path shape restored)." (This workstream-level comparison spans a
+wider baseline than either task's own isolated verification — comparing
+against the pre-Workstream-B parent rather than each task's immediate
+predecessor — so the cumulative `.text` delta here, +16,202B, is larger
+than either task's individually-disclosed figure; that is expected, not a
+new discrepancy.) `cacheSpan`'s logic was split into `cacheSpanFromNode`
+as a shared helper called from two sites within `cacheSpan` — present in
+the off build because the compiler did not inline it back down (unlike
+`numaGrowNode` et al., which did DCE away), not because any call site is
+un-gated: the function's own body collapses to today's single-stream
+behavior when `numaMaxHeapNodes` is the off-build's constant 1, matching
+`mheap.grow(npage, node)`'s established pattern from Task 8.
+
+**Verdict: PASS on the substantive criterion** (matching the Workstream A
+Gate 8 precedent's own language) — **not** a literal "build-ID-only" bar:
+zero unrelated-function changes (three explicit hot-path spot checks
+byte-identical), zero new symbols beyond the two already disclosed and
+accepted in Tasks 8/9's own review rounds, all 11 line-count deltas
+confined to functions in the workstream's own declared file map
+(`mheap.go`, `mcentral.go`). Archived `census/census-{head,parent}.txt`
+(full stripped disassembly, 7.8M each), `census/census-summary.txt`,
+`census/census-canary.go`.
+
+### Step 3 — IMC decision gate (pre-registered primary): **FAIL**
+
+```
+perf stat -x, -e mem_load_l3_miss_retired.local_dram,mem_load_l3_miss_retired.remote_dram -- \
+  env GOMAXPROCS=256 ./json -benchmem=512 -benchnum=1 -benchtime=10s
+```
+
+Arms: experiment off (stock, no `GOEXPERIMENT`) vs. experiment on
+(`GOEXPERIMENT=numa`, the full Workstream B build — homing + routing +
+soft affinity, all three ingredients, unlike Layer 2's homing-alone null).
+Both binaries built from the same `x/benchmarks` pin, `go version -m`
+confirmed (`ce4b564d8f`, `X:numa` on the numa arm). **5 interleaved runs
+per arm** (the brief raised the plan's ≥3 minimum to ≥5 given the stakes):
+
+| Arm | run | local_dram | remote_dram | remote share |
+|---|---:|---:|---:|---:|
+| baseline | 1 | 19,069,494 | 17,759,955 | 48.22% |
+| baseline | 2 | 74,177,335 | 69,903,196 | 48.52% |
+| baseline | 3 | 83,589,700 | 78,705,634 | 48.50% |
+| baseline | 4 | 26,330,712 | 24,900,195 | 48.60% |
+| baseline | 5 | 83,692,288 | 77,441,054 | 48.06% |
+| numa | 1 | 57,423,456 | 52,966,335 | 47.98% |
+| numa | 2 | 57,164,562 | 48,390,709 | 45.84% |
+| numa | 3 | 62,303,648 | 53,761,260 | 46.32% |
+| numa | 4 | 62,896,187 | 50,573,858 | 44.57% |
+| numa | 5 | 70,788,953 | 61,592,956 | 46.53% |
+
+**Medians: baseline 48.50%, numa 46.32%. Relative change: −4.49%.**
+**Pass bar: ≥10% relative drop (e.g. 48.50% → ≤43.65%). Actual: −4.49% —
+real, directionally correct, but well short of the bar.**
+
+Unlike Layer 2's null result (+0.10%/−0.07%, arms statistically
+indistinguishable), this is a **clean, statistically significant effect
+in the right direction**: `max(numa)=47.98% < min(baseline)=48.06%` —
+complete separation between the two arms across all 5×5 runs, exact
+two-sided Mann-Whitney U p=0.00794. The three-ingredient unit genuinely
+moves the metric that killed Layer 2. It does not move it far enough to
+clear the pre-registered bar.
+
+**Corroboration — `/numa/span-refills` in-vivo proxy (ON arm, same
+`GOMAXPROCS=256`, unpinned, `routing-probe -totalmb=16384`):**
+
+```
+gomaxprocs=256 local=393104 remote=325764 total=718868 local_share=54.6838%
+```
+
+Remote share 45.32% — **within ~1 percentage point of the perf-measured
+46.32%**, close agreement between the runtime's own routing telemetry and
+the hardware ground truth. This distinguishes the failure mode cleanly:
+**routing is not broken.** Gate 1 already proved ~99.5-100% local under
+external pinning; this in-vivo reading shows the routing mechanism is
+still doing real, correctly-attributed work at GOMAXPROCS=256 unpinned —
+the shortfall is that roughly **45-55%** of span refills land on a node
+other than the one most recently associated with the touching thread, a
+large gap from Gate 1's ~99-100% pinned figure.
+
+**Verdict: FAIL.** Per the brief's requirement to distinguish "routing
+broken" from "routing works, hardware can't show it": this is neither,
+precisely — routing works (proven twice, pinned and in-vivo-corroborated),
+*and* hardware shows the improvement (a real, significant, reproducible
+−4.49%) — it just isn't a large enough improvement to clear the
+pre-registered ≥10% bar. Archived `imc/{baseline,numa}-run{1..5}.csv`,
+`imc/analyze.py`, `imc/analyze-output.txt`, `imc/span-refills-corroboration.txt`.
+
+### Step 4 — pathology candidates (supporting evidence)
+
+Both binaries built fresh from HEAD (`ce4b564d8f`), `go version -m`
+confirmed, exit codes verified explicitly per arm (the Workstream A
+Gate 7 stale-binary-incident lesson). Node free memory re-checked before
+sizing (per this session's own earlier flag): node 0 ~12.0 GB free at
+sweep time, comfortably ≥3× the 4096 MB heap target used throughout this
+plan (WS-A's own precedent used the same target against ~10-11 GB free) —
+no sizing change needed; arm A stays pinned to node 0 as in every prior
+sweep.
+
+#### 4a. Candidate 1 — `x/benchmarks/garbage`, `-benchmem=4096 -benchnum=1`, GOMAXPROCS=128, n=15: **PASS**
+
+WS-A protocol (`numactl`-pinned A, stock B, experiment-on C, rotating
+order, `pathology-sweep.sh`). Mechanism validity: arm A 0/0 in 16/16
+rounds (incl. warmup); arm C 0/0 in 16/16 rounds (cleaner than Workstream
+A's own candidate 1, which had 2 negligible-noise rounds); arm B shows
+real hint faults (61k-390k) and migrations (1.09M-1.74M) every recorded
+round.
+
+```
+Garbage/benchmem-MB=4096-128  B=2.882m ± 15%  C=1.941m ± 1%   -32.65% (p=0.000 n=15)   [primary: B vs C]
+Garbage/benchmem-MB=4096-128  A=1.916m ± 1%   C=1.941m ± 1%   ~ (p=0.067 n=15)          [C vs A]
+Garbage/benchmem-MB=4096-128  A=1.916m ± 1%   B=2.882m ± 15%  +50.43% (p=0.000 n=15)    [context: A vs B]
+```
+
+Non-inferiority CI (round-paired log-ratio + t-distribution, `noninf_ci.py`):
+
+```
+n=15 point_estimate_C/A-1=-0.03% 95%CI=[-2.32%, +2.32%]
+Non-inferiority (upper bound <= +10%): PASS
+```
+
+Paired sign test: C slower than A in 11/15 rounds, faster in 4 — **not
+significant** (exact two-sided p=0.1185).
+
+**Verdict: PASS, and a materially tighter result than Workstream A's own
+candidate 1 gate** (which had point estimate +2.69%, CI upper +8.26%, and
+a *significant* paired sign test, p=0.035, 12/15 rounds). Here: point
+estimate essentially zero (−0.03%), CI upper +2.32% (well under a third of
+A's own margin), and the sign test does **not** reach significance. The
+full three-ingredient unit holds — and modestly tightens — Workstream A's
+confinement win on this workload at GOMAXPROCS=128 (where confinement is
+active for both A's pin and C's own `numaConfineIfSmall`). In-sweep-
+adjacent confinement observation (same command, run immediately after the
+sweep): `Cpus_allowed_list` narrowed to node 1's odd CPUs (this session's
+boot node). Archived `cand1-128p/`.
+
+#### 4b. Candidate 2 — `gc-pause-bench` heavy profile, GOMAXPROCS=128, n=10 round-level (80 cycles/arm): **PASS**
+
+Same protocol and flags as Workstream A's own Gate 7
+(`-ptrheap=true -toucher=false -heap=4096 -idle=1000000 -stacks=200
+-warm=45 -gcgap=5s -discard=2 -n=8`). Mechanism validity: arm A 0/0 in
+11/11 rounds; arm C 0/0 in 10/11 (one round with 1 hint fault, 0
+migrated — negligible, same character as every prior BIND-all
+measurement); arm B real faults/migrations every recorded round.
+
+Round-level analysis (median of 8 cycles/round, `cand2_analysis.py`, ICC
+and effective-n reported per protocol): arm A ICC=0.928 (eff. n≈10.7),
+arm B ICC=0.233 (eff. n≈30.4), arm C ICC=0.981 (eff. n≈10.2) — round-level
+is the correct unit, matching Workstream A's own finding for this
+workload.
+
+```
+=== Primary: B vs C (round medians) ===
+B median=3906.96ms  C median=3078.54ms  rel=-21.20%
+normal-approx p=0.0002 SIGNIFICANT; exact (full enumeration) p=1.083e-05 SIGNIFICANT
+=== Secondary: A vs B ===
+A median=3107.53ms  B median=3906.96ms  rel(B vs A)=+25.73%  p=0.0002 SIGNIFICANT
+=== C vs A (context) ===
+A median=3107.53ms  C median=3078.54ms  rel(C vs A)=-0.93%  p=0.3075 not significant
+```
+
+Non-inferiority CI: `n=10 point_estimate_C/A-1=-0.53% 95%CI=[-2.37%, +1.34%] — PASS`
+(tighter than Workstream A's own +5.15% upper bound). Paired sign test: C
+faster than A in 8/10 rounds — not significant (exact two-sided p=0.1094).
+
+**Verdict: PASS**, same pattern as candidate 1 — a clean win over stock
+(B), and a modest, non-significant *improvement* over Workstream A's own
+already-passing non-inferiority bound against the pinned oracle (A). The
+three-ingredient unit does not regress Workstream A's confinement-era
+wins at GOMAXPROCS=128 on either candidate; both point estimates land
+closer to zero than Workstream A's own gate battery achieved. In-sweep-
+adjacent confinement observation: `Cpus_allowed_list` narrowed to node 1's
+odd CPUs. Archived `cand2-gcpause/`.
+
+#### 4c. Exploratory — `x/benchmarks/garbage`, GOMAXPROCS=256, B vs C, n=10 (confinement never fires; pure Workstream B effect)
+
+At GOMAXPROCS=256, `numaConfineIfSmall` declines unconditionally (procs
+exceeds any single node's CPU count) — this isolates the effect of
+homing + routing + soft affinity alone, with none of Workstream A's own
+confinement contribution. Mechanism validity: arm C 0/0 in 11/11 rounds
+(Layer 1's own BIND-all signature, as always); arm B real faults/migrations
+every round.
+
+```
+Garbage/benchmem-MB=4096-256  sec/op:            B=3.054m ± 6%   C=3.164m ± 4%   ~ (p=0.247 n=10)
+Garbage/benchmem-MB=4096-256  user+sys-sec/op:    B=242.4m ± 5%   C=260.5m ± 8%   +7.45% (p=0.011 n=10)
+Garbage/benchmem-MB=4096-256  peak-RSS-bytes:     B=8.903Gi ± 2%  C=9.024Gi ± 2%  ~ (p=0.353 n=10)
+```
+
+**Not a pass/fail gate** (exploratory, per the brief) — but the honest
+reading: at GOMAXPROCS=256 with confinement inactive, wall-clock `sec/op`
+shows **no significant difference** (C nominally ~3.6% slower, not
+significant), and CPU time is **significantly worse** for C
+(+7.45%, p=0.011) — the same user+sys-time cost pattern as Gates 2b and
+2c above, now confirmed on a third, independent workload. **The "pure
+Workstream B effect" at this GOMAXPROCS, isolated from Workstream A's own
+confinement contribution, shows no throughput win and a real, repeated
+CPU-time cost.** This matches the IMC gate's own finding at the same
+GOMAXPROCS: a genuine but modest routing improvement (Step 3) that does
+not translate into a measured wall-clock win here, while adding
+measurable overhead. Archived `cand1-256p-exploratory/`.
+
+### Step 5 — overall verdict: Workstream B gate battery — **DOES NOT SHIP AS-IS**
+
+| Gate | Result |
+|---|---|
+| 1. Pinned routing proof (hard, gates everything) | **PASS** — 100.00% / 99.54% local (≥95% bar); numa_maps corroboration 95.35% / 100.00% |
+| 2a. 1P json (hard) | PASS — not significant, p=0.393 |
+| 2b. 1P alloc micro (hard) | **FAIL** — geomean +3.73% > +2% (p=0.000 both, CV≈0%, not noise) |
+| 2c. 256P json sec/op (hard) | PASS — pooled n=30, not significant, p=0.358 |
+| 2c. 256P json user+sys-sec/op (hard) | **FAIL** — +19.96% (p=0.025, pooled n=30, significant) |
+| 2d. RSS (hard) | PASS — not fattened, nominally lower, not significant |
+| 2e. vmstat 0/0 (hard) | PASS — 0/0 twice |
+| 2f. Off-binary census, workstream-once (hard) | PASS (substantive) — both deviations previously disclosed/accepted in Tasks 8/9's own reviews; hot paths byte-identical |
+| 3. IMC decision gate (pre-registered primary) | **FAIL** — −4.49% relative (need ≥−10.00%); real, corroborated, complete-separation effect (exact p=0.00794), just short of the bar |
+| 4a. Pathology candidate 1 (128P, supporting) | PASS — B-vs-C −32.65% (p=0.000); C-vs-A non-inferiority tighter than Workstream A's own (CI upper +2.32% vs +8.26%) |
+| 4b. Pathology candidate 2 (128P, supporting) | PASS — B-vs-C −21.20% (exact p=1.08e-5); C-vs-A non-inferiority tighter than Workstream A's own (CI upper +1.34% vs +5.15%) |
+| 4c. Exploratory 256P garbage (informational) | sec/op not significant; user+sys-sec/op +7.45% (p=0.011) — third confirmation of the CPU-time-cost pattern |
+
+**Two hard gates fail** (1P alloc micro +3.73%, 256P user+sys +19.96%,
+both statistically significant with tight, low-noise measurements — not
+borderline or ambiguous misses), and **the pre-registered primary decision
+gate fails** its ≥10% relative-drop bar (achieving −4.49%, a real and
+statistically clean but insufficient effect). Per the plan's stop rule
+("Merge the unit only on a full pass") and Global Constraints ("If a gate
+fails: stop, record the failure... do not start the next workstream"):
+**Workstream B does not ship as-is.**
+
+This is not the null result Layer 2 produced. All three ingredients (per-
+node arena streams, node-routed mcentral refill, soft affinity) were
+built, are individually verified working (Gate 1's pinned proof, the
+routing-probe corroboration), and together they move the IMC metric in
+the correct direction with a clean, statistically significant, complete-
+separation effect — a categorically different outcome from Layer 2's
++0.10%/−0.07% null. The unit is genuinely measured, per the brief's own
+requirement, and the measurement says: real but insufficient, at a real
+CPU-time cost.
+
+**Three-ingredient candidate analysis — what's still missing (per the
+brief's explicit request; the strongest-supported reading of the evidence
+gathered here, not a proven root cause without further profiling):**
+
+The most load-bearing piece of evidence is the size of the gap between
+Gate 1 (externally pinned: ~99.5-100% local) and the unpinned IMC/
+span-refills readings (~45-55% local at GOMAXPROCS=256). A gap that large
+points toward **thread-stability insufficiency, specifically at the
+goroutine level rather than the OS-thread (M) level**: `numaNoteSchedule`
+(Task 10) narrows an M's *CPU affinity* on node change, and — because the
+narrowed mask constrains the M to that node going forward — the kernel
+can never again report a different node for that M via `getcpu`, so in
+practice each M gets narrowed once, early, to whichever node the OS
+scheduler happened to place it on first, and then stays there for the
+rest of the process's life (short of an explicit widen event). At
+GOMAXPROCS=256 unpinned, that produces something close to a random,
+roughly 50/50 one-time split of Ms across the two nodes — but Go's M:N
+scheduler does not pin *goroutines* to Ps/Ms by NUMA node; goroutines
+(the actual units of memory access) migrate freely across all GOMAXPROCS
+Ps via ordinary work-stealing and run-queue rebalancing, entirely
+independent of which node a given P's M happens to be narrowed to. A
+span refilled by a P/M pinned to node 0 can trivially end up read by a
+goroutine that the scheduler later runs on a P/M pinned to node 1 — and
+with roughly half the Ms on each node, a roughly-50%-remote steady state
+is exactly what that mechanism predicts, matching the ~45-55% figures
+measured above far better than either alternative below on its own. This
+reads as ingredient (c) as built — OS-thread-level soft affinity — not
+addressing the actual unit that needs to stay put (the goroutine),
+because Go's own scheduler has no NUMA-awareness in its own placement
+decisions.
+
+Two other candidates remain plausible contributors, not ruled out by this
+battery's data:
+
+- **`pages.alloc` address-ordering** (Task 9's own carried-forward ruling
+  1: "pages.alloc address-ordered cross-stream accepted-for-now — honest
+  counter + Task 11 IMC gate decides; node-aware page allocation is the
+  follow-up candidate if the gate fails"). This gate has now failed, which
+  is precisely the condition Task 9 named as the trigger to revisit this.
+  Cross-stream page ordering could independently degrade the correlation
+  between a refill's chosen node and the physical pages it actually
+  receives, on top of (or instead of) the goroutine-migration mechanism
+  above; this battery did not isolate the two.
+- **Homing granularity** — arena chunks are homed once per grow (~4 MiB,
+  per Task 8), a coarse unit relative to individual allocations; if a
+  chunk's grow-time node assignment and its eventual readers diverge
+  systematically (for reasons unrelated to goroutine migration), finer-
+  grained homing would not help without also addressing (b)/(c)'s own
+  gaps first.
+
+**Distinguishing among these — and specifically confirming or ruling out
+the goroutine-migration mechanism above with a CPU profile or a
+runtime-level goroutine-placement trace — is follow-up work, not decided
+here.** The controller decides next steps; this battery's job was to
+measure honestly, not to diagnose exhaustively.
+
+**Concerns for the controller:**
+
+1. The CPU-time-cost pattern (Gate 2b +3.73%, Gate 2c +19.96%, Gate 4c
+   +7.45%, all statistically significant, all in the same direction)
+   recurs across three independent measurements at three different
+   GOMAXPROCS values and workloads — this is not a fluke of any single
+   gate. Any follow-up work should treat this as a real, load-bearing
+   finding, not something to explain away.
+2. The pathology candidates at GOMAXPROCS=128 (where Workstream A's own
+   confinement is active for arm C too) both look *better* than
+   Workstream A's own gate battery on the same workloads — worth noting
+   explicitly so this is not read as "Workstream B made things worse
+   everywhere": the two hard-gate failures and the IMC shortfall are
+   real, but they coexist with a genuine, measured improvement over
+   Workstream A alone on confinement-eligible workloads.
+3. This battery did not attempt to separate "the CPU-time cost is from
+   ingredient (b)'s refill-time `getcpu` calls" from "the cost is from
+   ingredient (c)'s soft-affinity scheduler hook" from "the cost is from
+   added branching/locking in the now-per-node spanSets regardless of
+   whether either fires" — a CPU profile (which would also serve Task
+   14's own adoption-gate question, still open) would answer both this
+   and the goroutine-migration hypothesis above in one pass.
+4. Per the plan's own framing (Task 7's go/no-go, "Input 2"): Workstream
+   A's own coverage gap — the general/node-exceeding case (GOMAXPROCS
+   unset or > one node's CPUs) regressing ~5% against stock — remains
+   unaddressed. This battery does not change that finding; Workstream B
+   as measured here does not close it either (Gate 4c's GOMAXPROCS=256
+   exploratory result shows no throughput win in that exact regime).
+
+Session end: `kernel.numa_balancing = 1` (confirmed), machine idle
+throughout and at close, remote tree unmodified beyond the archived
+scratch build directories under `/tmp/pb/` (not committed; raw results
+copied into the tracked archive above).

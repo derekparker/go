@@ -1,8 +1,26 @@
-# Workstream B gate battery — PARTIAL archive (paused mid-task)
+# Workstream B gate battery — archive index
+
+**Status: COMPLETE.** This file originally documented a mid-task pause
+after Gate 1 only; the battery was resumed and completed in a second
+sitting. Kept as historical record of the pause per the coordinator's
+instruction. See `../../RESULTS.md`'s "Workstream B gate battery" section
+for the full verdict (overall: Workstream B does not ship as-is — two hard
+gates fail, the IMC decision gate falls short of its ≥10% bar despite a
+real, corroborated effect) and `task-11-report.md` (gitignored SDD ledger)
+for the complete per-gate report.
+
+Subdirectories added in the second sitting: `gate2-1p/`, `gate3-256p/`,
+`census/`, `imc/`, `cand1-128p/`, `cand2-gcpause/`, `cand1-256p-exploratory/`,
+plus `gate1-numamaps-followup.txt` and `go-version-m-all-binaries.txt` at
+this directory's top level.
+
+---
+
+## Original pause note (first sitting, historical)
 
 Session paused by the user after Gate 1 (pinned routing proof) completed
-cleanly and before Gate 2 was started. This directory holds only Gate 1's
-evidence; Gates 2-6 have not run yet.
+cleanly and before Gate 2 was started. This directory held only Gate 1's
+evidence at that point.
 
 ## What's archived here
 
@@ -50,13 +68,15 @@ ssh numa-dell '
 - node1 half: `local=94346 remote=432 total=94778 local_share=99.5442%`
 - Both ≥95% — **PASS**.
 
-## To resume
+## Resume outcome (second sitting)
 
-Continue from Task 11 Step 2 (hard gates: 1P json, 1P alloc micro, 256P json,
-RSS, vmstat 0/0, off-binary census) using the established `numa-design/gate-json.sh`
-/ `numa-design/pathology-sweep.sh` protocol (BENCHNUM=10, single-session,
-rotating order). Then Step 3 (IMC decision gate, ≥5 interleaved runs/arm,
-pre-registered in RESULTS.md's "Workstream B go/no-go (Task 7)" section).
-Then Step 4 (pathology candidates A/B/C rerun, WS-A protocol, n=10-15).
-See `.superpowers/sdd/2026-08-20-numa-v3-locality-plan/task-11-brief.md` and
-`task-11-report.md` for the full remaining checklist.
+Steps 2-5 all ran to completion. Headline: Gate 2b (1P alloc micro)
+geomean +3.73% FAIL, Gate 2c (256P json) user+sys-sec/op +19.96% FAIL,
+Gate 3/Step 3 (IMC decision gate) −4.49% relative FAIL (short of the ≥10%
+bar, but a real, statistically clean, corroborated effect — not a null
+result like Layer 2). Both pathology candidates at GOMAXPROCS=128 (Step 4)
+PASS, and are tighter than Workstream A's own gate battery on the same
+workloads. Overall verdict: **Workstream B does not ship as-is** — see
+RESULTS.md for the full three-ingredient candidate analysis of what's
+still missing (leading candidate: thread-stability insufficiency at the
+goroutine level, not the OS-thread level soft affinity actually built).

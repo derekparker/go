@@ -1,0 +1,19 @@
+baseline runs:
+  baseline-run1.csv: local=19069494 remote=17759955 share=48.22%
+  baseline-run2.csv: local=74177335 remote=69903196 share=48.52%
+  baseline-run3.csv: local=83589700 remote=78705634 share=48.50%
+  baseline-run4.csv: local=26330712 remote=24900195 share=48.60%
+  baseline-run5.csv: local=83692288 remote=77441054 share=48.06%
+numa runs:
+  numa-run1.csv: local=57423456 remote=52966335 share=47.98%
+  numa-run2.csv: local=57164562 remote=48390709 share=45.84%
+  numa-run3.csv: local=62303648 remote=53761260 share=46.32%
+  numa-run4.csv: local=62896187 remote=50573858 share=44.57%
+  numa-run5.csv: local=70788953 remote=61592956 share=46.53%
+
+baseline median remote share: 48.50%
+numa median remote share:     46.32%
+relative change: -4.49%  (pass bar: <= -10.00%)
+verdict: FAIL
+
+complete separation between arms; exact two-sided MWU p = 0.00794
