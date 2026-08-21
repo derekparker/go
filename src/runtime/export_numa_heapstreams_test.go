@@ -43,27 +43,48 @@ func NumaHeapStreamsEnabledForTest() bool { return numaHeapStreamsEnabled }
 // NumaArenaNodeForTest exports numaArenaNode.
 func NumaArenaNodeForTest(p uintptr) int32 { return numaArenaNode(p) }
 
+// NumaGrowNodeForTest exports numaGrowNode's (stream, homed) pair
+// (review I1), for positive coverage of numaHeapStreamsEnabled's
+// effect on it (review "RECOMMENDED"): when streams are disabled
+// (race, tight-VA, or 32-bit), numaGrowNode must return (0, false),
+// not merely "some caller happened to skip before reaching a nonzero
+// stream." See TestNUMAHeapArenaStreams.
+func NumaGrowNodeForTest() (stream int32, homed bool) { return numaGrowNode() }
+
 // NumaHeapGrowForTest grows the heap via mheap.grow with an explicit
 // node argument -- bypassing numaGrowNode's getcpu call, the same way a
 // pinned allocation would land on a chosen node, but portable to any
-// test host -- and returns the base address of a newly-registered heap
-// arena from that growth (via h.heapArenas, which is append-only) along
-// with whether growth succeeded and registered at least one new arena.
+// test host.
+//
+// grew and newArena are reported separately (review NEW-2): grew is
+// mheap.grow's own success/failure result (false only means grow
+// itself failed, e.g. a real OOM); newArena additionally reports
+// whether that growth registered a *new* heapArena (via
+// h.heapArenas, which is append-only) as opposed to just extending
+// headroom in an already-registered one. base is only meaningful when
+// newArena is true -- it is the newly-registered arena's base address,
+// for callers (e.g. TestNUMAHeapArenaStreams) that need a pointer
+// inside a freshly-tagged heapArena.node to look up. Conflating these
+// into a single ok bool, as an earlier version of this export did,
+// made "grow failed" and "grow succeeded but reused headroom" the same
+// signal to callers, which is wrong for anything that needs to react
+// differently to a genuine failure (see growUntilNewArena in
+// numa_heapstreams_test.go).
 //
 // Run on the system stack, matching every other export in this package
 // that touches mheap_ directly under its lock (see
 // CheckScavengedBitsCleared in export_test.go for the same pattern).
-func NumaHeapGrowForTest(npage uintptr, node int32) (base uintptr, ok bool) {
+func NumaHeapGrowForTest(npage uintptr, node int32) (base uintptr, grew, newArena bool) {
 	systemstack(func() {
 		lock(&mheap_.lock)
 		before := len(mheap_.heapArenas)
-		_, grew := mheap_.grow(npage, node)
+		_, grew = mheap_.grow(npage, node)
 		if grew && len(mheap_.heapArenas) > before {
 			ai := mheap_.heapArenas[len(mheap_.heapArenas)-1]
 			base = arenaBase(ai)
-			ok = true
+			newArena = true
 		}
 		unlock(&mheap_.lock)
 	})
-	return base, ok
+	return base, grew, newArena
 }

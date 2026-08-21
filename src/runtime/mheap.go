@@ -153,6 +153,27 @@ type mheap struct {
 	// to be backed by huge pages.
 	arenasHugePages bool
 
+	// didFirstGrow latches true the first time mheap.grow runs, ever,
+	// across every stream (review I3). grow's one-shot ASLR
+	// randomization draws from heapRandSeed, a fixed 64-bit budget
+	// mallocinit sizes for exactly one consumption; it must fire on
+	// the process's true first grow call and never again, regardless
+	// of which stream that call (or any later one) targets. An
+	// explicit latch, rather than inferring "first grow" from
+	// curArena[0].base == 0, does not depend on stream 0 happening to
+	// be the first stream any code path grows into -- that ordering is
+	// true today (heap growth predates numaSchedinit, so
+	// numaGrowNode/numaCurrentNode return 0 before topology discovery
+	// completes) but is not a boundary this field should have to keep
+	// silently correct if that ordering ever changes.
+	//
+	// Placed here, immediately after arenasHugePages (review NEW-1):
+	// both are 1-byte bools, and this is the 7-byte padding hole before
+	// the next 8-byte-aligned field (heapArenaAlloc), so the latch
+	// costs nothing -- off-build sizeof(mheap) returns to the
+	// pre-task-8 parent value (93464) instead of growing by 8.
+	didFirstGrow bool
+
 	// heapArenaAlloc is pre-reserved space for allocating heapArena
 	// objects. This is only used on 32-bit, where we pre-reserve
 	// this space to avoid interleaving it with the heap itself.
@@ -212,21 +233,6 @@ type mheap struct {
 	curArena [numaMaxHeapNodes]struct {
 		base, end uintptr
 	}
-
-	// didFirstGrow latches true the first time mheap.grow runs, ever,
-	// across every stream (review I3). grow's one-shot ASLR
-	// randomization draws from heapRandSeed, a fixed 64-bit budget
-	// mallocinit sizes for exactly one consumption; it must fire on
-	// the process's true first grow call and never again, regardless
-	// of which stream that call (or any later one) targets. An
-	// explicit latch, rather than inferring "first grow" from
-	// curArena[0].base == 0, does not depend on stream 0 happening to
-	// be the first stream any code path grows into -- that ordering is
-	// true today (heap growth predates numaSchedinit, so
-	// numaGrowNode/numaCurrentNode return 0 before topology discovery
-	// completes) but is not a boundary this field should have to keep
-	// silently correct if that ordering ever changes.
-	didFirstGrow bool
 
 	// central free lists for small size classes.
 	// the padding makes sure that the mcentrals are
@@ -1714,8 +1720,16 @@ func (h *mheap) grow(npage uintptr, node int32) (uintptr, bool) {
 	// growth predates numaSchedinit, and numaGrowNode/numaCurrentNode
 	// return 0 before topology discovery completes) but silently
 	// depends on that ordering never changing; the latch does not.
+	//
+	// Read here, but not yet written: the write happens below, only
+	// once this call is past its one possible failure point (the
+	// av == nil OOM return in the branch below) -- review NEW-3. A
+	// failed first grow must not burn the latch: if it did, and the
+	// process later grew successfully (e.g. after the OS or another
+	// goroutine freed memory), that later, actually-first-successful
+	// grow would silently lose the second-stage ASLR jitter, a
+	// divergence from stock's own OOM-then-recover behavior.
 	firstGrow := !h.didFirstGrow
-	h.didFirstGrow = true
 
 	// We must grow the heap in whole palloc chunks.
 	// We call sysMap below but note that because we
@@ -1791,6 +1805,12 @@ func (h *mheap) grow(npage uintptr, node int32) (uintptr, bool) {
 		// least ask bytes in size.
 		nBase = alignUp(h.curArena[idx].base+ask, physPageSize)
 	}
+
+	// Past the only failure point in this function (the av == nil OOM
+	// return above) -- see firstGrow's doc comment (review NEW-3) for
+	// why the latch write waits until here rather than happening
+	// alongside firstGrow's read.
+	h.didFirstGrow = true
 
 	// Grow into the current arena.
 	v := h.curArena[idx].base

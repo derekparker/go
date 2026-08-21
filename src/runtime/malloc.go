@@ -696,12 +696,15 @@ func mallocinit() {
 			hint.next, mheap_.arenaHints[node] = mheap_.arenaHints[node], hint
 		}
 	} else {
-		// 32-bit: tight VA, the ultimate I5 tight-VA-fallback case --
-		// numaHeapStreamsEnabled stays false (its zero value; set
-		// explicitly here so this is a stated fact about this branch,
-		// not an accident of initialization order). Single fixed
-		// reservation below, no hint chain to partition across nodes at
-		// all; heap growth here always uses stream 0 (see mheap.grow).
+		// 32-bit: tight VA, the ultimate I5 tight-VA-fallback case.
+		// numaHeapStreamsEnabled is already false here (its zero
+		// value, since mallocinit runs before anything could set it
+		// true) -- this assignment is redundant in effect, and exists
+		// only to make that a stated fact about this branch rather
+		// than an unstated dependency on initialization order surviving
+		// future edits (review NEW-4). Single fixed reservation below,
+		// no hint chain to partition across nodes at all; heap growth
+		// here always uses stream 0 (see mheap.grow).
 		numaHeapStreamsEnabled = false
 
 		// On a 32-bit machine, we're much more concerned

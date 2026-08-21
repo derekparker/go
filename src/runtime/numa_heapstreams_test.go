@@ -36,6 +36,16 @@ func TestNUMAHeapArenaStreams(t *testing.T) {
 	// risk growing into a stream with no hints (the exact fatal
 	// "too many address space collisions" this review round caught).
 	if !runtime.NumaHeapStreamsEnabledForTest() {
+		// Positive C1 coverage (review "RECOMMENDED"), not just an
+		// absence-of-crash skip: assert numaGrowNode itself actually
+		// reports the disabled state (stream 0, homed false) before
+		// skipping, so a future change that re-enables streams under
+		// -race (or any other numaHeapStreamsEnabled==false case)
+		// without updating numaGrowNode to match gets caught here
+		// instead of only surfacing as the C1 crash again.
+		if stream, homed := runtime.NumaGrowNodeForTest(); stream != 0 || homed {
+			t.Fatalf("numaHeapStreamsEnabled is false but numaGrowNode returned (stream=%d, homed=%v), want (0, false)", stream, homed)
+		}
 		t.Skip("numaHeapStreamsEnabled is false: streams are not populated on this build/run (race, tight-VA, or 32-bit)")
 	}
 
@@ -86,16 +96,33 @@ func TestNUMAHeapArenaStreams(t *testing.T) {
 // have already grown stream 0 first. Node 1's stream never has this
 // problem (nothing else in this binary touches it), but the same
 // helper handles both for symmetry.
+//
+// grew and newArena are handled distinctly (review NEW-2): !grew means
+// mheap.grow itself failed (a real OOM, or something similarly wrong)
+// and is fatal immediately, with no retry -- retrying a genuine
+// allocation failure by asking for even more memory only makes things
+// worse. grew && !newArena just means this npage fit in headroom
+// already mapped for this stream, which is expected and retried with a
+// larger npage. The final Fatalf (if the cap is reached) reports the
+// npage that was actually just attempted and failed to produce a new
+// arena, not a doubled-but-never-tried value -- an earlier version of
+// this loop checked the cap after doubling, so its failure message
+// named a size this function had never actually asked mheap.grow for.
 func growUntilNewArena(t *testing.T, node int32) uintptr {
 	t.Helper()
 	npage := uintptr(1 << 14)
 	const maxNpage = uintptr(1) << 20 // ~8 GiB at 8 KiB pages; generous cap
-	for npage <= maxNpage {
-		if base, ok := runtime.NumaHeapGrowForTest(npage, node); ok {
+	for {
+		base, grew, newArena := runtime.NumaHeapGrowForTest(npage, node)
+		if !grew {
+			t.Fatalf("NumaHeapGrowForTest(node %d, npage %d) failed: mheap.grow itself returned false (real OOM?)", node, npage)
+		}
+		if newArena {
 			return base
+		}
+		if npage > maxNpage {
+			t.Fatalf("NumaHeapGrowForTest(node %d) never registered a new heap arena, gave up after npage=%d", node, npage)
 		}
 		npage *= 2
 	}
-	t.Fatalf("NumaHeapGrowForTest(node %d) never registered a new heap arena, gave up at npage=%d", node, npage)
-	return 0
 }
