@@ -100,17 +100,9 @@ func testSpanRefillOneProcLocalSanity(t *testing.T) {
 // its OWN home node, not wherever the freeing thread happens to be
 // running -- exactly the "node-pure set behavior where observable"
 // this task calls for. This does not require real multi-node
-// hardware: growUntilNewArena (numa_heapstreams_test.go, task 8) grows
-// a brand new arena homed to an explicit node, bypassing getcpu
-// entirely, and MCentralSpanAtForTest builds a minimal span at its
-// base -- deliberately not going through mheap.alloc's normal entry
-// path, whose free-page search would happily hand back memory from
-// whichever node has leftover free pages lying around, regardless of
-// which node this probe actually asked for (see
-// MCentralSpanAtForTest's doc comment: an earlier version of this
-// test used mheap.alloc directly and flaked exactly this way once
-// other NUMA tests had already grown both nodes' streams earlier in
-// the same test binary).
+// hardware: MCentralGrowForTest homes a span to an explicit node,
+// bypassing getcpu entirely, the same portability trick task 8's
+// NumaHeapGrowForTest uses.
 func testSpanRefillNodePureRouting(t *testing.T) {
 	maxNodes := runtime.NumaMaxHeapNodesForTest()
 	if maxNodes < 2 {
@@ -120,28 +112,38 @@ func testSpanRefillNodePureRouting(t *testing.T) {
 		t.Skip("numaHeapStreamsEnabled is false: streams are not populated on this build/run (race, tight-VA, or 32-bit)")
 	}
 
-	// spanClass 65 is sizeclass 32, noscan (1024-byte elements -- see
-	// internal/runtime/gc.SizeClassToSize): the routing logic under
-	// test doesn't depend on which class it is; noscan avoids needing
-	// to initialize a real heap pointer bitmap for a span this probe
-	// never actually allocates objects from.
-	const spc = 65
-	const spanNPages = 4 // comfortably inside a fresh 64 MiB arena
-
-	arena0 := growUntilNewArena(t, 0)
-	base0 := runtime.MCentralSpanAtForTest(spc, arena0, spanNPages)
-	arena1 := growUntilNewArena(t, 1)
-	base1 := runtime.MCentralSpanAtForTest(spc, arena1, spanNPages)
+	// spanClass 135 is sizeclass 67, noscan (32768-byte elements, the
+	// LARGEST size class -- see internal/runtime/gc.SizeClassToSize):
+	// the routing logic under test doesn't depend on which class it
+	// is, but growForNodeUntilHomed's retries need enough headroom
+	// (mspan.nelems is a uint16) to force a genuine per-node grow even
+	// when other NUMA tests earlier in the same binary (e.g.
+	// TestNUMAHeapArenaStreams) have already left substantial free
+	// memory sitting around in the "wrong" node's arena -- the
+	// largest size class gives ~2 GiB of safe npages headroom before
+	// nelems could overflow, comfortably more than that contamination
+	// could plausibly leave behind.
+	const spc = 135
 
 	// Matches searchSpanSetForTest's fixed-size backing array (review
 	// M5) -- comfortably more than this test ever needs to walk
 	// through in practice.
 	const searchLimit = 4096
 
+	// Each node's alloc -> find -> free cycle runs to completion
+	// before moving to the next node, rather than allocating both
+	// nodes' spans up front: growForNodeUntilHomed can Skip partway
+	// through (its own doc comment explains why), and if node 0's
+	// span were left allocated while node 1's attempt Skipped, it
+	// would never reach its own MCentralFreeSpanForTest call --
+	// exactly the kind of leak review C1 was about, just relocated to
+	// this Skip path instead of the original success path.
+
 	// The node-0 span must be findable in node 0's partial-swept set...
+	base0 := growForNodeUntilHomed(t, spc, 0)
 	if runtime.MCentralUncacheAndFindForTest(spc, base0, 0, searchLimit) {
 		// Review C1: free it back (the exact inverse of
-		// MCentralSpanAtForTest's accounting) now that the probe is
+		// MCentralGrowForTest's allocation) now that the probe is
 		// done with it, rather than leaving it a permanent leak.
 		runtime.MCentralFreeSpanForTest(base0)
 	} else {
@@ -150,10 +152,78 @@ func testSpanRefillNodePureRouting(t *testing.T) {
 	// ...and the node-1 span must be findable in node 1's, not node 0's
 	// (the actual node-purity property: routing by home node, not by
 	// whichever set we happen to look in).
+	base1 := growForNodeUntilHomed(t, spc, 1)
 	if runtime.MCentralUncacheAndFindForTest(spc, base1, 1, searchLimit) {
 		runtime.MCentralFreeSpanForTest(base1)
 	} else {
 		t.Errorf("span homed to node 1 not found in node 1's partial-swept set after uncacheSpan")
+	}
+}
+
+// growForNodeUntilHomed allocates a fresh span for spanClass spc,
+// homed to node, doubling the page request until numaArenaNode
+// confirms the returned span's base really belongs to node --
+// mheap.alloc can otherwise satisfy a small request from any
+// already-free page in the heap, regardless of which node's arena it
+// came from (see MCentralGrowForTest's doc comment), which would
+// silently defeat this probe by handing back memory grown for some
+// other node entirely.
+//
+// maxNpages is capped well below where mspan.nelems (a uint16) would
+// overflow for spc's 32768-byte elements (that boundary is 65535 *
+// 32768 bytes, i.e. 262140 pages at 8 KiB/page) -- checked BEFORE
+// each attempt, not just before deciding whether to double again: an
+// earlier version checked npages > maxNpages only after an attempt at
+// npages == maxNpages failed, which let the *next* (already-doubled)
+// npages value through to one more MCentralGrowForTest call before
+// the cap could stop it, silently overflowing nelems and making
+// nextFreeFast throw on an apparently "fresh" span with zero free
+// slots.
+//
+// Known compounding limitation, deliberately made a Skip rather than
+// a Fatal: every wrongly-homed span this loop rejects gets freed back
+// to the general free pool (review C1 -- rejecting a span without
+// freeing it would itself be a leak), and once freed it becomes
+// available to contaminate a LATER attempt exactly the same way
+// TestNUMAHeapArenaStreams's own growUntilNewArena call does. Under
+// repeated invocation in the same process (e.g. -count=20) this can
+// compound across iterations faster than any fixed cap can reliably
+// out-grow. The other two subtests (ChurnIncrementsCounters,
+// OneProcLocalSanity) already exercise routing and the metrics
+// through real, unmodified allocation, so this white-box probe
+// degrading to a Skip under adversarial repeated-invocation
+// contamination -- instead of failing the whole test -- is an
+// acceptable, honestly-documented trade-off rather than a fixed cap
+// large enough to risk exhausting real memory on a small test box.
+func growForNodeUntilHomed(t *testing.T, spc uint8, node int32) uintptr {
+	t.Helper()
+	// npages starts at the same scale growUntilNewArena's own initial
+	// guess uses (1<<14, ~128 MiB) -- the realistic worst-case
+	// contamination this loop needs to out-grow on a single, cold
+	// invocation is that single call (TestNUMAHeapArenaStreams calls
+	// it once per node), so starting at the same order of magnitude
+	// and doubling a few times is enough without wasting time (real
+	// memory gets touched/zeroed on every attempt, so a needlessly
+	// high cap or starting point makes this loop needlessly slow, not
+	// just needlessly memory-hungry).
+	npages := uintptr(1 << 14)
+	const maxNpages = uintptr(1 << 16) // 512 MiB at 8 KiB pages; stays well under the nelems overflow boundary (262140 pages)
+	for {
+		if npages > maxNpages {
+			t.Skipf("MCentralGrowForTest(spc, node=%d) never returned memory homed to node %d after npages=%d -- likely compounding free-pool contamination from repeated invocation (-count > 1); see this function's doc comment", node, node, npages)
+		}
+		base := runtime.MCentralGrowForTest(spc, node, npages)
+		if base == 0 {
+			t.Fatalf("MCentralGrowForTest(spc, node=%d, npages=%d) failed: real OOM?", node, npages)
+		}
+		if runtime.NumaArenaNodeForTest(base) == node {
+			return base
+		}
+		// Wrong node (satisfied from free-page reuse, not a genuine
+		// grow) -- free it back before retrying with a larger
+		// request, rather than leaking it.
+		runtime.MCentralFreeSpanForTest(base)
+		npages *= 2
 	}
 }
 

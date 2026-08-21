@@ -97,19 +97,28 @@ func (s sweepClass) split() (spc spanClass, full bool) {
 // The background sweeper doesn't route by node the way cacheSpan does
 // (design §12.4) -- it just needs to drain every unswept span
 // eventually, so it tries every node's set for a given span class
-// before moving on, up to numaGrowLoopBound (review I3): streams above
-// that have never been grown into and are therefore provably empty, so
-// there's nothing to skip by walking further. With the experiment off,
-// numaGrowLoopBound is always 0 (I5) and this inner loop always runs
-// exactly once.
+// before moving on. This deliberately does NOT use numaGrowLoopBound
+// (review I3) the way cacheSpan's remote-fallback loop does: an
+// earlier version bounded this loop the same way and a reviewer
+// reproduced a hard crash from it on real 2-node hardware
+// ("attempt to clear non-empty span set", finishsweep_m ->
+// spanSet.reset) -- I3's optimization is safe for cacheSpan because a
+// miss there just falls through to a correct, if suboptimal, grow
+// call, but nextSpanForSweep has a strict correctness requirement
+// (finishsweep_m's own full-range reset asserts every unswept span
+// was already drained by this function, and throws otherwise) that a
+// bounded search cannot be proven to uphold with full confidence
+// against sweep.centralIndex's forward-only progress marker
+// interacting with a high-water mark that can still be moving during
+// the same sweep phase. With the experiment off, numaMaxHeapNodes ==
+// 1 (I5) and this inner loop always runs exactly once regardless.
 func (h *mheap) nextSpanForSweep() *mspan {
 	sg := h.sweepgen
-	hwm := numaGrowLoopBound()
 	for sc := sweep.centralIndex.load(); sc < numSweepClasses; sc++ {
 		spc, full := sc.split()
 		c := &h.central[spc].mcentral
 		var s *mspan
-		for node := int32(0); node <= hwm; node++ {
+		for node := int32(0); node < numaMaxHeapNodes; node++ {
 			if full {
 				s = c.fullUnswept(sg, node).pop()
 			} else {
