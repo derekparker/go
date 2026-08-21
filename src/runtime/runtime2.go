@@ -724,8 +724,11 @@ type m struct {
 	locksHeldLen int
 	locksHeld    [10]heldLockInfo
 
-	// numa is this M's NUMA stand-down convergence state (see
-	// numaFixThreadPlacement in numa_linux.go). Placed immediately
+	// numa is this M's NUMA per-M state: stand-down convergence (see
+	// numaFixThreadPlacement in numa_linux.go) and, since task 10,
+	// node-mask soft affinity's own last-narrowed-node and next-getcpu-
+	// check-deadline caches (see numaNoteSchedule/numaWidenBeforeClone,
+	// same file). Placed immediately
 	// BEFORE self, which stays the struct's actual last field: a
 	// zero-size field placed anywhere except last costs zero bytes and
 	// shifts nothing that follows it, whereas a zero-size field placed

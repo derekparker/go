@@ -121,6 +121,7 @@ func numaSchedinit() {
 		return
 	}
 	numaInitTopology()
+	numaBuildNodeCPUMaskCache()
 	numaSetProcessBindAll()
 	numaDetectStartupAffinity()
 	if debug.numa > 0 {
@@ -331,23 +332,68 @@ func numaAffinityPopcount(mask []byte) int32 {
 	return pop
 }
 
-// numaNodeAffinityMask fills *mask with the CPU affinity bitmask for
-// every CPU numaTopology.NodeOfCPU reports as belonging to node, and
-// reports whether at least one CPU was found (a topology with no CPUs
-// for this node -- e.g. a CPU-less memory-only node -- cannot be
-// narrowed to). Shared by numaConfine (process-wide fill-one-socket
-// confinement, once, from schedinit) and numaNoteSchedule (per-M soft
-// affinity, design §12.4).
-func numaNodeAffinityMask(node int32, mask *[numaCPUMaskBytes]byte) bool {
-	*mask = [numaCPUMaskBytes]byte{}
-	n := 0
-	for cpu := 0; cpu < 8192; cpu++ {
-		if numaTopology.NodeOfCPU(cpu) == node {
-			mask[cpu/8] |= 1 << (uint(cpu) % 8)
-			n++
+// numaNodeCPUMaskCache holds, once built, the CPU affinity bitmask for
+// every NUMA node id numaTopology could ever report -- indexed directly
+// by node id, matching numaShouldConfine's and numaNoteSchedule's own
+// node<64 bound (numaMaxNode-derived). numaNodeCPUMaskCachedPopcount[id]
+// is the same node's CPU count; 0 means "no cached mask" (either the id
+// is not one of this host's real nodes, or its node is legitimately
+// CPU-less -- both cases correctly report "cannot be narrowed to").
+//
+// Built once, eagerly, by numaBuildNodeCPUMaskCache, called from
+// numaSchedinit while m0 is still the only runtime thread -- the same
+// single-threaded invariant numaConfine/numaSetProcessBindAll/
+// numaDetectStartupAffinity already rely on -- so every M thereafter
+// reads it lock-free: numaTopology itself is documented read-only after
+// schedinit, and this cache is a pure, deterministic function of it.
+//
+// 64 * numaCPUMaskBytes(1024) = 64KiB of static BSS. Build-tagged
+// on-experiment only via this file's Linux-only, always-on-when-Linux
+// nature is not the guard here (numa_linux.go builds regardless of the
+// experiment) -- goexperiment.Numa gates numaBuildNodeCPUMaskCache's
+// only call site (numaSchedinit), so with the experiment off this array
+// is simply never populated (still statically allocated, same as
+// numaScratch above, which accepts the same kind of always-present-but-
+// only-used-on cost). Comparable in kind to Task 8's disclosed per-node
+// array costs.
+var numaNodeCPUMaskCache [64][numaCPUMaskBytes]byte
+var numaNodeCPUMaskCachedPopcount [64]int32
+
+// numaBuildNodeCPUMaskCache populates numaNodeCPUMaskCache for every
+// node numaTopology discovered. Called once from numaSchedinit, after
+// numaInitTopology. A single 8192-CPU scan per discovered node (not per
+// getcpu-triggered node change) -- this is what turns the per-node mask
+// from an 8192-iteration scan on every soft-affinity node change (the
+// review's M3 finding) into an O(1) cache lookup.
+func numaBuildNodeCPUMaskCache() {
+	for i := int32(0); i < numaTopology.NumNodes; i++ {
+		id := numaTopology.Nodes[i].ID
+		if id < 0 || id >= 64 {
+			continue
 		}
+		n := 0
+		for cpu := 0; cpu < 8192; cpu++ {
+			if numaTopology.NodeOfCPU(cpu) == id {
+				numaNodeCPUMaskCache[id][cpu/8] |= 1 << (uint(cpu) % 8)
+				n++
+			}
+		}
+		numaNodeCPUMaskCachedPopcount[id] = int32(n)
 	}
-	return n > 0
+}
+
+// numaNodeAffinityMask fills *mask with the cached CPU affinity bitmask
+// for node (see numaNodeCPUMaskCache) and reports whether at least one
+// CPU was found (a topology with no CPUs for this node -- e.g. a
+// CPU-less memory-only node -- cannot be narrowed to). Shared by
+// numaConfine (process-wide fill-one-socket confinement, once, from
+// schedinit) and numaNoteSchedule (per-M soft affinity, design §12.4).
+func numaNodeAffinityMask(node int32, mask *[numaCPUMaskBytes]byte) bool {
+	if node < 0 || node >= 64 || numaNodeCPUMaskCachedPopcount[node] == 0 {
+		return false
+	}
+	*mask = numaNodeCPUMaskCache[node]
+	return true
 }
 
 // numaShouldConfine reports whether fill-one-socket-first should engage
@@ -524,8 +570,20 @@ func numaStandDownIfNeeded(procs int32, customGOMAXPROCS bool) bool {
 	if procs <= numaConfinedNodeCPUs && customGOMAXPROCS {
 		return false
 	}
-	numaConfined.Store(false)
+	// Store numaStoodDown BEFORE numaConfined (Task 10 review I1):
+	// numaNoteSchedule's reader checks numaConfined.Load() first, then
+	// numaStoodDown.Load(), via a short-circuit ||. With the stores in
+	// the other order, a reader could observe numaConfined already
+	// false but numaStoodDown not yet true -- both gate checks false, so
+	// node-mask soft affinity could engage and narrow an M's affinity
+	// during the stand-down transition itself. Storing numaStoodDown
+	// first closes that window: since these are sequentially consistent
+	// atomics and numaStoodDown only ever goes false->true (never
+	// back), by the time any reader observes numaConfined==false,
+	// numaStoodDown==true is already guaranteed visible to that same
+	// reader's subsequent load, regardless of interleaving.
 	numaStoodDown.Store(true)
+	numaConfined.Store(false)
 	if debug.numa > 0 {
 		if !customGOMAXPROCS {
 			println("numa: confinement stood down, GOMAXPROCS reverted to default (customGOMAXPROCS=false)")
@@ -906,7 +964,7 @@ var numaStartupFullAffinity bool
 // numaStartupAffinity is the raw CPU affinity mask numaDetectStartupAffinity
 // read at startup (the same sched_getaffinity result numaStartupFullAffinity
 // is derived from). Kept, not just the derived bool, because
-// numaWidenForFork needs the actual mask to restore a soft-affinity-
+// numaWidenBeforeClone needs the actual mask to restore a soft-affinity-
 // narrowed M to before it forks (see that function's doc comment) --
 // and unlike numaShouldConfine's own numaSavedAffinity, this is captured
 // unconditionally (independent of sched.customGOMAXPROCS), so it is
@@ -920,6 +978,15 @@ var numaStartupAffinity [numaCPUMaskBytes]byte
 // without numaSetThreadAffinity, since neither can ever reach
 // numaNoteSchedule's eligibility gate (numaSoftAffinityEligible)
 // regardless of this value.
+//
+// NOTE (M6, copied from numaShouldConfine's own equivalent note):
+// offline CPUs can make sysfs-online and the affinity popcount disagree
+// -- a host with offline CPUs may have numaOnlineCPUCount() count a CPU
+// this process's affinity mask never included, so the popcount
+// comparison declines (numaStartupFullAffinity stays false) even though
+// nothing actually narrowed this process's affinity. Conservative:
+// offline-CPU hosts simply do not get soft affinity, the same
+// consequence numaShouldConfine already accepts for confinement.
 func numaDetectStartupAffinity() {
 	if numaTopology.NumNodes < 2 || !numaHasSetAffinity {
 		return
@@ -929,6 +996,13 @@ func numaDetectStartupAffinity() {
 		return
 	}
 	numaStartupFullAffinity = numaAffinityPopcount(numaStartupAffinity[:r]) == numaOnlineCPUCount()
+	if debug.numa > 0 {
+		if numaStartupFullAffinity {
+			println("numa: soft affinity eligible (process started with full affinity)")
+		} else {
+			println("numa: soft affinity declined: narrowed startup affinity")
+		}
+	}
 }
 
 // numaSoftAffinityEligible reports whether node-mask soft affinity
@@ -971,6 +1045,11 @@ func numaSoftAffinityEligible() bool {
 // re-narrowed promptly relative to typical scheduling quanta, and long
 // enough that even a schedule()-call rate in the millions/sec keeps the
 // syscall rate in the hundreds/sec.
+//
+// M9: if Task 11's gates want a different tradeoff (faster convergence
+// vs even less overhead), the natural next step is a GODEBUG=numasoft=N
+// knob rather than re-tuning this literal -- not done here since no
+// gate has asked for it yet.
 const numaSoftAffinityCheckInterval = 4 * 1e6 // 4ms in nanotime() units
 
 // numaNoteSchedule applies node-mask soft affinity to the current M
@@ -1009,6 +1088,24 @@ const numaSoftAffinityCheckInterval = 4 * 1e6 // 4ms in nanotime() units
 // disabled for the rest of the process's life -- there is no path back
 // from a stand-down to re-engaging either ingredient.
 //
+// Soft affinity has no stand-down of its own for a process that was
+// NEVER confined (numaConfined never true, so numaStandDownIfNeeded's
+// own precondition -- "if !numaConfined.Load() { return false }" --
+// never even evaluates this process): if GOMAXPROCS is later raised on
+// such a process, already-narrowed Ms simply stay narrowed to whichever
+// node they were last observed on. This is judged benign by design, not
+// an oversight: sched_setaffinity narrows a CPU *set* (the whole node),
+// never a single CPU, so the kernel keeps full scheduling freedom within
+// that node and can still migrate the OS thread under real pressure;
+// work-stealing across Ps is untouched (Forbidden list: "no steal
+// changes"); and any NEW M the larger GOMAXPROCS brings in finds its own
+// node independently via its own first numaNoteSchedule pass (and, as of
+// the C1 fix below, starts from a genuinely wide inherited mask, not a
+// leaked narrow one). The net effect of a GOMAXPROCS raise is simply
+// "more Ms, each independently node-sticky", which is the intended
+// steady state -- not "the process reverts to full spread", which is
+// what stand-down means for confinement specifically.
+//
 // The experiment-off case is not checked here: like
 // numaConfineIfSmall/numaFixThreadPlacement, this function relies
 // entirely on its call site (schedule(), proc.go) gating on
@@ -1044,52 +1141,112 @@ func numaNoteSchedule() {
 	if last, ok := mp.numa.softAffinityNode(); ok && int32(last) == node {
 		return // already narrowed to this node
 	}
+	numaApplySoftAffinity(mp, node)
+}
+
+// numaApplySoftAffinity is numaNoteSchedule's slow path: it only runs on
+// an actual node change (M2, review): computing/copying the per-node
+// mask needs a [numaCPUMaskBytes]byte (1024-byte) local, and keeping
+// that out of numaNoteSchedule's own frame keeps the throttled fast path
+// (the overwhelmingly common call) a tiny frame -- go:noinline so the
+// compiler cannot undo the split by inlining this back into its caller.
+//
+//go:noinline
+func numaApplySoftAffinity(mp *m, node int32) {
 	var mask [numaCPUMaskBytes]byte
 	if !numaNodeAffinityMask(node, &mask) {
 		return
 	}
 	if numaSetThreadAffinity(0, &mask) {
 		mp.numa.setSoftAffinityNode(int8(node))
+		if debug.numa > 0 {
+			println("numa: soft affinity narrowed M to node", node)
+		}
 	}
 }
 
-// numaWidenForFork undoes node-mask soft affinity's per-M CPU narrowing
-// on the calling M just before it forks, so a child process spawned
-// (via os/exec, from any goroutine on this M) does not inherit a
-// scheduling HINT as if it were deliberate operator placement.
+// numaWidenBeforeClone undoes node-mask soft affinity's per-M CPU
+// narrowing on the calling M just before it clones a new kernel thread
+// -- either via fork(2)+exec (os/exec, any goroutine on this M) or via
+// this runtime's own clone(2) call in newosproc (a new M) -- so the new
+// thread does not inherit a scheduling HINT as if it were deliberate
+// operator placement.
 //
-// sched_setaffinity's mask is inherited across fork(2)/clone(2): without
-// this, a child forked from a soft-affinity-narrowed M would start life
-// with that narrowed mask as its OWN startup affinity -- and nothing
-// about that mask distinguishes "the runtime narrowed the forking
-// thread as a transient scheduling hint" from "an operator ran the
-// parent under taskset". A GOEXPERIMENT=numa child would read that
-// inherited mask via its own numaDetectStartupAffinity/numaShouldConfine
-// checks and conclude "operator placement wins", silently declining
-// both confinement and its own soft affinity for its entire lifetime --
-// this is exactly the failure mode design §12.4's stand-down rule exists
-// to prevent, just triggered by an internal artifact instead of a real
-// operator.
+// sched_setaffinity's mask is inherited across both fork(2) and
+// clone(2): without this, a thread cloned from a soft-affinity-narrowed
+// M would start life with that narrowed mask as its OWN startup
+// affinity -- and nothing about that mask distinguishes "the runtime
+// narrowed the parent thread as a transient scheduling hint" from "an
+// operator ran the parent under taskset". This has two distinct, both
+// serious, consequences depending on which clone path leaked:
+//
+//   - via os/exec: a GOEXPERIMENT=numa child process reads the inherited
+//     mask via its own numaDetectStartupAffinity/numaShouldConfine
+//     checks and concludes "operator placement wins", silently declining
+//     both confinement and its own soft affinity for its entire
+//     lifetime -- design §12.4's stand-down rule, tripped by an internal
+//     artifact instead of a real operator (found in this task's own
+//     verification: broke 3 existing Workstream A tests when go test's
+//     own soft-narrowed Ms spawned testprog subprocesses).
+//   - via newosproc (review C1, the critical finding): every new M this
+//     runtime itself creates inherits whichever node the CREATING M
+//     happened to be soft-narrowed to. Since numaNoteSchedule has no
+//     widening path of its own (it only ever narrows), and getcpu on an
+//     already-kernel-narrowed thread can only ever report the node it is
+//     confined to, that new M's own first numaNoteSchedule pass just
+//     confirms the same inherited node instead of discovering its own --
+//     a self-reinforcing cascade that collapses the entire process onto
+//     whichever node the first M to narrow (typically m0, at its very
+//     first schedule() pass, before any other M exists) happened to be
+//     on. On numa-dell at GOMAXPROCS=256 this manifested as every M
+//     pinned to one node's 128 CPUs -- 2x oversubscription, the other
+//     node fully idle -- silently defeating the entire feature while
+//     still passing every prior correctness test (which only checked
+//     "is each M narrowed to *a* single node", never "do Ms collectively
+//     span more than one").
 //
 // Widens back to numaStartupAffinity: this process's own true starting
-// mask, which is always the full mask whenever this M could have been
-// soft-affinity-narrowed in the first place (numaSoftAffinityEligible
+// mask, which is always the full mask whenever the calling M could have
+// been soft-affinity-narrowed in the first place (numaSoftAffinityEligible
 // requires numaStartupFullAffinity, which is only ever true when
 // numaStartupAffinity's popcount already equals numaOnlineCPUCount()).
-// Also clears this M's cached softAffinityNode: without that, the next
-// numaNoteSchedule pass would see the same node as before and believe
-// no change is needed, permanently leaving this M's real kernel affinity
-// wide (silently losing soft affinity for it) instead of re-narrowing.
-// No separate restore is needed after fork returns in the parent -- the
-// clear alone makes the next schedule() pass self-heal.
+// Also clears this M's cached softAffinityNode (and, per review M4, its
+// nextCheck deadline -- see clearSoftAffinityNode): without that, the
+// next numaNoteSchedule pass would see the same node as before (or, for
+// the deadline, not check again for up to numaSoftAffinityCheckInterval)
+// and either believe no change is needed or simply not look -- either
+// way permanently or transiently leaving this M's real kernel affinity
+// wide instead of promptly re-narrowing to wherever it actually lands.
+// No separate restore is needed after the clone/fork syscall returns in
+// the parent -- the clear alone makes the next schedule() pass
+// self-heal, immediately (nextCheck==0 is always due).
 //
-// Called from syscall_runtime_BeforeFork (proc.go), under the same "no
-// more allocation or calls of non-assembly functions" constraint
-// syscall.forkAndExecInChild1 documents at its own runtime_BeforeFork
-// call site -- everything from here down must stay nosplit.
+// Called from two sites: syscall_runtime_BeforeFork (proc.go, the
+// os/exec path) and newosproc (os_linux.go, the runtime's own new-M
+// path), both before the actual clone/fork syscall runs. The fork call
+// site runs under the same "no more allocation or calls of non-assembly
+// functions" constraint syscall.forkAndExecInChild1 documents at its own
+// runtime_BeforeFork call site, so this function -- and everything it
+// calls -- must stay nosplit; the newosproc call site has no such
+// constraint of its own, but nosplit is a strictly more restrictive
+// property, so the same function is safe to call from both.
+//
+// I5 ruling (review): this function's sched_setaffinity syscall can run
+// with mp.locks != 0 at the newosproc call site (newm holds acquirem
+// across mp allocation and thread start) and at the BeforeFork call site
+// (BeforeFork increments gp.m.locks for the signal-blocking window this
+// runs inside). Accepted, not a Forbidden-list violation: the Forbidden
+// list's "no syscalls under sched.lock or with mp.locks != 0" rule
+// targets scheduler-hook syscalls that could contend with concurrent
+// scheduling state (numaNoteSchedule's own schedule()-hook rule); here,
+// signals are already blocked, no runtime lock is held, and the actual
+// fork/clone syscall is imminent on the same thread regardless -- the
+// same reasoning Task 9's own recorded ruling used to scope that same
+// Forbidden-list line to scheduler hooks specifically, not every
+// mp.locks!=0 context in the runtime.
 //
 //go:nosplit
-func numaWidenForFork(mp *m) {
+func numaWidenBeforeClone(mp *m) {
 	if _, ok := mp.numa.softAffinityNode(); !ok {
 		return // never soft-narrowed; nothing to undo
 	}

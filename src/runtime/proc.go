@@ -5286,11 +5286,11 @@ func syscall_runtime_BeforeFork() {
 	// placement to its own numaShouldConfine/numaNoteSchedule checks.
 	// Widen back to full before the fork/clone syscall runs (below,
 	// still in the syscall package) so the child inherits the correct,
-	// wide mask; see numaWidenForFork's doc comment (numa_linux.go).
+	// wide mask; see numaWidenBeforeClone's doc comment (numa_linux.go).
 	// Gated on goexperiment.Numa, a compile-time constant, so this
 	// dead-code-eliminates out of an experiment-off binary.
 	if goexperiment.Numa {
-		numaWidenForFork(gp.m)
+		numaWidenBeforeClone(gp.m)
 	}
 
 	// This function is called before fork in syscall package.

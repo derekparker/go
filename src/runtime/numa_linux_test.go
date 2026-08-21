@@ -190,7 +190,7 @@ func TestNUMASoftAffinity(t *testing.T) {
 		t.Skip("no sched_setaffinity plumbing on this arch")
 	}
 	got := runTestProg(t, "testprog", "NUMASoftAffinity", "GOMAXPROCS="+strconv.Itoa(runtime.NumCPU()))
-	narrowed, total, gomaxprocs := parseSoftAffinity(t, got)
+	narrowed, total, gomaxprocs, nodes := parseSoftAffinity(t, got)
 	if total == 0 {
 		t.Fatalf("no threads observed; output %q", got)
 	}
@@ -198,23 +198,85 @@ func TestNUMASoftAffinity(t *testing.T) {
 		t.Fatalf("narrowed=%d below gomaxprocs=%d (total=%d threads observed): soft affinity did not narrow every worker M to a single node; output %q",
 			narrowed, gomaxprocs, total, got)
 	}
+	// I2 (review): this is the assertion that actually catches C1's
+	// process-wide single-node collapse. Every prior check above only
+	// asks "is every M narrowed to *a* single node" -- which a total
+	// collapse onto one node satisfies just as well as a healthy spread
+	// across nodes does. Only checking that Ms collectively span more
+	// than one node distinguishes the two.
+	if len(nodes) <= 1 {
+		t.Fatalf("Ms collapsed onto %v (want >1 distinct node on a multi-node host): output %q", nodes, got)
+	}
 }
 
-func parseSoftAffinity(t *testing.T, out string) (narrowed, total, gomaxprocs int) {
+func parseSoftAffinity(t *testing.T, out string) (narrowed, total, gomaxprocs int, nodes []int) {
 	t.Helper()
 	for _, line := range strings.Split(out, "\n") {
 		if strings.HasPrefix(line, "softaffinity ") {
 			if strings.Contains(line, "SKIP") {
 				t.Skipf("probe skipped: %q", line)
 			}
-			if _, err := fmt.Sscanf(line, "softaffinity narrowed=%d total=%d gomaxprocs=%d", &narrowed, &total, &gomaxprocs); err != nil {
+			var nodesStr string
+			if _, err := fmt.Sscanf(line, "softaffinity narrowed=%d total=%d gomaxprocs=%d nodes=%s", &narrowed, &total, &gomaxprocs, &nodesStr); err != nil {
 				t.Fatalf("bad probe line %q: %v", line, err)
 			}
-			return narrowed, total, gomaxprocs
+			if nodesStr != "" {
+				for _, s := range strings.Split(nodesStr, ",") {
+					n, err := strconv.Atoi(s)
+					if err != nil {
+						t.Fatalf("bad node id %q in probe line %q: %v", s, line, err)
+					}
+					nodes = append(nodes, n)
+				}
+			}
+			return narrowed, total, gomaxprocs, nodes
 		}
 	}
 	t.Fatalf("no %q line in output %q", "softaffinity", out)
-	return 0, 0, 0
+	return 0, 0, 0, nil
+}
+
+// TestNUMASoftAffinityForkRegression (review I3) exercises the review
+// C1/fork-leak fix (numaWidenBeforeClone, numa_linux.go) directly: a
+// process narrows itself via soft affinity, then forks+execs a child
+// while narrowed. Before the fix, the child would inherit the parent's
+// narrowed CPU mask via fork(2)/clone(2) affinity inheritance; the fix
+// widens the forking M back to the full mask immediately before the
+// fork/exec syscall runs. This isolates the mechanism directly, rather
+// than depending on a GOEXPERIMENT=numa child re-declining confinement
+// as its downstream symptom (which is what originally caught the
+// os/exec case, per this task's own report).
+func TestNUMASoftAffinityForkRegression(t *testing.T) {
+	if runtime.NumaNumAllowedNodes() <= 1 {
+		t.Skip("not multi-node")
+	}
+	if !runtime.NumaHasSetAffinityForTest() {
+		t.Skip("no sched_setaffinity plumbing on this arch")
+	}
+	got := runTestProg(t, "testprog", "NUMASoftAffinityForkParent", "GOMAXPROCS="+strconv.Itoa(runtime.NumCPU()))
+	var parentPop, childPop, online int
+	found := false
+	for _, line := range strings.Split(got, "\n") {
+		if strings.HasPrefix(line, "forkchild ") {
+			if strings.Contains(line, "SKIP") || strings.Contains(line, "ERR") {
+				t.Fatalf("probe failed: %q", line)
+			}
+			if _, err := fmt.Sscanf(line, "forkchild parentpop=%d childpop=%d online=%d", &parentPop, &childPop, &online); err != nil {
+				t.Fatalf("bad probe line %q: %v", line, err)
+			}
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Fatalf("no %q line in output %q", "forkchild", got)
+	}
+	if parentPop >= online {
+		t.Fatalf("parent never actually narrowed (parentpop=%d >= online=%d); probe did not exercise the fix; output %q", parentPop, online, got)
+	}
+	if childPop != online {
+		t.Fatalf("child inherited a narrowed mask (childpop=%d, want online=%d): fork/clone affinity leak not fixed; output %q", childPop, online, got)
+	}
 }
 
 func parsePlacement(t *testing.T, out, label string) (aff int, mode int) {

@@ -63,12 +63,20 @@ func (s *mNUMAState) softAffinityNode() (node int8, ok bool) {
 // M's CPU affinity to node.
 func (s *mNUMAState) setSoftAffinityNode(node int8) { s.lastNode = node + 1 }
 
-// clearSoftAffinityNode resets lastNode to "never narrowed" (see
-// numaWidenForFork, numa_linux.go): after widening this M's real kernel
-// affinity back to full ahead of a fork, the cached node must be cleared
-// too, or the next numaNoteSchedule pass would see no change and skip
-// re-narrowing, silently leaving the M's actual affinity wide forever.
-func (s *mNUMAState) clearSoftAffinityNode() { s.lastNode = 0 }
+// clearSoftAffinityNode resets lastNode to "never narrowed" and
+// nextCheck to "always due" (M4, review) -- see numaWidenBeforeClone,
+// numa_linux.go: after widening this M's real kernel affinity back to
+// full ahead of a fork/clone, both caches must be cleared, or the next
+// numaNoteSchedule pass would either see no node change (lastNode stale)
+// or not even check yet (nextCheck stale, up to
+// numaSoftAffinityCheckInterval in the future) -- either way delaying or
+// skipping the re-narrow that keeps this M's actual affinity from
+// silently staying wide. Zeroing nextCheck makes the very next
+// schedule() pass due immediately (0 <= any real nanotime() reading).
+func (s *mNUMAState) clearSoftAffinityNode() {
+	s.lastNode = 0
+	s.nextCheck = 0
+}
 
 // softAffinityCheckDue reports whether now has reached this M's next
 // getcpu-check deadline.

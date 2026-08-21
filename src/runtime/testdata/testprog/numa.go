@@ -9,7 +9,9 @@ package main
 import (
 	"fmt"
 	"os"
+	"os/exec"
 	"runtime"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -23,6 +25,8 @@ func init() {
 	register("NUMAStandDown", NUMAStandDown)
 	register("NUMAStandDownDefaultGOMAXPROCS", NUMAStandDownDefaultGOMAXPROCS)
 	register("NUMASoftAffinity", NUMASoftAffinity)
+	register("NUMASoftAffinityForkChild", NUMASoftAffinityForkChild)
+	register("NUMASoftAffinityForkParent", NUMASoftAffinityForkParent)
 }
 
 // getMempolicySyscall: get_mempolicy(2) numbers differ per arch.
@@ -104,14 +108,34 @@ func NUMAStandDownDefaultGOMAXPROCS() {
 // NUMASoftAffinity probes node-mask soft affinity (design §12.4, task
 // 10): it spawns GOMAXPROCS CPU-bound, OS-thread-locked goroutines to
 // force genuine concurrent use of every CPU the process is allowed to
-// run on, runs them for a bounded duration (each yielding periodically
-// via runtime.Gosched, so its M passes through schedule() -- where
-// numaNoteSchedule's hook lives -- many times), then walks
+// run on, runs them for a bounded duration, then walks
 // /proc/self/task/*/status and classifies each thread's
 // Cpus_allowed_list against /sys/devices/system/node/nodeN/cpulist:
 // "narrowed" if every CPU in the mask belongs to the same single NUMA
 // node, unnarrowed otherwise (spans >1 node, e.g. a thread that never
 // ran user code, such as sysmon).
+//
+// M1 (review): despite each goroutine calling runtime.Gosched() in a
+// loop, that does NOT give numaNoteSchedule "many" chances to run per
+// M, as an earlier version of this comment claimed. LockOSThread sets
+// mp.lockedg synchronously (dolockOSThread), and schedule()'s very
+// first check -- "if mp.lockedg != 0 { stoplockedm(); execute(...) }"
+// -- takes a fast path that bypasses numaNoteSchedule entirely whenever
+// that is true. So each spawned goroutine gets exactly ONE
+// numaNoteSchedule opportunity: the schedule() pass that first runs it,
+// BEFORE it reaches its own runtime.LockOSThread() call inside the
+// goroutine body. Every later Gosched() in that goroutine's loop
+// reschedules via the lockedg fast path and never touches the hook
+// again. This is sufficient for what this probe checks (did each M get
+// narrowed to *some* single node at least once) but does NOT exercise
+// re-narrowing on a later migration -- and it is exactly why an earlier,
+// less thorough version of this test could not have caught review C1
+// (see I2 below): one narrowing opportunity per M, spread across
+// GOMAXPROCS goroutines by wherever the OS scheduler happened to first
+// run each one, still passes a check that only asks "is every M
+// narrowed to *a* single node", never "do Ms collectively span more
+// than one" -- which is exactly what C1's process-wide collapse onto
+// one node would satisfy too.
 //
 // Run with GOMAXPROCS set by the test to a value LARGER than any single
 // node's CPU count, so fill-one-socket confinement (Workstream A) never
@@ -119,7 +143,10 @@ func NUMAStandDownDefaultGOMAXPROCS() {
 // same way TestNUMAConfineSkipsNarrowedAffinity isolates confinement
 // from Layer 1.
 //
-// Prints one line: "softaffinity narrowed=<N> total=<M> gomaxprocs=<P>".
+// Prints one line: "softaffinity narrowed=<N> total=<M> gomaxprocs=<P>
+// nodes=<comma-separated distinct node ids seen>" (I2, review: the
+// distinct-node list is the assertion that actually catches C1's
+// single-node collapse -- a passing narrowed count alone does not).
 func NUMASoftAffinity() {
 	nodeOf := readNodeCPUMap()
 	if len(nodeOf) == 0 {
@@ -144,8 +171,14 @@ func NUMASoftAffinity() {
 				}
 				// CPU-bound work (forces real concurrent CPU use
 				// across nodes) interleaved with allocation churn
-				// and an explicit yield (forces a schedule() pass
-				// on this M every iteration).
+				// and an explicit yield. See the M1 doc note above:
+				// once this goroutine's own LockOSThread call above
+				// has run, Gosched here no longer reaches
+				// numaNoteSchedule -- it just keeps this M's CPU
+				// genuinely busy so the OS scheduler's initial
+				// placement (this M's one narrowing opportunity,
+				// already past by this point) had real concurrent
+				// load to spread across nodes.
 				buf := make([]byte, 4096)
 				for j := range buf {
 					buf[j] = byte(j)
@@ -163,8 +196,12 @@ func NUMASoftAffinity() {
 	close(stop)
 	wg.Wait()
 
-	narrowed, total := probeThreadAffinity(nodeOf)
-	fmt.Printf("softaffinity narrowed=%d total=%d gomaxprocs=%d\n", narrowed, total, n)
+	narrowed, total, nodes := probeThreadAffinity(nodeOf)
+	nodeStrs := make([]string, len(nodes))
+	for i, nd := range nodes {
+		nodeStrs[i] = strconv.Itoa(nd)
+	}
+	fmt.Printf("softaffinity narrowed=%d total=%d gomaxprocs=%d nodes=%s\n", narrowed, total, n, strings.Join(nodeStrs, ","))
 }
 
 // readNodeCPUMap reads /sys/devices/system/node/node*/cpulist and
@@ -233,11 +270,20 @@ func parseCPUList(s string) []int {
 // all belong to a single NUMA node (per nodeOf); total counts every
 // thread whose status could be read (a thread can exit between the
 // directory listing and the read -- that one is simply skipped, not
-// counted as unnarrowed).
-func probeThreadAffinity(nodeOf map[int]int) (narrowed, total int) {
+// counted as unnarrowed). distinctNodes is the sorted, de-duplicated
+// list of every node id seen among narrowed threads -- I2 (review): an
+// earlier version of this function computed this same per-thread `nodes`
+// set and then threw it away, checking only len(nodes)==1 per thread;
+// that is exactly why the original test could not distinguish "every M
+// individually narrowed to *a* node, healthily spread across the
+// machine" from review C1's "every M individually narrowed to *a*
+// node -- the SAME one, process-wide collapse". Callers must check
+// len(distinctNodes) > 1 on a multi-node host to actually catch that.
+func probeThreadAffinity(nodeOf map[int]int) (narrowed, total int, distinctNodes []int) {
+	seen := map[int]bool{}
 	entries, err := os.ReadDir("/proc/self/task")
 	if err != nil {
-		return 0, 0
+		return 0, 0, nil
 	}
 	for _, e := range entries {
 		data, err := os.ReadFile("/proc/self/task/" + e.Name() + "/status")
@@ -263,7 +309,93 @@ func probeThreadAffinity(nodeOf map[int]int) (narrowed, total int) {
 		}
 		if len(nodes) == 1 {
 			narrowed++
+			for nd := range nodes {
+				seen[nd] = true
+			}
 		}
 	}
-	return narrowed, total
+	for nd := range seen {
+		distinctNodes = append(distinctNodes, nd)
+	}
+	sort.Ints(distinctNodes)
+	return narrowed, total, distinctNodes
+}
+
+// NUMASoftAffinityForkParent probes the fork/clone affinity-leak fix
+// directly (review I3, numaWidenBeforeClone in numa_linux.go): waits
+// for its own (single, unlocked -- main's M is never LockOSThread'd, so
+// every Gosched here does reach numaNoteSchedule, unlike NUMASoftAffinity's
+// worker goroutines; see that function's M1 doc note) M to be
+// soft-affinity-narrowed to some node (polls its own affinity popcount
+// until it is below the online CPU count), then forks+execs a child
+// (os/exec, re-invoking this same binary as NUMASoftAffinityForkChild)
+// while still narrowed, and reports the child's own affinity popcount.
+// If numaWidenBeforeClone's pre-fork widen did not run, the child would
+// inherit the parent's narrowed mask via fork(2)/clone(2) affinity
+// inheritance and report a popcount well below the online CPU count,
+// same as syscall_runtime_BeforeFork's own os/exec case -- this test
+// isolates the same mechanism directly rather than depending on a
+// GOEXPERIMENT=numa child re-declining confinement as its symptom.
+//
+// Prints one line: "forkchild parentpop=<N> childpop=<M> online=<P>".
+func NUMASoftAffinityForkParent() {
+	online := runtime.NumCPU()
+	var parentPop int
+	narrowed := false
+	deadline := time.Now().Add(2 * time.Second)
+	for time.Now().Before(deadline) {
+		runtime.Gosched()
+		if pop, ok := ownAffinityPopcount(); ok && pop > 0 && pop < online {
+			parentPop = pop
+			narrowed = true
+			break
+		}
+		time.Sleep(2 * time.Millisecond)
+	}
+	if !narrowed {
+		fmt.Println("forkchild SKIP parent never narrowed")
+		return
+	}
+	out, err := exec.Command(os.Args[0], "NUMASoftAffinityForkChild").CombinedOutput()
+	if err != nil {
+		fmt.Printf("forkchild ERR exec failed: %v: %s\n", err, out)
+		return
+	}
+	childPop := -1
+	for _, line := range strings.Split(string(out), "\n") {
+		if rest, ok := strings.CutPrefix(line, "childpop="); ok {
+			fmt.Sscanf(rest, "%d", &childPop)
+		}
+	}
+	fmt.Printf("forkchild parentpop=%d childpop=%d online=%d\n", parentPop, childPop, online)
+}
+
+// NUMASoftAffinityForkChild prints its own affinity popcount as
+// "childpop=<N>"; invoked as a subprocess by NUMASoftAffinityForkParent.
+func NUMASoftAffinityForkChild() {
+	pop, ok := ownAffinityPopcount()
+	if !ok {
+		fmt.Println("childpop=-1")
+		return
+	}
+	fmt.Printf("childpop=%d\n", pop)
+}
+
+// ownAffinityPopcount returns the popcount of the calling process's
+// current CPU affinity mask (sched_getaffinity, self).
+func ownAffinityPopcount() (int, bool) {
+	var buf [1024]byte
+	n, _, errno := syscall.RawSyscall(syscall.SYS_SCHED_GETAFFINITY,
+		0, uintptr(len(buf)), uintptr(unsafe.Pointer(&buf[0])))
+	if errno != 0 {
+		return 0, false
+	}
+	pop := 0
+	for _, b := range buf[:n] {
+		for b != 0 {
+			b &= b - 1
+			pop++
+		}
+	}
+	return pop, true
 }
