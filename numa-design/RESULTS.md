@@ -3017,3 +3017,85 @@ This rerun also produced the strongest, least fragile version of the phase-shift
 
 **Combining the three sweeps — relabeled per audit as "cross-configuration," not a single-effect-size estimate:** the three phase-shift sweeps differ in build (original: Layer 0+1+2; L1-only: a scratch L1-only patch; this rerun: post-Task-6 HEAD, genuinely Layer 0+1), `GOMAXPROCS` (128/128/256), and phase-loop code (this rerun added `-numamaps`, which the primary set structurally excludes, but the phase-timing loop itself changed shape to accommodate it). Fisher's method combining the three sweeps' primary Mann-Whitney U p-values (original p=0.0288, L1-only p=0.0232, this rerun p=8.176×10⁻⁶): χ²(df=6) = 38.05, combined p = **1.10×10⁻⁶** (closed-form regularized incomplete gamma for even df, not scipy — this host has none, matching every other exact-test computation in this file). **What this combination actually establishes is narrower than "the shipping configuration's effect is this certain": it answers "a C-faster-than-B effect exists in at least one of these three configurations," not a single pooled effect-size claim across a heterogeneous set.** This rerun alone carries the overwhelming majority of that combined evidence — **23.4 of the total 38.05 χ²** — and is independently conclusive on its own (p=8.18×10⁻⁶, all four robustness tests significant, GOMAXPROCS=256/Layer-0+1-only, the configuration closest to what would actually ship) without leaning on the other two sweeps at all. One further caveat, present in all three sweeps equally and not resolved by combining them: all three share the same benchmark program, whose own perfect-locality reference arm (arm A, `numactl --cpunodebind=0 --membind=0`, established in the original sweep) is the *slowest* of all three arms at a flat single-controller ceiling — a benchmark-specific artifact of this design (readers and memory both confined to one controller for the whole run), not evidence about locality in general. Three sweeps of the same benchmark corroborate that this benchmark's C-vs-B effect is real and repeatable; they do not, by themselves, generalize the finding beyond this specific synthetic workload.
 
+## Workstream B gate battery (PARTIAL — paused by user)
+
+Task 11 (plan `2026-08-20-numa-v3-locality-plan.md:1334`), the unit's single
+verdict, started at HEAD `ce4b564d8f` (local and remote in sync, remote tree
+already built at this SHA). **Session paused by the user after Step 1
+completed; Steps 2-4 (hard gates, IMC decision gate, pathology reruns) have
+not run.** This section records only what actually ran; nothing below is
+extrapolated or predicted for the remaining steps. Resume from Task 11 Step
+2. Raw evidence archived under `numa-design/bench-data/ws-b-gates/` (see
+`PARTIAL-STATE.md` there for exact resume instructions and remote-host
+state).
+
+### Step 1 — pinned routing proof (design §12.4; gates everything else)
+
+Per the plan's mandatory validation order: prove routing correctness with
+externally pinned threads before any unpinned measurement. Harness:
+`numa-design/bench-data/ws-b-gates/routing-probe.go`, a standalone
+single-file program (no go.mod, built directly with `go build`, same
+technique as the Workstream A gate battery's off-binary census canary) —
+`GOMAXPROCS` goroutines each allocate-and-touch (write + read-back XOR
+checksum, forcing genuine read/write DRAM traffic, not allocate-and-drop) a
+stream of 4/8/16/32 KiB objects for a fixed total volume (objects are not
+retained past one loop iteration, so live-set/RSS stays small regardless of
+total volume while still exercising `mheap.grow` and `mcentral` refill at a
+realistic rate), then reads `/numa/span-refills/{local,remote}:spans` via
+`runtime/metrics` at exit and prints the local share.
+
+Built with `GOEXPERIMENT=numa` from the in-sync `ce4b564d8f` tree
+(`go version -m`: `go1.28-devel_ce4b564d8f Fri Aug 21 09:40:09 2026 -0700
+X:numa`, archived `probe-on-govm.txt`). Run as two halves, `numactl
+--cpunodebind=0` and `--cpunodebind=1` (no `--membind` — memory placement is
+exactly what this probe measures), `GOMAXPROCS=128`, `-totalmb=2048`:
+
+```
+$ ssh numa-dell 'numactl --cpunodebind=0 env GOMAXPROCS=128 /tmp/pb/routing-probe/probe-on -totalmb=2048'
+gomaxprocs=128 local=93329 remote=0 total=93329 local_share=100.0000%
+
+$ ssh numa-dell 'numactl --cpunodebind=1 env GOMAXPROCS=128 /tmp/pb/routing-probe/probe-on -totalmb=2048'
+gomaxprocs=128 local=94346 remote=432 total=94778 local_share=99.5442%
+```
+
+**Requirement:** local share ≥95% in each half. **Result: node 0 half
+100.0000%, node 1 half 99.5442% — both PASS**, well clear of the bar. The
+node 1 half's 432 remote refills (out of 94,778, 0.46%) are consistent with
+the documented pre-topology-discovery fallback window (`mheap.go:166`:
+`numaGrowNode`/`numaCurrentNode` return node 0 before topology discovery
+completes — a brief boot-time window on a node-1-pinned process would
+misroute a handful of very early refills to node 0, read back as "remote"
+against the node-1-pinned process), not a routing defect; node 0's 0 remote
+count is consistent with that same fallback since node 0 is also the
+fallback default, so a node-0-pinned process's pre-discovery allocations are
+never misclassified.
+
+**heapArena.node distribution corroboration:** not captured this session
+(no exported test-only accessor exists for external sampling outside the
+runtime test binary — see `src/runtime/export_numa_test.go`, which has no
+`NumaArenaNode`-shaped export; adding one would be a code change, out of
+scope for a pure-validation task). The `/numa/span-refills` counters above
+are the routing-correctness evidence actually gathered; a `/proc/self/numa_maps`
+N0=/N1= placement cross-check (the technique Task 12's phase-shift study
+used) was planned as a substitute corroboration but not yet run — carried to
+the resumed session.
+
+**Verdict: PASS.** Routing is correct under external pinning in both
+directions. Per the plan's stop rule ("FAIL → fix routing before any
+unpinned measurement"), this clears the gate for Step 2 to proceed once
+work resumes.
+
+### Steps 2-4 — not started
+
+Hard gates (1P json, 1P alloc micro, 256P json, RSS, vmstat 0/0, off-binary
+census), the IMC decision gate (the plan's pre-registered primary,
+`2026-08-20-numa-v3-locality-plan.md:1340` / "Workstream B go/no-go (Task
+7)" above), and the pathology candidate reruns have not run. No numbers,
+verdicts, or predictions for these are recorded here or anywhere else —
+per this plan's own discipline against fabricating or extrapolating
+unmeasured results.
+
+Session end (paused, not a natural stopping point in the plan): `kernel.numa_balancing = 1`
+(confirmed), no orphaned processes left on `numa-dell`, remote tree
+unmodified and in sync with local HEAD at `ce4b564d8f`.
+

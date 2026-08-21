@@ -1,0 +1,14 @@
+/tmp/pb/routing-probe/probe-on: go1.28-devel_ce4b564d8f Fri Aug 21 09:40:09 2026 -0700 X:numa
+	path	command-line-arguments
+	build	-buildmode=exe
+	build	-compiler=gc
+	build	DefaultGODEBUG=netmarshal=0
+	build	CGO_ENABLED=1
+	build	CGO_CFLAGS=
+	build	CGO_CPPFLAGS=
+	build	CGO_CXXFLAGS=
+	build	CGO_LDFLAGS=
+	build	GOARCH=amd64
+	build	GOEXPERIMENT=numa
+	build	GOOS=linux
+	build	GOAMD64=v1
