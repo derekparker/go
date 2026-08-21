@@ -1,0 +1,34 @@
+Task 10 review NEW-1 hardware verification: cgo-build distinct-node check
+Host: numa-dell (2 nodes, 128 CPUs each, 256 total), SHA 68b2a56c91.
+
+NEW-1 (Important): on cgo builds, newm1's cgo branch (asmcgocall(
+_cgo_thread_start,...) -> pthread_create) never reaches newosproc, so
+the original C1 fix (which only widened before newosproc's clone(2)
+call) never covered cgo-built binaries -- pthread_create shares
+clone(2)'s CPU-affinity-inheritance semantics, so the same
+self-reinforcing single-node collapse was fully intact there.
+
+Verification binary: a standalone scratch program (/tmp/numa10_cgo_hw/
+main.go, not part of the committed diff) that imports "C" and calls a
+trivial C function (forcing genuine cgo linkage -- confirmed via `file`:
+"dynamically linked", unlike a pure-Go static binary) and otherwise
+mirrors testprog's NUMASoftAffinity probe: GOMAXPROCS locked worker
+goroutines doing CPU-bound + allocation churn, then a
+/proc/self/task/*/status Cpus_allowed_list walk.
+
+Command (reviewer's exact distinct-node check, against the cgo binary):
+  GODEBUG=numa=1 GOMAXPROCS=256 ./cgo_hw_check.exe &
+  PID=$!
+  sleep 1.5
+  for t in /proc/$PID/task/*/status; do grep -h Cpus_allowed_list "$t"; done | sort | uniq -c
+
+Result (post-NEW-1-fix, numaWidenBeforeClone hoisted to the top of
+newm1, covering both its clone(2) and pthread_create branches):
+    124 Cpus_allowed_list:	<node 0's 128 CPUs>
+    134 Cpus_allowed_list:	0-255              (unnarrowed: sysmon, template thread, etc.)
+    132 Cpus_allowed_list:	<node 1's 128 CPUs>
+stdout tail: "cgo-softaffinity narrowed=276 total=400 gomaxprocs=256 nodes=0,1 iscgo-forced=true"
+
+PASS: masks from BOTH nodes present on the cgo-enabled binary, roughly
+balanced (124 vs 132) -- the same healthy spread the non-cgo hardware
+check showed post-C1-fix, now confirmed for the cgo path too.
