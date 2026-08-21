@@ -2808,3 +2808,82 @@ Raw data archived under `numa-design/bench-data/ws-a-l2removal/`: per-round `.vm
 2. `strace -c`'s summary count (1713 mbind) and the full-trace completed-call count (1738) disagree by 25; not investigated further than noting the same class of `-f`-under-thread-churn artifact Gate 4 already diagnosed and corrected for. Does not affect the qualitative finding (100% BIND, 0% PREFERRED in either count).
 3. `bind-all-policy.md` (Task 5) still describes the confined-1P Gate-4 mbind breakdown as "11 BIND + 11 PREFERRED — Layer 2 still in-tree at report time" — accurate when written, now stale now that Layer 2 is removed. Not touched by this task (out of its stated file scope); flagged per Task 5's own report, which anticipated exactly this follow-up.
 
+---
+
+## Workstream B go/no-go (Task 7)
+
+Date: 2026-08-20. HEAD at decision time: `53d631efd7` ("numa-design: update bind-all-policy for Layer 2 removal"), immediately following the Layer 2 removal + confirmation sweep recorded above (`4b13232e3c`, confirmation sweep same session).
+
+### Decision: **GO for Workstream B**
+
+Tasks 8–11 (design §12.3–§12.4: per-node arena streams / `heapArena.node`, per-node mcentral spanSets, node-mask soft affinity) are authorized to proceed as **one gated unit**, per the plan's own framing (§12.1, three-ingredient rule — see below). This is not a rubber stamp of the plan's default path; the reasoning is laid out in full because the case for Workstream B is a narrower one than "Workstream A won, so continue," and the data supports it on that narrower ground.
+
+### Input 1 — the plan's stated entry condition is met
+
+The plan (`2026-08-20-numa-v3-locality-plan.md:1240`) sets Workstream B's entry condition as: "Workstream A shipped its gates, or A's candidate results show a remaining C-vs-A/C-vs-B gap for node-exceeding processes that justifies the cost." The first branch holds outright:
+
+- **Workstream A gate battery — SHIP.** All 8 pre-declared gates PASS (hard gates 1–5, 8; decision gates 6–7), see "Overall verdict: Workstream A gate battery" above.
+- **Layer 2 removal + confirmation sweep confirms the win survives.** `x/benchmarks/garbage`, B vs C (post-removal, confinement alone), GOMAXPROCS=128, n=15: **C beats B by -33.13%** (p=0.000), with clean 16/16-round mechanism validity and a direct in-sweep `Cpus_allowed_list` confinement observation (not a pilot proxy — see "Layer 2 removal + confirmation sweep" above). This is a wider margin than the original Gate 6 result (-29.61%, with Layer 2 still active) and the two figures' closeness (attributed to ordinary between-session B-arm variance, not to Layer 2 being mildly harmful) reads as **complete separation** between B and C on this workload across every session this plan has run.
+
+So the condition is met on its own terms: Workstream A shipped, cleanly, with every gate passing and the confinement win independently reproduced after Layer 2's removal.
+
+### Input 2 — what Workstream A does *not* cover, and why that is the actual reason to proceed
+
+Meeting the plan's entry condition is necessary but not sufficient to justify Workstream B's cost; the honest question is what problem remains unsolved. Workstream A's confinement mechanism (`numaConfineIfSmall`) engages under a narrow condition: `GOEXPERIMENT=numa`, multi-node, GOMAXPROCS **explicitly set** (`sched.customGOMAXPROCS`), no pre-existing narrowed affinity, and GOMAXPROCS ≤ one node's CPU count (design §12.2, plan intro line 7). Outside that window — default GOMAXPROCS, or GOMAXPROCS greater than a single node's CPU count (e.g. GOMAXPROCS=256 on numa-dell's 2-node/256-CPU box) — confinement never fires (Gate 4(a): 0 `sched_setaffinity` calls at 256P, by design) and the process runs on **Layer 1 BIND-all alone**.
+
+That general, node-exceeding case is not a theoretical gap. The single-session three-arm sweep ("Single-session three-arm candidate 1 sweep" above) measured it directly: at GOMAXPROCS=128 on `x/benchmarks/garbage`, **both** C-full (Layer 0+1+2) and C-L1 (Layer 0+1 alone) regress against stock B by **+5.17%/+5.24% (both p=0.001, n=15)**, statistically indistinguishable from each other (C-full vs C-L1, p=0.838). The mechanism is understood, not just observed: BIND-all's uniform arena `mbind` exempts the heap VMA from the kernel's NUMA balancer (that is Layer 1's entire point — RESULTS.md Layer 1 promotion evidence, garbage vmstat), but the balancer was doing real, beneficial work on stock B — convergent migration of hot pages toward the threads touching them — that BIND-all suppresses and nothing in Workstream A replaces. For the general-unpinned case, Workstream A trades away a working mechanism (the balancer) for a strictly better one only when confinement can engage; when it can't, the trade is pure loss, measured at a real, well-powered ~5% throughput cost (plus a corroborating ~6–7% CPU-time penalty) with p=0.001 — not a rounding-noise result.
+
+**This is the actual motivation for Workstream B: not the residual gap in A's own gates (see Input 5), but the fact that A's fix has a hole exactly the size of "GOMAXPROCS unset, or a process bigger than one node" — which on real deployments is the common case, not the edge case.**
+
+### Input 3 — the three-ingredient rule and the Layer-2 null are why B must be one gated unit, not another homing-only step
+
+Design §12.1 states plainly: locality requires (a) memory **homed** per node, (b) refill-time **routing** so a thread is fed spans homed where it runs, and (c) **threads that stay put** long enough for (b) to still hold at use time — "any proper subset is expected to measure ~zero." This plan already ran that experiment once. Layer 2 (PREFERRED-at-grow) was ingredient (a) alone, and its own decision gate — the same IMC remote-DRAM-share metric Task 11 pre-registers below — measured **+0.10% / -0.07% relative change**, against a required ≥10% relative *drop* ("Layer 2 gate (v2)", Gate 6 — IMC locality, above): homing alone did not move the needle, in either direction, across two independent triplicate `perf stat` sets. Layer 2 was subsequently proven behaviorally inert outright by the three-arm sweep (C-full vs C-L1, p=0.838) and removed on that basis (Task 6).
+
+That null is the reason Workstream B is scoped as Tasks 8–10 building all three ingredients (per-node arena streams for (a), per-node mcentral refill routing for (b), soft node affinity from `schedule()` for (c)) with **nothing merging until Task 11's combined gates pass as one unit** (plan line 1240). Re-attempting homing alone, or homing plus routing without thread stability, would just be Layer 2's experiment again with extra steps — the data already answers that question. The IMC ≥10% relative-drop gate (Task 11 Step 3) is the direct successor to the metric that killed Layer 2, now measured with all three ingredients present instead of one; that is what makes Task 11's verdict a real test rather than a repeat of a known-negative result.
+
+### Input 4 — risks recorded before Workstream B's code lands
+
+- **This is the largest runtime change in the series.** Tasks 8–10 touch `mheap.go`, `malloc.go` (arena hints), `numa_linux.go`, and the mcache/mcentral refill path — surfaces every prior layer (0/1/2, confinement) deliberately avoided. Workstream A's own off-binary census (Gate 8) already shows how sensitive this codebase is to new package-level state (a benign but real data-address shift from Workstream A's confinement globals); Workstream B's surface area is larger by a wide margin.
+- **Per-node mcentral spanSets footprint.** Design §12.3's sketch implies per-node span-set state; per the plan's own Task 8 framing this must be **build-tagged** (`goexperiment.numa`) — an un-tagged version would add on the order of ~180KB to every binary's BSS regardless of whether the experiment is compiled in, which is not acceptable per the plan's off-experiment-must-collapse-to-today's-shape requirement (design §12.3, "with the experiment off the node argument is a constant and the code collapses to today's shape"). This is a build-tag discipline item to verify explicitly at Task 8, not an open question — it will be build-tagged; recorded here as the risk that makes it worth stating rather than assuming.
+- **Struct/layout constraints.** `heapArena.node` (one `node uint8` field, design §12.3) and any per-P/per-M routing state added for ingredient (b)/(c) must preserve `sizeof` off-experiment, the same discipline Task 3 already established and Gate 8 verified for `mNUMAState` (empty-struct/zero-size when `!goexperiment.numa`). Workstream B has more types touching this constraint than any prior task.
+- **The v2 forbidden list stays binding.** The plan's Global Constraints (line 80) prohibit "anything on the v2 forbidden list; no `p.numaNode`-by-index; no flush" — carried forward unchanged into Workstream B, which is exactly the territory (per-P routing) where those prohibitions matter most.
+- **Stop rules apply per task**, same as Workstream A: a hard-gate FAIL at any of Tasks 8–10 stops that task; Task 11's combined verdict (pinned routing proof first, per design §12.4's validation order, then hard gates, then the IMC decision gate) is the only thing that can merge the unit, and a Step 3 IMC FAIL requires the verdict to state the routing-local ratio so a "routing broken" failure can be distinguished from "routing works, hardware can't show it" (plan line 1347).
+
+### Input 5 — what is explicitly *not* the motivation
+
+Workstream A's own decision gates (6–7) reported a residual: candidate 1's paired sign test found C slower than the pinned oracle A in 12 of 15 rounds (p=0.035), bounding — not excluding — a small C-vs-A gap at ≤+8.3% (95% CI upper bound); candidate 2's equivalent bound was tighter, ≤+5.15%. **This bounded residual is not why Workstream B is being started.** It is a small, honestly-reported uncertainty band around an already-passing non-inferiority gate, on workloads where confinement engages at all. Chasing it down with Workstream B's much larger, riskier change would be solving the wrong problem — the residual only exists inside the window where GOMAXPROCS ≤ one node's CPUs, i.e. exactly where confinement already works and delivers 96–108% of the pinned-oracle gap. The real problem — the one Workstream B actually targets — is the general-unpinned/node-exceeding case from Input 2, where there is no bounded residual to argue about because confinement never engages and the measured cost is a real, unambiguous +5% regression against stock, not a same-mechanism rounding difference.
+
+### Task 11 pre-registration (per plan line 1244, committed before any Workstream B code lands)
+
+Primary metric: **IMC remote-DRAM-miss share**, identical protocol to Layer 2's Gate 6 and Workstream A's evidence base —
+
+```
+perf stat -x, -e mem_load_l3_miss_retired.local_dram,mem_load_l3_miss_retired.remote_dram -- \
+  env GOMAXPROCS=256 ./json -benchmem=512 -benchnum=1 -benchtime=10s
+```
+
+computed as `remote / (local + remote)`, ≥3 interleaved runs per arm, medians compared experiment-on vs experiment-off. **Pass:** ≥10% relative drop (e.g. 0.48 → ≤0.432) — the same bar Layer 2 failed at +0.10%/-0.07%. Corroborating signal: `/numa/span-refills:local`/`:remote` from the same runs. Validation order is mandatory (design §12.4, plan Task 11 Step 1): pinned routing proof (`numactl --cpunodebind` per half, ≥95% local refills required) **before** any unpinned measurement — this isolates routing correctness from placement stability and must pass before the IMC gate is run at all. This pre-registration is recorded now, in this commit, before Task 8's first line of code.
+
+### Workstream C sequencing
+
+Per the plan's independence note (line 1355, "Tasks 12 and 13 may run in parallel with Workstream A (different files)"), Workstream C's cheap, low-risk tasks are sequenced **before/alongside** Workstream B's heavy tasks rather than after them, since they touch disjoint files and carry no dependency on Workstream B's outcome:
+
+- **Task 12** (phase-shift attribution rerun, n=20, pre-registered Spearman correlation on H-bandwidth vs H-faulttax) — settles a mechanism question about an already-collected result; no code dependency on Tasks 8–11.
+- **Task 13** (`getcpu` asm for remaining Linux arches) — pure enablement, touches only per-arch `.s` files and the `numa_linux_getcpu*.go` build tags; explicitly widens what confinement *could* target on other arches (still gated by `numaHasSetAffinity` until per-arch `SYS_SCHED_SETAFFINITY` constants land).
+- **Task 15** (dynamic cpuset staleness documentation) — a doc-only addition to `bind-all-policy.md`; no code at all.
+- **Task 14** (rseq/vDSO getcpu) stays **profile-gated**, per the plan's explicit adoption gate (line 1394): its implementation half does not start until a CPU profile from Workstream B's own Task 11 Step 1 pinned run shows `getcpu` ≥1% of cycles in refill/scheduler-pass paths. Task 14's research half (the one-page rseq/vDSO note) may proceed independently at any time, but the implementation is contingent on Workstream B producing that profile — it cannot be pulled forward.
+
+This ordering lets Workstream C's low-risk, high-certainty items land immediately while Workstream B's larger, riskier surface is built and gated on its own schedule.
+
+### Summary table
+
+| Input | Finding |
+|---|---|
+| Entry condition (plan line 1240) | MET — Workstream A gate battery SHIP (8/8 gates); Layer 2 removal confirmation sweep -33.13% B-vs-C, complete separation |
+| Coverage gap Workstream A leaves | Confinement is GOMAXPROCS-explicit-and-≤-node-CPUs only; general/node-exceeding case runs Layer-1-only, measured **+5.17%/+5.24% regression vs stock (p=0.001, n=15)** |
+| §12.1 three-ingredient rule | Layer 2 (ingredient (a) alone) measured IMC +0.10%/-0.07% — a proper subset is ~zero, exactly as predicted; Workstream B is ingredients (a)+(b)+(c) as ONE gated unit, Task 11 verdict only |
+| Task 11 primary metric | IMC remote-DRAM share, ≥10% relative drop, pre-registered above before any code lands |
+| Risks | Largest runtime change in the series; per-node mcentral spanSets must be build-tagged (no un-tagged ~180KB BSS); struct/layout `sizeof` discipline; v2 forbidden list binding; per-task stop rules |
+| NOT the motivation | Workstream A's bounded C-vs-A residual (≤+8.3%/≤+5.15%) — small, already inside its non-inferiority gate, and confined to the window where confinement already works |
+| Workstream C sequencing | Tasks 12/13/15 run before/alongside Workstream B (disjoint files, no dependency); Task 14 implementation stays profile-gated on Workstream B's own Task 11 profile |
+
