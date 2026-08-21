@@ -21,16 +21,23 @@
 //
 // Usage:
 //
-//	./phase-shift [-heap=6144] [-readers=64] [-phase=30s] [-phases=4]
+//	./phase-shift [-heap=6144] [-readers=64] [-phase=30s] [-phases=4] [-numamaps=PREFIX]
 //
 // Prints one line to stdout when the run completes:
 //
 //	BenchmarkPhaseChase 1 <ns/read> ns/op
+//
+// -numamaps=PREFIX additionally snapshots /proc/self/numa_maps at the
+// start, midpoint, and end of every phase, for offline node-placement
+// analysis (Task 12, numa-design/RESULTS.md). Runs using this flag add a
+// few extra syscalls/file writes to the coordinator goroutine and should
+// not be pooled with unflagged runs in the primary ns/read comparison.
 package main
 
 import (
 	"flag"
 	"fmt"
+	"io"
 	"os"
 	"runtime"
 	"sync"
@@ -47,6 +54,12 @@ var (
 	numPhases  = flag.Int("phases", 4, "number of alternating-node phases")
 	procs      = flag.Int("procs", 0, "GOMAXPROCS (0 = runtime default)")
 	verbose    = flag.Bool("v", false, "log phase transitions and pin failures")
+	numamaps   = flag.String("numamaps", "", "if set, snapshot /proc/self/numa_maps at the start, "+
+		"midpoint, and end of every phase to <prefix>-phase<k>-{start,mid,end}.numamaps. "+
+		"Snapshotting happens only in the coordinator goroutine, between phase-timer sleeps -- "+
+		"never in the reader hot loop -- but still costs a few syscalls/file writes per phase, "+
+		"so runs using this flag are kept out of the primary ns/read comparison (Task 12 "+
+		"pre-registration).")
 )
 
 const ringCount = 4096
@@ -151,7 +164,7 @@ func main() {
 		}(i)
 	}
 
-	fmt.Fprintf(os.Stderr, "Running %d phases x %.0fs (noop-pin=%v)...\n", *numPhases, *phaseSec, noopPin)
+	fmt.Fprintf(os.Stderr, "Running %d phases x %.0fs (noop-pin=%v numamaps=%q)...\n", *numPhases, *phaseSec, noopPin, *numamaps)
 	t0 := time.Now()
 	for p := 0; p < *numPhases; p++ {
 		target := p % 2
@@ -159,7 +172,16 @@ func main() {
 		if *verbose {
 			fmt.Fprintf(os.Stderr, "  phase %d: pin readers to node%d\n", p, target)
 		}
-		time.Sleep(time.Duration(*phaseSec * float64(time.Second)))
+		snapshotNumaMaps(*numamaps, p, "start")
+		// Split the phase sleep into thirds so a mid-phase snapshot is
+		// possible without changing the total phase duration.
+		full := time.Duration(*phaseSec * float64(time.Second))
+		third := full / 3
+		time.Sleep(third)
+		snapshotNumaMaps(*numamaps, p, "mid")
+		time.Sleep(third)
+		snapshotNumaMaps(*numamaps, p, "end")
+		time.Sleep(full - 2*third)
 	}
 	elapsed := time.Since(t0)
 	close(done)
@@ -181,6 +203,37 @@ func main() {
 	// here previously collapsed every round to exactly 1 or 2, destroying
 	// all variance and making the metric useless to benchstat.
 	fmt.Fprintf(os.Stdout, "BenchmarkPhaseChase 1 %.4f ns/op\n", nsPerRead)
+}
+
+// snapshotNumaMaps copies /proc/self/numa_maps to
+// "<prefix>-phase<phase>-<tag>.numamaps". A no-op when prefix is empty.
+// Called only from the coordinator goroutine (main's phase loop), between
+// phase-timer sleeps -- never from a reader goroutine's hot loop -- per the
+// Task 12 pre-registration (numa-design/RESULTS.md, "Phase-shift mechanism
+// study"). numa_maps reports each VMA's per-node page count (N0=/N1=
+// fields); the working set allocated by allocRings shows up as one or more
+// large anonymous entries, which the offline analysis sums to get the
+// heap's node split at that instant.
+func snapshotNumaMaps(prefix string, phase int, tag string) {
+	if prefix == "" {
+		return
+	}
+	src, err := os.Open("/proc/self/numa_maps")
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "numa_maps snapshot phase=%d %s: open: %v\n", phase, tag, err)
+		return
+	}
+	defer src.Close()
+	dstPath := fmt.Sprintf("%s-phase%d-%s.numamaps", prefix, phase, tag)
+	dst, err := os.Create(dstPath)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "numa_maps snapshot phase=%d %s: create: %v\n", phase, tag, err)
+		return
+	}
+	defer dst.Close()
+	if _, err := io.Copy(dst, src); err != nil {
+		fmt.Fprintf(os.Stderr, "numa_maps snapshot phase=%d %s: copy: %v\n", phase, tag, err)
+	}
 }
 
 // allocRings allocates size bytes as node structs (64B each), linked into
