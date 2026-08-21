@@ -92,7 +92,7 @@ does not pass an explicit policy (`mbind` after `mmap` still wins).
 
 | Mapping | Effect with `GOEXPERIMENT=numa` on a multi-node box |
 |---------|-----------------------------------------------------|
-| Heap arenas | `mbind` BIND-all then PREFERRED local. Balancer-exempt. First-touch biased to the allocating M’s node. Shortage can spill (`PREFERRED`). |
+| Heap arenas | `mbind` BIND-all only. Balancer-exempt. (Layer 2's PREFERRED-local refinement was removed in Task 6 — its IMC gate failed and a three-arm sweep proved it inert; see "What we set" above.) |
 | Goroutine stacks / workbufs | Manual spans from those arenas. Covered by arena `mbind`, not by a separate stack policy. |
 | OS thread stacks (`clone` / glibc `mmap`) | Created after BIND-all → inherit task policy → balancer-exempt, first-touch among **all** allowed nodes (no local PREFERRED unless something `mbind`s them). |
 | Runtime `mmap` (`sysAllocOS`, other `MAP_ANON`) after init | Same as task policy: BIND-all, no MOF. |
@@ -108,7 +108,7 @@ and user `mmap`s that never call `mbind`.
 
 That is the product question: the experiment currently behaves like wrapping
 the process in `numactl --membind=<allowed-nodes>` for **new** mappings after
-runtime init, plus extra PREFERRED on Go heap arenas.
+runtime init.
 
 ## Fill-one-socket-first (v3)
 
