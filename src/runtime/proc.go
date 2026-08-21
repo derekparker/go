@@ -2962,6 +2962,22 @@ func newm(fn func(), pp *p, id int64) {
 }
 
 func newm1(mp *m) {
+	// Node-mask soft affinity (design §12.4, task 10 review C1/NEW-1):
+	// both branches below create a brand new OS thread that inherits
+	// the CALLING M's (getg().m, not mp -- the new, not-yet-started M
+	// this function's own parameter names) current CPU affinity mask --
+	// the cgo branch via pthread_create (asmcgocall(_cgo_thread_start,
+	// ...)), the other via newosproc's clone(2). Both are POSIX thread-
+	// creation primitives with the same inherit-caller's-affinity
+	// semantics, so this must run before EITHER branch, not just before
+	// newosproc: an earlier version of this fix lived inside newosproc
+	// itself and never widened the cgo path at all, leaving C1's
+	// self-reinforcing single-node collapse fully intact on any cgo
+	// build (review NEW-1). See numaWidenBeforeClone's doc comment
+	// (numa_linux.go) for the full mechanism.
+	if goexperiment.Numa {
+		numaWidenBeforeClone(getg().m)
+	}
 	if iscgo && _cgo_thread_start != nil {
 		var ts cgothreadstart
 		ts.g.set(mp.g0)

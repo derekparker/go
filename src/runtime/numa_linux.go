@@ -1167,18 +1167,20 @@ func numaApplySoftAffinity(mp *m, node int32) {
 
 // numaWidenBeforeClone undoes node-mask soft affinity's per-M CPU
 // narrowing on the calling M just before it clones a new kernel thread
-// -- either via fork(2)+exec (os/exec, any goroutine on this M) or via
-// this runtime's own clone(2) call in newosproc (a new M) -- so the new
-// thread does not inherit a scheduling HINT as if it were deliberate
-// operator placement.
+// -- via fork(2)+exec (os/exec, any goroutine on this M), via this
+// runtime's own clone(2) call in newosproc (a new non-cgo M), or via
+// pthread_create on a cgo build (asmcgocall(_cgo_thread_start, ...), a
+// new cgo M) -- so the new thread does not inherit a scheduling HINT as
+// if it were deliberate operator placement.
 //
-// sched_setaffinity's mask is inherited across both fork(2) and
-// clone(2): without this, a thread cloned from a soft-affinity-narrowed
-// M would start life with that narrowed mask as its OWN startup
-// affinity -- and nothing about that mask distinguishes "the runtime
-// narrowed the parent thread as a transient scheduling hint" from "an
-// operator ran the parent under taskset". This has two distinct, both
-// serious, consequences depending on which clone path leaked:
+// sched_setaffinity's mask is inherited across fork(2), clone(2), AND
+// pthread_create (which itself is built on clone(2) with the same
+// inheritance semantics): without this, a thread created from a
+// soft-affinity-narrowed M would start life with that narrowed mask as
+// its OWN startup affinity -- and nothing about that mask distinguishes
+// "the runtime narrowed the parent thread as a transient scheduling
+// hint" from "an operator ran the parent under taskset". This has two
+// distinct, both serious, consequences depending on which path leaked:
 //
 //   - via os/exec: a GOEXPERIMENT=numa child process reads the inherited
 //     mask via its own numaDetectStartupAffinity/numaShouldConfine
@@ -1188,7 +1190,8 @@ func numaApplySoftAffinity(mp *m, node int32) {
 //     artifact instead of a real operator (found in this task's own
 //     verification: broke 3 existing Workstream A tests when go test's
 //     own soft-narrowed Ms spawned testprog subprocesses).
-//   - via newosproc (review C1, the critical finding): every new M this
+//   - via newm1's own new-M paths (review C1, the critical finding, and
+//     NEW-1, the cgo-build gap in the first fix): every new M this
 //     runtime itself creates inherits whichever node the CREATING M
 //     happened to be soft-narrowed to. Since numaNoteSchedule has no
 //     widening path of its own (it only ever narrows), and getcpu on an
@@ -1203,7 +1206,12 @@ func numaApplySoftAffinity(mp *m, node int32) {
 //     node fully idle -- silently defeating the entire feature while
 //     still passing every prior correctness test (which only checked
 //     "is each M narrowed to *a* single node", never "do Ms collectively
-//     span more than one").
+//     span more than one"). The first fix for this only widened before
+//     newosproc's clone(2) call, missing that newm1's cgo branch
+//     (asmcgocall(_cgo_thread_start, ...) -> pthread_create) never
+//     reaches newosproc at all -- so the exact same cascade was fully
+//     intact on any cgo build. Fixed by hoisting the widen call up to
+//     the top of newm1, before either branch.
 //
 // Widens back to numaStartupAffinity: this process's own true starting
 // mask, which is always the full mask whenever the calling M could have
@@ -1217,33 +1225,49 @@ func numaApplySoftAffinity(mp *m, node int32) {
 // and either believe no change is needed or simply not look -- either
 // way permanently or transiently leaving this M's real kernel affinity
 // wide instead of promptly re-narrowing to wherever it actually lands.
-// No separate restore is needed after the clone/fork syscall returns in
-// the parent -- the clear alone makes the next schedule() pass
-// self-heal, immediately (nextCheck==0 is always due).
+// No separate restore is needed after the clone/fork/pthread_create call
+// returns in the parent -- the clear alone makes the next schedule()
+// pass self-heal, immediately (nextCheck==0 is always due). When it
+// actually widens (mp was soft-narrowed), it also increments
+// numaWidenCount -- a diagnostic-only counter (numaWidenCountForTest,
+// export_numa_test.go) that gives automated tests a race-safe way to
+// observe that this path fired at all, closing the coverage gap I2's
+// -race skip leaves for the newm1/newosproc/cgo site specifically
+// (review adjudication (b)).
 //
 // Called from two sites: syscall_runtime_BeforeFork (proc.go, the
-// os/exec path) and newosproc (os_linux.go, the runtime's own new-M
-// path), both before the actual clone/fork syscall runs. The fork call
-// site runs under the same "no more allocation or calls of non-assembly
-// functions" constraint syscall.forkAndExecInChild1 documents at its own
-// runtime_BeforeFork call site, so this function -- and everything it
-// calls -- must stay nosplit; the newosproc call site has no such
+// os/exec path) and newm1 (proc.go, the runtime's own new-M path --
+// both its cgo and non-cgo branches, per NEW-1 above), both before the
+// actual clone/fork/pthread_create call runs. The fork call site runs
+// under the same "no more allocation or calls of non-assembly
+// functions" constraint syscall.forkAndExecInChild1 documents at its
+// own runtime_BeforeFork call site, so this function -- and everything
+// it calls -- must stay nosplit; the newm1 call site has no such
 // constraint of its own, but nosplit is a strictly more restrictive
 // property, so the same function is safe to call from both.
 //
-// I5 ruling (review): this function's sched_setaffinity syscall can run
-// with mp.locks != 0 at the newosproc call site (newm holds acquirem
-// across mp allocation and thread start) and at the BeforeFork call site
-// (BeforeFork increments gp.m.locks for the signal-blocking window this
-// runs inside). Accepted, not a Forbidden-list violation: the Forbidden
-// list's "no syscalls under sched.lock or with mp.locks != 0" rule
-// targets scheduler-hook syscalls that could contend with concurrent
-// scheduling state (numaNoteSchedule's own schedule()-hook rule); here,
-// signals are already blocked, no runtime lock is held, and the actual
-// fork/clone syscall is imminent on the same thread regardless -- the
-// same reasoning Task 9's own recorded ruling used to scope that same
-// Forbidden-list line to scheduler hooks specifically, not every
-// mp.locks!=0 context in the runtime.
+// I5 ruling (review, reworded per NEW-2 to the reviewer's stronger
+// ground): this function's sched_setaffinity syscall runs, at both call
+// sites, at essentially the identical lock/signal state as the
+// clone/fork/pthread_create call it immediately precedes within the
+// same function -- mp.locks != 0 throughout in both cases (acquirem,
+// held across newm/newm1's entire body). An earlier version of this
+// comment claimed "signals already blocked, no runtime lock held" for
+// the newosproc call site specifically; that was wrong there (execLock
+// is acquired, and sigprocmask blocks signals, both AFTER where that
+// call used to run) and is moot now that the call lives at the top of
+// newm1, before execLock.rlock() in either branch. The correct,
+// simpler ground: this code region already has to tolerate one syscall
+// right here, because it is about to make a far more consequential one
+// (clone/pthread_create itself) a few lines later under the same lock
+// state -- an extra sched_setaffinity call is strictly no worse than
+// what is already sanctioned at that exact point. Not a Forbidden-list
+// violation: that list's "no syscalls under sched.lock or with
+// mp.locks != 0" rule targets scheduler-hook syscalls that could
+// contend with concurrent scheduling state (numaNoteSchedule's own
+// schedule()-hook rule) -- the same reasoning Task 9's own recorded
+// ruling used to scope that Forbidden-list line to scheduler hooks
+// specifically, not every mp.locks!=0 context in the runtime.
 //
 //go:nosplit
 func numaWidenBeforeClone(mp *m) {
@@ -1252,5 +1276,16 @@ func numaWidenBeforeClone(mp *m) {
 	}
 	if numaSetThreadAffinity(0, &numaStartupAffinity) {
 		mp.numa.clearSoftAffinityNode()
+		numaWidenCount.Add(1)
 	}
 }
+
+// numaWidenCount counts every time numaWidenBeforeClone actually widened
+// a narrowed M (review adjudication (b)): diagnostic-only, read by
+// NumaWidenCountForTest (export_numa_test.go) so automated tests have a
+// race-safe way to confirm the newm1/newosproc/cgo widen path fired at
+// all during M-creation churn, without depending on the distinct-node
+// spread TestNUMASoftAffinity's I2 check asserts (which is skipped under
+// -race -- see that test's doc comment) or on any particular kernel
+// scheduling outcome. Not read by any non-test runtime code.
+var numaWidenCount atomic.Uint64

@@ -96,3 +96,11 @@ func NumaIsNodeCPUCountForTest(n int) bool {
 // NumaConfinedForTest reports whether fill-one-socket-first confinement is
 // currently active for this process (see numaConfined in numa_linux.go).
 func NumaConfinedForTest() bool { return numaConfined.Load() }
+
+// NumaWidenCountForTest returns the number of times numaWidenBeforeClone
+// has actually widened a soft-narrowed M since process start (review
+// adjudication (b)): a race-safe way to confirm the newm1/newosproc/cgo
+// widen path fired at all during M-creation churn, closing the
+// automated-coverage gap TestNUMASoftAffinity's I2 distinct-node
+// assertion leaves under -race (see that test's doc comment).
+func NumaWidenCountForTest() uint64 { return numaWidenCount.Load() }

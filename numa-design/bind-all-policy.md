@@ -85,6 +85,47 @@ Gaps:
 - We do not walk existing Ms and set policy on each; extra Ms are created
   after this call.
 
+### CPU affinity inheritance: confinement vs soft affinity (v3, task 10 adjudication c)
+
+The mempolicy inheritance described above is not the only kernel-level
+inheritance this design touches. `sched_setaffinity`'s CPU mask is *also*
+inherited across `fork(2)`, `clone(2)`, and `pthread_create` — and the two
+v3 layers that narrow it (fill-one-socket confinement, Workstream A; node-mask
+soft affinity, Workstream B task 10) deliberately take opposite positions on
+whether that inheritance should be allowed to happen.
+
+**Confinement's narrowing is meant to inherit.** `numaConfine` narrows the
+whole process's CPU affinity once, at startup, before any other runtime
+thread exists — this is a *process-wide* placement decision, equivalent in
+kind to an operator running the process under `numactl --cpunodebind` or
+`taskset` from the outset. A child spawned later (`os/exec`, or any new M
+this runtime creates) inheriting that same narrowed mask is exactly the
+behavior an external `numactl`-wrapped process would already exhibit, and is
+consistent with the whole design's framing of confinement as "the operator
+chose a small GOMAXPROCS" (locked decision 6) — a choice a subprocess
+plausibly should honor too. No code exempts confinement's own mask from
+inheritance, and none is planned to; this is by design, not an unaudited gap
+(see task-10-report.md's "Concerns" section for the residual: this specific
+inheritance path itself is not independently tested).
+
+**Soft affinity's narrowing is deliberately exempted from inheritance.**
+Node-mask soft affinity (`numaNoteSchedule`) narrows a *single M*, as a
+transient, self-correcting scheduling *hint* — not a placement decision
+anyone chose. Nothing about the resulting mask distinguishes "the runtime
+narrowed this thread because it happened to be running on this node a moment
+ago" from "an operator deliberately pinned this process" — so if it were
+allowed to inherit like confinement's mask does, a child process (or a new M
+this runtime creates) would read that inherited narrow mask via its own
+`numaShouldConfine`/`numaDetectStartupAffinity` checks and conclude "operator
+placement wins," silently and permanently declining both confinement and its
+own soft affinity. This was found and fixed in task 10's review (finding
+C1): `numaWidenBeforeClone`, called from both `syscall_runtime_BeforeFork`
+(the `os/exec` path) and `newm1` (this runtime's own new-M path, covering
+both its `clone(2)` and cgo `pthread_create` branches — review NEW-1),
+widens the calling M's affinity back to its true starting mask immediately
+before the fork/clone/`pthread_create` call runs, so the new thread's own
+placement is never contaminated by the parent M's transient hint.
+
 ## What this does to non-heap mappings
 
 Task policy is the default for **new** VMAs from that thread when the caller

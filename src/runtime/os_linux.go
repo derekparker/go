@@ -7,7 +7,6 @@ package runtime
 import (
 	"internal/abi"
 	"internal/goarch"
-	"internal/goexperiment"
 	"internal/runtime/atomic"
 	"internal/runtime/syscall/linux"
 	"internal/strconv"
@@ -177,27 +176,15 @@ func newosproc(mp *m) {
 		print("newosproc stk=", stk, " m=", mp, " g=", mp.g0, " clone=", abi.FuncPCABI0(clone), " id=", mp.id, " ostk=", &mp, "\n")
 	}
 
-	// Node-mask soft affinity (design §12.4, task 10 review C1): clone(2)
-	// inherits the calling thread's CPU affinity mask, same as fork(2).
-	// If this M (the one calling newosproc, not mp -- the new M being
-	// created, which has not run yet) was soft-narrowed to a node, the
-	// new OS thread would start life already confined to that same node
-	// -- and since numaNoteSchedule has no widening path (it only ever
-	// narrows), that new M's own getcpu could then only ever report the
-	// node it is already stuck on, "confirming" the inherited narrowing
-	// forever. Every new M created afterward from that new M would
-	// inherit the same node in turn: a self-reinforcing cascade that
-	// silently collapses the entire process onto whichever node the
-	// first M to narrow (typically m0, at its very first schedule()
-	// pass, before any other M exists) happened to be on. Widening here,
-	// symmetric with syscall_runtime_BeforeFork's fix for the os/exec
-	// leak, closes it: the new thread inherits a genuinely wide mask and
-	// finds its own node independently via its own first
-	// numaNoteSchedule pass. See numaWidenBeforeClone's doc comment for
-	// the full mechanism and the real-hardware evidence that found this.
-	if goexperiment.Numa {
-		numaWidenBeforeClone(getg().m)
-	}
+	// Node-mask soft affinity (design §12.4, task 10 review C1/NEW-1):
+	// the widen-before-clone call that used to live here has moved up to
+	// newm1 (proc.go), its only caller -- newm1 also has a cgo path
+	// (asmcgocall(_cgo_thread_start, ...), which creates the OS thread
+	// via pthread_create rather than ever reaching this function) that
+	// needs the exact same widen and was missed here. See
+	// numaWidenBeforeClone's doc comment (numa_linux.go) for the full
+	// mechanism and the real-hardware evidence (both the original clone
+	// leak and the cgo-path gap) that found this.
 
 	// Disable signals during clone, so that the new thread starts
 	// with signals disabled. It will enable them in minit.
