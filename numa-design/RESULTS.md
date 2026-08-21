@@ -4162,3 +4162,121 @@ and `kernel.kptr_restrict` both restored to their pre-experiment values
 tree unmodified beyond scratch build/profile artifacts under `/tmp/pb/`
 (raw results copied into the tracked archive above; the oversized
 `perf.data` files deliberately left uncommitted).
+
+## Workstream B verdict (Task 11 decision)
+
+**DECISION: Workstream B does NOT ship as-is.**
+
+### Established
+
+The following are cited only from audit-surviving figures in "Workstream B
+gate battery — 2026-08-21" above (post-correction, post-E1/E2-redo):
+
+1. **Routing correctness is proven under external pinning** (Gate 1:
+   `100.0000%` / `99.5442%` local, both ≥95% bar; corroborated by an
+   independent `/proc/self/numa_maps` residency sample, 95.35% / 100.00%
+   on-node).
+2. **IMC remote share moves in the correct direction, but not far
+   enough:** 48.50% → 46.32% = **−4.49% relative** — a real, clean effect
+   (complete separation across all 5×5 runs, exact two-sided Mann-Whitney
+   U p=0.00794) whose 95% CI **[−7.6%, −1.2%]** (Welch's t-test;
+   bootstrap agrees, [−8.09%, −1.06%]) positively **excludes** the
+   pre-registered ≥10% relative-drop bar. This is categorically different
+   from Layer 2's null (+0.10%/−0.07%).
+3. **Unpinned node-routed refill leaves 25–47% of refills remote at every
+   thread count tested, 2–256** (E1 redo, confinement genuinely off at
+   every point per `GODEBUG=numa=1` evidence, 15/15 runs) — routing alone
+   does not deliver locality without thread/goroutine placement.
+4. **The 128P confinement-eligible pathology wins hold:** candidate 1
+   (garbage) B-vs-C −32.65% (p=0.000), candidate 2 (gc-pause) B-vs-C
+   −21.20% (exact p=1.08e-5); both candidates' C ties the pinned oracle A
+   (non-inferiority PASS, within-session). Workstream A's own product is
+   intact under Workstream B.
+5. **Costs, all statistically significant:** 1P alloc micro geomean
+   +3.73% (FAIL, ≤+2% bar, p=0.000, CV≈0%); 256P json `user+sys-sec/op`
+   +19.96% (FAIL, p=0.025, pooled n=30 — significant but, at this gate's
+   own ≈21% MDE, "significant, magnitude imprecise" rather than a
+   precisely-pinned figure); 1P `STW-ns/op` +201.56% (exploratory, p=0.000,
+   complete separation, does not recur at 256P p=0.786); 256P garbage
+   `user+sys-sec/op` +7.45% (p=0.011, third independent confirmation of
+   the same-direction CPU-time-cost pattern).
+6. **Cost attribution: NOT syscalls.** `getcpu`/`mbind`/`sched_setaffinity`
+   together account for ≤0.05% of cycles (E2, kernel-cycle-inclusive
+   ON/OFF profile). Under matched work (allocs/op essentially identical
+   between arms), Workstream B shifts **~72e9 cycles (+46.6% relative to
+   the OFF arm's own spinlock time)** from user-mode spanSet work into
+   kernel-mode spinlock wait. The dominant contended lock, identified from
+   a single run's call-graph (n=1, not a statistical claim), is
+   `sighand->siglock` contention during POSIX CPU-timer signal delivery —
+   the `x/benchmarks` harness's own built-in CPU profiler, present in
+   **both** arms but contending more under Workstream B — so the 256P
+   `user+sys` regression is **at least partly a profiler-interaction
+   artifact that Workstream B aggravates**, not a pure Workstream B
+   mechanism in isolation. A disclosed page-supply/heap-footprint confound
+   (`bytes-from-system` +37%, peak RSS +41%) is not controlled for in this
+   attribution and remains a live alternative/contributing explanation.
+
+### What it does not establish
+
+- **Why locality stays ~50% unpinned.** The goroutine-migration and
+  M-placement-randomness hypotheses were not separated: the pre-registered
+  discriminating rule, applied honestly to the E1 redo's own data, favors
+  M-placement or is non-discriminating, not migration — and the redo never
+  actually tested a low-M-count regime (~68–71 Ms were active at every
+  GOMAXPROCS point tested, including 2). This remains open.
+- **Whether the CPU cost survives with the harness's own CPU profiler
+  disabled.** The lock-class finding implicates a profiler-interaction
+  artifact but was not re-measured with the profiler off.
+- **The lock class beyond a single run's call-graph** (n=1 attribution
+  evidence, not a statistical claim; the remaining ~41% of the spinlock's
+  own time is not broken down further).
+
+### Three-ingredient reading
+
+Homing (Task 8) and routing (Task 9) are proven correct in isolation
+(Gate 1). Thread stability as built (Task 10's soft affinity) stabilizes
+OS threads (Ms) — narrowing an M's CPU affinity on node change — but the
+full three-ingredient unit still misses its primary gate. The missing
+ingredient is most plausibly **goroutine/P-level placement** (Go's
+scheduler migrates goroutines across Ps via ordinary work-stealing,
+independent of which node a P's M happens to be narrowed to), or
+alternatively that the unit's own overhead (established above) negates
+whatever locality win it does produce. Design §12.1's rule held exactly
+as predicted: a proper subset (Layer 2, homing alone) measured ~zero;
+the full three-ingredient unit measures **small-but-real** — a real,
+statistically clean, complete-separation effect, just short of the
+pre-registered bar.
+
+### Next candidates (ranked; a future plan, not this one)
+
+0. **Re-run Gate 2c with the json harness's built-in CPU profiler
+   disabled.** If the `user+sys` regression vanishes or shrinks
+   substantially, the cost story changes entirely — this is the cheapest,
+   highest-information next step and should run before anything below.
+1. **Identify and fix the residual kernel lock contention** with full
+   call-graph attribution (n≥3, not n=1) and a soft-affinity-off control
+   arm to isolate Task 10's own contribution from the rest.
+2. **Goroutine/P-level placement awareness** for the >node-capacity
+   regime — the only regime where Workstream B matters at all, since the
+   ≤node-capacity regime is already covered by Workstream A's confinement
+   (and ties/beats it there, per items 4/5 above).
+3. **`pages.alloc` node-awareness** (Task 9's own carried-forward ruling
+   1 — this gate's FAIL is precisely the condition Task 9 named as the
+   trigger to revisit cross-stream address ordering).
+4. **Reduce per-node stream fresh-page demand** — the heap-footprint
+   confound (+37% `bytes-from-system`) identified in the cost attribution.
+
+### Task 14 decision: DEFERRED
+
+**Task 14 (rseq / vDSO getcpu) is deferred — its own adoption gate was
+not met.** The gate (design §12.4 / plan Task 14 Step 2) requires a CPU
+profile showing `getcpu` ≥1% of cycles attributable to refill/scheduler-
+pass paths before implementation proceeds. Task 11's own E2 attribution
+measured the NUMA syscall/routing-decision path (which includes
+`getcpu`) at **0.02–0.05% of cycles across every capture** — never
+approaching the ≥1% bar, in either round of the attribution experiment.
+Per plan Task 14 Step 2's own stated fallback ("below that, the raw
+syscall stays"), the raw-syscall `getcpu` implementation is retained
+as-is; vDSO/rseq work does not proceed. Task 14's heading in
+`numa-design/2026-08-20-numa-v3-locality-plan.md` is marked
+**DEFERRED (profile gate not met at Task 11)**.

@@ -1335,9 +1335,9 @@ func numaNoteSchedule()
 
 Validation order is mandatory (design §12.4): **prove routing correctness with externally pinned threads FIRST**, then measure unpinned.
 
-- [ ] **Step 1 — pinned routing proof:** run a DRAM-heavy alloc/read workload as two halves, `numactl --cpunodebind=0` and `--cpunodebind=1` (soft affinity irrelevant under external pinning): `/numa/span-refills:local / (local+remote)` must be ≥95% in each half, and sampled `heapArena.node` distribution must track the pinned node. This isolates routing from placement stability. FAIL → fix routing before any unpinned measurement.
-- [ ] **Step 2 — hard gates:** 1P json (BENCHNUM=10) ≤ +2%; 1P alloc micro ≤ +2%; **256P json ≤ +2%**; RSS not systematically fatter (per-node spanSets can strand memory — watch `peak-RSS-bytes`, pooled n≥30 if noisy); vmstat 0/0; off-binary census (workstream's once).
-- [ ] **Step 3 — IMC decision gate (pre-registered primary):** the metric that killed Layer 2, now with all three ingredients present. Same events, same protocol, ≥3 interleaved runs per arm, medians:
+- [x] **Step 1 — pinned routing proof:** run a DRAM-heavy alloc/read workload as two halves, `numactl --cpunodebind=0` and `--cpunodebind=1` (soft affinity irrelevant under external pinning): `/numa/span-refills:local / (local+remote)` must be ≥95% in each half, and sampled `heapArena.node` distribution must track the pinned node. This isolates routing from placement stability. FAIL → fix routing before any unpinned measurement.
+- [x] **Step 2 — hard gates:** 1P json (BENCHNUM=10) ≤ +2%; 1P alloc micro ≤ +2%; **256P json ≤ +2%**; RSS not systematically fatter (per-node spanSets can strand memory — watch `peak-RSS-bytes`, pooled n≥30 if noisy); vmstat 0/0; off-binary census (workstream's once).
+- [x] **Step 3 — IMC decision gate (pre-registered primary):** the metric that killed Layer 2, now with all three ingredients present. Same events, same protocol, ≥3 interleaved runs per arm, medians:
 
 ```bash
 perf stat -x, -e mem_load_l3_miss_retired.local_dram,mem_load_l3_miss_retired.remote_dram -- \
@@ -1345,8 +1345,8 @@ perf stat -x, -e mem_load_l3_miss_retired.local_dram,mem_load_l3_miss_retired.re
 ```
 
 **Pass:** ≥10% **relative** drop in `remote/(local+remote)` vs the experiment-off arm (e.g. 0.48 → ≤0.432). Corroborate with the `/numa/span-refills` ratio from the same runs. **Fail:** stop; RESULTS.md verdict must say the three-ingredient unit was actually measured (unlike Layer 2) and what the refill-local ratio was — that distinguishes "routing broken" from "routing works, hardware can't show it".
-- [ ] **Step 4 — pathology candidates 1–2 rerun** (three arms, single session, Task-0 driver) as supporting evidence; record.
-- [ ] **Step 5:** RESULTS.md + bench-data archive + verdict commit. Merge the unit only on a full pass.
+- [x] **Step 4 — pathology candidates 1–2 rerun** (three arms, single session, Task-0 driver) as supporting evidence; record.
+- [x] **Step 5:** RESULTS.md + bench-data archive + verdict commit. Merge the unit only on a full pass.
 
 ---
 
@@ -1387,6 +1387,13 @@ Follow the amd64/arm64 pattern (`#define SYS_getcpu`, NOSPLIT wrapper matching `
 - [ ] **Step 3:** Commit: `runtime: add getcpu wrappers for remaining linux architectures`. Note: this also widens where fill-one-socket confinement *could* engage — but `numaHasSetAffinity` still gates it to amd64/arm64 until `SYS_SCHED_SETAFFINITY` constants are added per-arch (do that only with a machine to test on; record as future work).
 
 ### Task 14: rseq / vDSO getcpu (research-then-implement, profile-gated)
+
+**DEFERRED (profile gate not met at Task 11)** — Task 11's own CPU-cost
+attribution (E2) measured the NUMA syscall/routing-decision path
+(`getcpu` et al.) at 0.02–0.05% of cycles across every capture, never
+approaching the ≥1% adoption bar in Step 2 below. Per Step 2's own
+stated fallback, the raw syscall stays; see RESULTS.md "Workstream B
+verdict (Task 11 decision)" for the full record.
 
 The refill/scheduler-pass paths added by Workstream B call raw-syscall `getcpu` (~50 ns). Alternatives: amd64 `__vdso_getcpu` (few ns; runtime has vDSO plumbing in `vdso_linux_amd64.go`; arm64 has **no** vDSO getcpu) and rseq `cpu_id` (~1 ns userspace read; kernel ≥4.18; needs runtime-owned per-thread registration and a coexistence story with glibc/cgo rseq registration — `EBUSY` on double registration; see background.md §7).
 
