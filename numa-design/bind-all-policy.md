@@ -133,7 +133,7 @@ does not pass an explicit policy (`mbind` after `mmap` still wins).
 
 | Mapping | Effect with `GOEXPERIMENT=numa` on a multi-node box |
 |---------|-----------------------------------------------------|
-| Heap arenas | `mbind` BIND-all only. Balancer-exempt. (Layer 2's PREFERRED-local refinement was removed in Task 6 — its IMC gate failed and a three-arm sweep proved it inert; see "What we set" above.) |
+| Heap arenas | `mbind` BIND-all only. Balancer-exempt. (Layer 2's PREFERRED-local refinement was removed in Task 6 — its IMC gate failed and a three-arm sweep proved it inert; see "What we set" above. Workstream B's *separate* per-node arena stream homing is research-only, not part of this shipped behavior — see the "Workstream B: per-node heap homing" section below.) |
 | Goroutine stacks / workbufs | Manual spans from those arenas. Covered by arena `mbind`, not by a separate stack policy. |
 | OS thread stacks (`clone` / glibc `mmap`) | Created after BIND-all → inherit task policy → balancer-exempt, first-touch among **all** allowed nodes (no local PREFERRED unless something `mbind`s them). |
 | Runtime `mmap` (`sysAllocOS`, other `MAP_ANON`) after init | Same as task policy: BIND-all, no MOF. |
@@ -163,7 +163,7 @@ allowed-node mask. It narrows on top of Layer 1; nothing here replaces it.
 | Mapping | Effect while confined |
 |---------|------------------------|
 | Task-default policy (new allocations on the confined M with no explicit `mbind`) | `MPOL_PREFERRED` to the confined node, **replacing** the Layer-1 BIND-all task policy on that thread (`numaConfine`'s `set_mempolicy` call). Locked decision 1: PREFERRED, never single-node `MPOL_BIND` — BIND has no fallback node, so pinning the whole process to one node is exactly the OOM footgun this doc's Recommendation section below forbids. |
-| Heap arenas | Unchanged and still running: `numaBindArena` keeps stamping every new chunk `MPOL_BIND` over the **full** allowed-node mask, not narrowed to the confined node (locked decision 5). Confinement changes where the task-default policy points; it does not touch the arena VMA policy. |
+| Heap arenas | Unchanged and still running when Workstream B homing is inactive: `numaBindArena` keeps stamping every new chunk `MPOL_BIND` over the **full** allowed-node mask, not narrowed to the confined node (locked decision 5). Confinement changes where the task-default policy points; it does not touch the arena VMA policy. **With Workstream B homing active** (multi-node, arena streams enabled — see the section below), each new chunk instead gets `MPOL_PREFERRED` to its own stream's node via `numaBindGrowth`/`numaBindArenaHome`, in place of this uniform BIND-all; Workstream B is research-only (failed its Task 11 gate), so this alternate path is not part of the shipped/default behavior this table otherwise describes. |
 
 Gate 4's confined-1P strace confirms this empirically: `mbind`=22 (11
 heap-chunk grows, each still issuing the BIND-then-PREFERRED pair that was
@@ -208,6 +208,35 @@ VMA-merge — Gate 4 measured a 32-line `/proc/PID/maps` for the confined
 arm, matching the Layer-1 baseline character, not the ~1172 VMAs Layer 2's
 per-chunk different-node `MPOL_PREFERRED` calls produced (the same
 fragmentation Task 6 cites as one reason to remove that call).
+
+## Workstream B: per-node heap homing (research-only)
+
+Workstream B (design §12.3–§12.4, `2026-08-20-numa-v3-locality-plan.md`)
+implements a separate mechanism from everything else on this page: per-node
+heap arena address partitioning (`heapArena.node`), per-node `mcentral`
+spanSets with refill routing by node, and node-mask soft affinity from the
+scheduler. When active — multi-node, `numaHeapStreamsEnabled`,
+`numaHeapHomingActive` true — each newly grown heap chunk gets
+`MPOL_PREFERRED` to its own stream's node (`numaBindGrowth` →
+`numaBindArenaHome`) instead of the uniform BIND-all `numaBindArena`
+applies everywhere else on this page (both unconfined and confined, see
+the tables above). This is the one case in the whole document where a
+heap-arena VMA does not simply get the uniform Layer-1 BIND-all policy.
+
+**Status: failed its gate, research-only, not shipped.** Task 11's gate
+battery (audited x3) failed two hard gates and its pre-registered IMC
+decision gate: routing was proven correct under pinning, but the measured
+IMC (inter-memory-controller remote-access share) improvement's 95%
+confidence interval excludes the pre-registered ≥10% relative-drop bar,
+25-47% of accesses remained remote-unpinned at every thread count tested,
+and a CPU-cost regression traced to kernel spinlock contention (at least
+partly a benchmark-harness profiler artifact rather than a pure Workstream
+B mechanism) was also observed. See `numa-design/2026-08-20-numa-v3-locality-plan.md`'s
+Workstream B section and its Task 11 gate-battery record for the full
+verdict. Everything above this section describes the actual
+`GOEXPERIMENT=numa` behavior; this section exists only so a reader who
+finds `numaBindGrowth`/`numaHeapHomingActive` in the source does not
+mistake it for part of that shipped behavior.
 
 ## Dynamic cpuset staleness (v3)
 

@@ -316,6 +316,31 @@ func (c *mcentral) cacheSpan() *mspan {
 	// exit, from the span that's actually about to be returned -- one
 	// arena-metadata lookup (not getcpu), honest for every path that
 	// reaches here (local pop, remote pop, or grow).
+	//
+	// Final review F5 (documented, deliberately not excluded from the
+	// count): when genuine is false (numaRefillNode's doc comment:
+	// streams disabled, a failed getcpu, or node >= numaMaxHeapNodes),
+	// node is numaGrowNode's sentinel 0, not a real reading of where
+	// this call is actually running -- and node 0 also happens to be
+	// the default tag every heapArena gets when it was never explicitly
+	// homed (numaArenaSetNode from mheap.sysAlloc, given numaGrowNode's
+	// own homed=false return in those same non-genuine cases). So on a
+	// build/run where genuine is always false (streams disabled --
+	// race, tight-VA riscv64, or 32-bit; see numaHeapStreamsEnabled),
+	// essentially every arena is tagged 0 and every refill's node is
+	// forced to 0, so numaSpanRefillLocal would read ~100% regardless
+	// of where anything actually ran -- not a measurement of real
+	// locality on those builds. Left counted anyway (rather than gated
+	// on genuine) because TestNUMASpanRefillMetrics' primary red-test
+	// property (testSpanRefillCountersIncrement) asserts these counters
+	// move on any refill churn, streams enabled or not, as the basic
+	// "the counters are wired up" signal; gating counting on genuine
+	// would make that assertion vacuously fail whenever streams are
+	// disabled. Readers of /numa/span-refills/{local,remote}:spans on
+	// such a build/run should treat the split as uninformative, not as
+	// a locality signal -- routing itself is a separate, unaffected
+	// concern (numaRefillNode's own doc comment covers why searching
+	// node 0's sets when !genuine is still the right ROUTING behavior).
 	local := !goexperiment.Numa || numaArenaNode(s.base()) == node
 	if goexperiment.Numa {
 		if local {

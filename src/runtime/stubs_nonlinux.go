@@ -68,8 +68,13 @@ func numaFixThreadPlacement() {
 // reading to home to on a platform with no getcpu path. mheap.grow's
 // callers (allocSpan, via numaGrowNodeArg) call this on every GOOS,
 // unconditionally, not just with goexperiment.Numa set, so this stub exists
-// purely so those call sites compile everywhere; heapArena.node's only
-// consumer today is numaArenaNode's diagnostic/test lookup.
+// purely so those call sites compile everywhere. On non-Linux, every
+// heapArena still gets tagged node 0 (numaArenaSetNode/numaArenaNode,
+// mheap.go), which mcentral.uncacheSpan (task 9) uses to route a
+// refill's span back to its home node's spanSet -- final review F4:
+// heapArena.node is no longer just a diagnostic/test lookup, it is real
+// refill-routing plumbing everywhere, including here, where node 0 is
+// simply the only node that is ever tagged.
 func numaGrowNode() (stream int32, homed bool) {
 	return 0, false
 }

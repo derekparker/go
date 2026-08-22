@@ -42,9 +42,19 @@ type Topology struct {
 	//
 	// At Layer 0, every online node is allowed, including nodes with
 	// memory but no CPUs (e.g. CXL/HBM): excluding CPU-less nodes here
-	// would silently shrink the usable-memory mask. A later layer
-	// narrows this to the process's actual memory policy via
-	// get_mempolicy(MPOL_F_MEMS_ALLOWED).
+	// would silently shrink the usable-memory mask.
+	//
+	// Final review F5: this field itself is never narrowed below
+	// NumNodes -- ReadTopology always sets both to the same value (see
+	// below), and nothing later mutates NumAllowedNodes either, so
+	// NumAllowedNodes == NumNodes holds by construction for the whole
+	// lifetime of any Topology this package produces. The actual
+	// allowed-node narrowing this comment used to promise happens
+	// entirely in the runtime package instead: runtime.numaSetProcessBindAll
+	// reads the process's real memory policy via
+	// get_mempolicy(MPOL_F_MEMS_ALLOWED) and publishes the narrowed
+	// result as its own separate bitmask (numaAllowedNodemask), not by
+	// writing back into this Topology.
 	NumAllowedNodes int32
 
 	Nodes [MaxNodes]Node

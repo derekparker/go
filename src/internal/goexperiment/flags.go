@@ -128,7 +128,10 @@ type Flags struct {
 	// arrays (KKKKVVVV).
 	MapSplitGroup bool
 
-	// Numa enables NUMA topology discovery and (later) memory policy.
-	// Linux-only; other platforms no-op. Off by default.
+	// Numa enables NUMA topology discovery, memory policy (task/VMA
+	// mempolicy via mbind/set_mempolicy, fill-one-socket-first
+	// confinement, per-node heap arena stream homing), and node-mask
+	// soft affinity from the scheduler. Linux-only; other platforms
+	// no-op. Off by default.
 	Numa bool
 }

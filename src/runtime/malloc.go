@@ -626,6 +626,26 @@ func mallocinit() {
 		// uses, and read later by numaGrowNode at grow time. See
 		// numaHeapStreamsEnabled's doc comment for why a mismatch
 		// between this and the hint loop is fatal, not just suboptimal.
+		//
+		// Final review F5: this depends only on goexperiment.Numa (a
+		// compile-time constant), raceenabled, and vmaSize -- NOT on
+		// numaTopology.NumNodes. So an experiment-on single-node host
+		// still gets numaHeapStreamsEnabled == true here and the hint
+		// loop below still partitions its 0x40 heap-hint range across
+		// all numaMaxHeapNodes==8 streams (node := i / (0x40/8)), even
+		// though numaCurrentNode always reports node 0 on that host
+		// (numaTopology.NumNodes < 2) and every grow therefore lands in
+		// stream 0's window alone. Runtime BEHAVIOR on such a host is
+		// still stock-equivalent (one stream actually used, one
+		// BIND-all/PREFERRED policy, same as the experiment-off path
+		// this whole function otherwise takes) -- but the address
+		// LAYOUT is not bit-identical to an experiment-off binary's:
+		// stream 0's hints only cover 1/8th of the 0x40 range an
+		// experiment-off build would have used whole, at different
+		// addresses than experiment-off's arenaHints[0] chain would
+		// pick. Anything that depends on exact heap address layout
+		// (not just behavior) on a single-node host should account for
+		// this.
 		numaHeapStreamsEnabled = goexperiment.Numa && !raceenabled && !(GOARCH == "riscv64" && vmaSize == 39)
 
 		for i := 0x7f; i >= 0; i-- {
