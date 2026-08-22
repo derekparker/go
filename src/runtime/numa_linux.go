@@ -14,6 +14,15 @@ import (
 
 // Layer 1 mempolicy constants. See numaSetProcessBindAll and numaBindArena.
 //
+// The allowed-nodes narrowing lives entirely here, in
+// numaSetProcessBindAll, not in numaTopology/internal/runtime/numa: that
+// package's Topology.NumAllowedNodes is never narrowed below NumNodes --
+// the two are equal by construction for any Topology it produces (final
+// review F5; see Topology.NumAllowedNodes's own doc comment). Instead,
+// numaSetProcessBindAll reads the process's real memory policy via
+// get_mempolicy(MPOL_F_MEMS_ALLOWED) directly and publishes the result
+// as numaAllowedNodemask, a value entirely separate from numaTopology.
+//
 // numaMaxNode is the maxnode argument passed to get_mempolicy,
 // set_mempolicy, and mbind, on every architecture: a fixed 65. It is
 // NEVER derived from numaNodemaskBits (which is 32 on 32-bit platforms:
@@ -99,8 +108,13 @@ var numaAllowedNodemask atomic.Uintptr
 // numaTopology.NumNodes == 0 correctly represents as "unknown" rather than
 // silently claiming a single node.
 //
-// Layer 0: read-only after schedinit; nothing consumes it yet besides
-// diagnostics and tests.
+// Layer 0: read-only after schedinit. Final review F4: stale comment
+// corrected -- this was true only through the earliest Layer-0-only
+// milestone; numaTopology is now the source topology reference for
+// fill-one-socket confinement (numaShouldConfine/numaConfine), node-mask
+// soft affinity (numaNoteSchedule), per-node heap arena stream homing
+// (numaGrowNode/numaHeapHomingActive), and Topology.NumAllowedNodes
+// (internal/runtime/numa/numa.go), in addition to diagnostics and tests.
 var numaTopology numa.Topology
 
 // numaScratch is I/O scratch space for numaInitTopology. It is only used
@@ -414,7 +428,23 @@ func numaNodeAffinityMask(node int32, mask *[numaCPUMaskBytes]byte) bool {
 // documented staleness -- see bind-all-policy.md's "Dynamic cpuset
 // staleness" section.
 func numaShouldConfine(procs int32) (int32, bool) {
-	if numaTopology.NumNodes < 2 || numaTopology.TruncatedNodes || !numaHasSetAffinity {
+	// Final review F5: these first three conditions used to bail out
+	// silently (a single bundled `if`, no numaConfineDeclined call) --
+	// the only decline paths in this function that did not print under
+	// GODEBUG=numa=1, contrary to this function's own doc comment above.
+	// Split out and reported individually so a diagnostic run can tell
+	// "not multi-node" apart from "topology discovery gave up partway"
+	// apart from "this arch has no sched_setaffinity".
+	if numaTopology.NumNodes < 2 {
+		numaConfineDeclined("not multi-node")
+		return 0, false
+	}
+	if numaTopology.TruncatedNodes {
+		numaConfineDeclined("topology truncated")
+		return 0, false
+	}
+	if !numaHasSetAffinity {
+		numaConfineDeclined("no sched_setaffinity on this arch")
 		return 0, false
 	}
 	if numaAllowedNodemask.Load() == 0 {
@@ -450,8 +480,18 @@ func numaShouldConfine(procs int32) (int32, bool) {
 		return 0, false
 	}
 	node := numaCurrentNode() // boot CPU's node (locked decision 2)
-	if node < 0 || node >= 64 {
+	// Final review F5: node < 0 (the getcpu syscall itself failed) and
+	// node >= 64 (getcpu succeeded but returned an id past what the
+	// 64-node nodemask/cache arrays this package uses can represent) are
+	// different failure modes -- report them separately so a diagnostic
+	// run does not conflate "no working getcpu on this host" with "this
+	// host has an implausibly high node id".
+	if node < 0 {
 		numaConfineDeclined("getcpu failed")
+		return 0, false
+	}
+	if node >= 64 {
+		numaConfineDeclined("node id out of range")
 		return 0, false
 	}
 	ncpus := numaNodeCPUCount(node)
@@ -489,12 +529,23 @@ func numaNodeCPUCount(node int32) int32 {
 // for this thread and, by clone inheritance, every later M. Runs while
 // m0 is the only runtime thread.
 //
-// Heap-VMA exemption does not depend on this task policy: numaBindArena
-// keeps stamping every chunk with uniform BIND-all (numaAllowedNodemask
-// stays published) — the VMA-own policy is what holds against threads
-// the task policy never reached (pre-runtime cgo threads; locked
-// decision 1), and uniform policies VMA-merge, so there is no Layer-2-
-// style map blowup.
+// Heap-VMA exemption does not depend on this task policy (final review
+// F4: corrected -- an earlier version of this comment said every chunk
+// keeps uniform BIND-all unconditionally, which stopped being true once
+// per-node heap arena stream homing landed, task 8): numaAllowedNodemask
+// stays published either way, so mheap.grow's chunks keep getting an
+// explicit VMA policy regardless of confinement, but which policy
+// depends on numaHeapHomingActive (numa_linux.go) — with homing active
+// (multi-node, streams enabled), numaBindGrowth stamps each chunk
+// MPOL_PREFERRED to its own stream's node instead; with homing inactive
+// (single-node, streams disabled, or topology not yet discovered),
+// numaBindArena's uniform BIND-all applies exactly as originally
+// described. Either way, the VMA-own policy is what holds against
+// threads the task policy never reached (pre-runtime cgo threads;
+// locked decision 1), and both a uniform BIND-all mask and per-node
+// PREFERRED masks confined to mheap.grow's own disjoint per-node address
+// partitioning VMA-merge cleanly, so neither case sees a Layer-2-style
+// map blowup.
 func numaConfine(node int32) bool {
 	var cpumask [numaCPUMaskBytes]byte
 	if !numaNodeAffinityMask(node, &cpumask) {
@@ -1235,34 +1286,46 @@ func numaApplySoftAffinity(mp *m, node int32) {
 // -race skip leaves for the newm1/newosproc/cgo site specifically
 // (review adjudication (b)).
 //
-// Called from two sites: syscall_runtime_BeforeFork (proc.go, the
-// os/exec path) and newm1 (proc.go, the runtime's own new-M path --
-// both its cgo and non-cgo branches, per NEW-1 above), both before the
-// actual clone/fork/pthread_create call runs. The fork call site runs
-// under the same "no more allocation or calls of non-assembly
-// functions" constraint syscall.forkAndExecInChild1 documents at its
-// own runtime_BeforeFork call site, so this function -- and everything
-// it calls -- must stay nosplit; the newm1 call site has no such
-// constraint of its own, but nosplit is a strictly more restrictive
-// property, so the same function is safe to call from both.
+// Called from three sites: syscall_runtime_BeforeFork (proc.go, the
+// os/exec ForkExec path), syscall_runtime_BeforeExec (proc.go, the
+// syscall.Exec direct-execve path -- fixed alongside this comment: an
+// earlier version only widened before fork/clone, missing that execve
+// also inherits -- preserves, really, since no new thread is created --
+// the calling thread's affinity mask, and syscall.Exec reaches execve
+// without ever going through ForkExec/BeforeFork at all), and newm1
+// (proc.go, the runtime's own new-M path -- both its cgo and non-cgo
+// branches, per NEW-1 above). The first two run immediately before the
+// actual fork/clone/execve syscall each guards; newm1's runs before the
+// clone/pthread_create call within it. The BeforeFork call site runs
+// under the "no more allocation or calls of non-assembly functions"
+// constraint syscall.forkAndExecInChild1 documents at its own
+// runtime_BeforeFork call site, so this function -- and everything it
+// calls -- must stay nosplit; neither the BeforeExec nor the newm1 call
+// site has that constraint of its own, but nosplit is a strictly more
+// restrictive property, so the same function is safe to call from all
+// three.
 //
 // I5 ruling (review, reworded per NEW-2 to the reviewer's stronger
-// ground): this function's sched_setaffinity syscall runs, at both call
-// sites, at essentially the identical lock/signal state as the
-// clone/fork/pthread_create call it immediately precedes within the
-// same function -- mp.locks != 0 throughout in both cases (acquirem,
-// held across newm/newm1's entire body). An earlier version of this
-// comment claimed "signals already blocked, no runtime lock held" for
-// the newosproc call site specifically; that was wrong there (execLock
-// is acquired, and sigprocmask blocks signals, both AFTER where that
-// call used to run) and is moot now that the call lives at the top of
-// newm1, before execLock.rlock() in either branch. The correct,
-// simpler ground: this code region already has to tolerate one syscall
-// right here, because it is about to make a far more consequential one
-// (clone/pthread_create itself) a few lines later under the same lock
-// state -- an extra sched_setaffinity call is strictly no worse than
-// what is already sanctioned at that exact point. Not a Forbidden-list
-// violation: that list's "no syscalls under sched.lock or with
+// ground): at the BeforeFork and newm1 call sites, this function's
+// sched_setaffinity syscall runs at essentially the identical
+// lock/signal state as the clone/fork/pthread_create call it
+// immediately precedes within the same function -- mp.locks != 0
+// throughout in both cases (acquirem, held across newm/newm1's entire
+// body). An earlier version of this comment claimed "signals already
+// blocked, no runtime lock held" for the newosproc call site
+// specifically; that was wrong there (execLock is acquired, and
+// sigprocmask blocks signals, both AFTER where that call used to run)
+// and is moot now that the call lives at the top of newm1, before
+// execLock.rlock() in either branch. The correct, simpler ground: this
+// code region already has to tolerate one syscall right here, because
+// it is about to make a far more consequential one (clone/pthread_create
+// itself) a few lines later under the same lock state -- an extra
+// sched_setaffinity call is strictly no worse than what is already
+// sanctioned at that exact point. The BeforeExec call site differs --
+// mp.locks is not necessarily nonzero there, but execLock is held
+// write-locked across the whole BeforeExec-to-AfterExec window instead.
+// Not a Forbidden-list violation at any of the three sites: that list's
+// "no syscalls under sched.lock or with
 // mp.locks != 0" rule targets scheduler-hook syscalls that could
 // contend with concurrent scheduling state (numaNoteSchedule's own
 // schedule()-hook rule) -- the same reasoning Task 9's own recorded

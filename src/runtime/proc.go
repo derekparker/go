@@ -5390,6 +5390,25 @@ func syscall_runtime_BeforeExec() {
 	// Prevent thread creation during exec.
 	execLock.lock()
 
+	// Node-mask soft affinity (design §12.4) narrows this M's own CPU
+	// affinity as a scheduling hint, not an operator placement choice --
+	// but sched_setaffinity's mask survives execve(2) (unlike fork/clone,
+	// execve does not create a new thread; it replaces this thread's own
+	// image in place), so without this, a process image replaced via
+	// syscall.Exec from a soft-narrowed M would start life with that
+	// narrowed mask as its own startup affinity, indistinguishable from
+	// real operator placement to its own numaShouldConfine/
+	// numaNoteSchedule checks -- the same leak numaWidenBeforeClone's doc
+	// comment (numa_linux.go) describes for fork(2)/clone(2)/
+	// pthread_create, but via execve specifically: syscall.Exec bypasses
+	// fork entirely, so syscall_runtime_BeforeFork's own widen call above
+	// never runs for this path. Gated on goexperiment.Numa, a
+	// compile-time constant, so this dead-code-eliminates out of an
+	// experiment-off binary.
+	if goexperiment.Numa {
+		numaWidenBeforeClone(getg().m)
+	}
+
 	// On Darwin, wait for all pending preemption signals to
 	// be received. See issue #41702.
 	if GOOS == "darwin" || GOOS == "ios" {

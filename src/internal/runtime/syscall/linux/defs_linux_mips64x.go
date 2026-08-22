@@ -7,22 +7,23 @@
 package linux
 
 const (
-	SYS_CLOSE         = 5003
-	SYS_MPROTECT      = 5010
-	SYS_FCNTL         = 5070
-	SYS_PRCTL         = 5153
-	SYS_EPOLL_CTL     = 5208
-	SYS_EPOLL_PWAIT   = 5272
-	SYS_EPOLL_CREATE1 = 5285
-	SYS_EPOLL_PWAIT2  = 5441
-	SYS_EVENTFD2      = 5284
-	SYS_OPENAT        = 5247
-	SYS_PREAD64       = 5016
-	SYS_READ          = 5000
-	SYS_UNAME         = 5061
-	SYS_MBIND         = 5227
-	SYS_GET_MEMPOLICY = 5228
-	SYS_SET_MEMPOLICY = 5229
+	SYS_CLOSE             = 5003
+	SYS_MPROTECT          = 5010
+	SYS_FCNTL             = 5070
+	SYS_PRCTL             = 5153
+	SYS_EPOLL_CTL         = 5208
+	SYS_EPOLL_PWAIT       = 5272
+	SYS_EPOLL_CREATE1     = 5285
+	SYS_EPOLL_PWAIT2      = 5441
+	SYS_EVENTFD2          = 5284
+	SYS_OPENAT            = 5247
+	SYS_PREAD64           = 5016
+	SYS_READ              = 5000
+	SYS_UNAME             = 5061
+	SYS_MBIND             = 5227
+	SYS_GET_MEMPOLICY     = 5228
+	SYS_SET_MEMPOLICY     = 5229
+	SYS_SCHED_SETAFFINITY = 5195
 
 	EFD_NONBLOCK = 0x80
 

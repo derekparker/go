@@ -34,7 +34,7 @@
 // numa_linux_test.go, which already carries this same tag, so gating the
 // whole file this way costs nothing.
 
-//go:build linux && (amd64 || arm64) && goexperiment.numa
+//go:build linux && goexperiment.numa
 
 package runtime
 
@@ -96,6 +96,32 @@ func NumaIsNodeCPUCountForTest(n int) bool {
 // NumaConfinedForTest reports whether fill-one-socket-first confinement is
 // currently active for this process (see numaConfined in numa_linux.go).
 func NumaConfinedForTest() bool { return numaConfined.Load() }
+
+// NumaHostAffinityNarrowedForTest reports whether this process's own
+// affinity mask, as it was at the very start of this process (before
+// this process's own GOEXPERIMENT=numa scheduling could have narrowed
+// anything itself), was already narrower than the machine's online CPU
+// count -- i.e., whether the surrounding environment (which a
+// freshly-exec'd testprog subprocess inherits by default, absent an
+// explicit taskset of its own) is cpuset/taskset-narrowed for reasons
+// outside this package's control.
+//
+// Deliberately reads numaStartupFullAffinity/numaStartupAffinity (a
+// snapshot numaDetectStartupAffinity took once, unconditionally, from
+// schedinit while m0 was still the only thread) rather than re-reading
+// sched_getaffinity(0, ...) live on the calling M: an earlier version of
+// this function did exactly that live re-read, and on real multi-node
+// hardware it produced false positives -- the calling test goroutine's
+// own M can itself be soft-affinity-narrowed by this SAME test binary's
+// own node-mask soft affinity (task 10) at the moment this function
+// runs, which has nothing to do with the environment and would
+// otherwise make every test using this helper spuriously Skip. The
+// startup-time snapshot is immune to that: it is captured before any
+// scheduling, and therefore before any soft-affinity or confinement
+// narrowing, could possibly have run.
+func NumaHostAffinityNarrowedForTest() bool {
+	return !numaStartupFullAffinity
+}
 
 // NumaWidenCountForTest returns the number of times numaWidenBeforeClone
 // has actually widened a soft-narrowed M since process start (review

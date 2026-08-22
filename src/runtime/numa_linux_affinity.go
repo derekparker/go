@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-//go:build linux && (amd64 || arm64)
+//go:build linux
 
 package runtime
 
@@ -15,6 +15,14 @@ import (
 // numaSetThreadAffinity. Confinement (fill-one-socket-first) engages
 // only where it is true; elsewhere numaShouldConfine already fails via
 // numaGetCPUNode, and this constant keeps the stand-down path honest.
+//
+// True on every linux GOARCH (final review F3): SYS_SCHED_SETAFFINITY is
+// defined for all 13 linux GOARCHes in internal/runtime/syscall/linux's
+// per-arch defs_linux_*.go files, verified against each arch's
+// src/syscall/zsysnum_linux_*.go. Originally amd64/arm64-only while the
+// other arches' numbers were unverified; numa_linux_affinity_other.go's
+// numaHasSetAffinity=false stub covered the rest until this file's build
+// tag widened to plain linux.
 const numaHasSetAffinity = true
 
 // numaSetThreadAffinity sets the CPU affinity mask of thread tid
@@ -23,16 +31,19 @@ const numaHasSetAffinity = true
 // simply means confinement (or a stand-down restore for one thread)
 // did not take effect, which callers treat as stand-down.
 //
-// nosplit: numaWidenBeforeClone (numa_linux.go) calls this from two
-// sites -- syscall_runtime_BeforeFork (proc.go, the os/exec path) and
-// newosproc (os_linux.go, this runtime's own new-M path). The
-// BeforeFork site runs under the "no more allocation or calls of
-// non-assembly functions" constraint syscall.forkAndExecInChild1
-// imposes on everything between it and the fork/clone syscall -- so this
-// function, and everything it calls (linux.Syscall6), must stay nosplit.
-// The newosproc site has no such constraint of its own, but nosplit is
-// a strictly more restrictive property, so it is safe to call from
-// there too.
+// nosplit: numaWidenBeforeClone (numa_linux.go) calls this from three
+// sites -- syscall_runtime_BeforeFork (proc.go, the os/exec ForkExec
+// path), syscall_runtime_BeforeExec (proc.go, the syscall.Exec direct-
+// execve path), and newm1 (proc.go, this runtime's own new-M path,
+// both its cgo and non-cgo branches -- not newosproc, which newm1
+// itself calls on the non-cgo branch only). The BeforeFork site runs
+// under the "no more allocation or calls of non-assembly functions"
+// constraint syscall.forkAndExecInChild1 imposes on everything between
+// it and the fork/clone syscall -- so this function, and everything it
+// calls (linux.Syscall6), must stay nosplit. Neither the BeforeExec nor
+// the newm1 site has that constraint of its own, but nosplit is a
+// strictly more restrictive property, so it is safe to call from there
+// too.
 //
 //go:nosplit
 func numaSetThreadAffinity(tid int32, mask *[numaCPUMaskBytes]byte) bool {

@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-//go:build linux && (amd64 || arm64) && goexperiment.numa
+//go:build linux && goexperiment.numa
 
 package runtime_test
 
@@ -73,12 +73,30 @@ func TestNUMAFillOneSocketConfined(t *testing.T) {
 	if !runtime.NumaHasSetAffinityForTest() {
 		t.Skip("no sched_setaffinity plumbing on this arch")
 	}
+	// Final review F6 (Task 2 minor 7): if the environment this test
+	// itself runs in is already cpuset/taskset-narrowed, testprog
+	// inherits that narrowed mask and numaShouldConfine correctly
+	// declines via its own "affinity narrower than online CPUs" rule
+	// (operator placement wins) -- a property of the environment, not a
+	// regression, so Skip rather than Fail below.
+	if runtime.NumaHostAffinityNarrowedForTest() {
+		t.Skip("host/environment CPU affinity is already narrower than online CPUs; testprog would inherit that and correctly decline to confine")
+	}
 	// GOMAXPROCS=1 <= every node's CPU count: the subprocess must confine.
 	// NOTE: testprog is built by buildTestProg with the inherited
 	// environment; run via `make test-numa` so GOEXPERIMENT=numa applies
 	// to the subprocess build too.
 	got := runTestProg(t, "testprog", "NUMAPlacementInfo", "GOMAXPROCS=1")
 	aff, mode := parsePlacement(t, got, "info")
+	if mode == 0 {
+		// Final review F6: MPOL_DEFAULT means numaSetProcessBindAll
+		// never ran at all in the child, which only happens when the
+		// testprog binary itself was built without GOEXPERIMENT=numa
+		// (e.g. `go test` invoked directly instead of `make
+		// test-numa`) -- a build/invocation issue, not a confinement
+		// regression, so Skip rather than Fail.
+		t.Skip("testprog child reports MPOL_DEFAULT (mode=0): likely built without GOEXPERIMENT=numa -- run via `make test-numa`")
+	}
 	if mode != 1 {
 		t.Fatalf("confined process mode=%d want MPOL_PREFERRED(1); output %q", mode, got)
 	}
@@ -122,8 +140,18 @@ func TestNUMAStandDownOnGOMAXPROCSGrowth(t *testing.T) {
 	if !runtime.NumaHasSetAffinityForTest() {
 		t.Skip("no sched_setaffinity plumbing on this arch")
 	}
+	// Final review F6 (Task 2 minor 7, same rationale as
+	// TestNUMAFillOneSocketConfined): an already-narrowed host
+	// environment makes the "before" confinement this test depends on
+	// correctly decline, not fail.
+	if runtime.NumaHostAffinityNarrowedForTest() {
+		t.Skip("host/environment CPU affinity is already narrower than online CPUs; testprog would inherit that and correctly decline to confine")
+	}
 	got := runTestProg(t, "testprog", "NUMAStandDown", "GOMAXPROCS=1")
 	baff, bmode := parsePlacement(t, got, "before")
+	if bmode == 0 {
+		t.Skip("testprog child reports MPOL_DEFAULT (mode=0) before stand-down: likely built without GOEXPERIMENT=numa -- run via `make test-numa`")
+	}
 	aaff, amode := parsePlacement(t, got, "after")
 	if bmode != 1 || !runtime.NumaIsNodeCPUCountForTest(baff) {
 		t.Fatalf("before stand-down: affinity=%d mode=%d, want node-sized+PREFERRED; %q", baff, bmode, got)
@@ -162,8 +190,18 @@ func TestNUMAStandDownOnSetDefaultGOMAXPROCS(t *testing.T) {
 	if !runtime.NumaHasSetAffinityForTest() {
 		t.Skip("no sched_setaffinity plumbing on this arch")
 	}
+	// Final review F6 (Task 2 minor 7, same rationale as
+	// TestNUMAFillOneSocketConfined): an already-narrowed host
+	// environment makes the "before" confinement this test depends on
+	// correctly decline, not fail.
+	if runtime.NumaHostAffinityNarrowedForTest() {
+		t.Skip("host/environment CPU affinity is already narrower than online CPUs; testprog would inherit that and correctly decline to confine")
+	}
 	got := runTestProg(t, "testprog", "NUMAStandDownDefaultGOMAXPROCS", "GOMAXPROCS=64")
 	baff, bmode := parsePlacement(t, got, "before")
+	if bmode == 0 {
+		t.Skip("testprog child reports MPOL_DEFAULT (mode=0) before SetDefaultGOMAXPROCS: likely built without GOEXPERIMENT=numa -- run via `make test-numa`")
+	}
 	aaff, amode := parsePlacement(t, got, "after")
 	if bmode != 1 || !runtime.NumaIsNodeCPUCountForTest(baff) {
 		t.Fatalf("before SetDefaultGOMAXPROCS: affinity=%d mode=%d, want node-sized+PREFERRED; %q", baff, bmode, got)
@@ -321,6 +359,125 @@ func TestNUMASoftAffinityForkRegression(t *testing.T) {
 	}
 	if childPop != online {
 		t.Fatalf("child inherited a narrowed mask (childpop=%d, want online=%d): fork/clone affinity leak not fixed; output %q", childPop, online, got)
+	}
+}
+
+// TestNUMASoftAffinityExecRegression (final review F1) exercises the
+// syscall.Exec-specific affinity-leak fix (numaWidenBeforeClone, called
+// from syscall_runtime_BeforeExec, proc.go): a process narrows itself
+// via soft affinity, then execve(2)'s directly via syscall.Exec (NOT
+// os/exec's ForkExec, which TestNUMASoftAffinityForkRegression already
+// covers) while narrowed. execve does not create a new thread -- it
+// replaces the calling thread's own image in place -- so without a
+// widen call at the BeforeExec site specifically, the replaced image
+// would simply keep running under the same already-narrowed kernel
+// affinity mask. This isolates that call site: BeforeFork's own widen
+// call never runs on this path at all, since syscall.Exec never calls
+// ForkExec.
+func TestNUMASoftAffinityExecRegression(t *testing.T) {
+	if runtime.NumaNumAllowedNodes() <= 1 {
+		t.Skip("not multi-node")
+	}
+	if !runtime.NumaHasSetAffinityForTest() {
+		t.Skip("no sched_setaffinity plumbing on this arch")
+	}
+	got := runTestProg(t, "testprog", "NUMASoftAffinityExecParent", "GOMAXPROCS="+strconv.Itoa(runtime.NumCPU()))
+	var parentPop, online int
+	found := false
+	for _, line := range strings.Split(got, "\n") {
+		if strings.HasPrefix(line, "execchild ") {
+			if strings.Contains(line, "SKIP") {
+				t.Skipf("probe skipped: %q", line)
+			}
+			if strings.Contains(line, "ERR") {
+				t.Fatalf("probe failed: %q", line)
+			}
+			if _, err := fmt.Sscanf(line, "execchild parentpop=%d online=%d", &parentPop, &online); err != nil {
+				t.Fatalf("bad probe line %q: %v", line, err)
+			}
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Fatalf("no %q line in output %q", "execchild", got)
+	}
+	if parentPop >= online {
+		t.Fatalf("parent never actually narrowed (parentpop=%d >= online=%d); probe did not exercise the fix; output %q", parentPop, online, got)
+	}
+	childPop := parseCpusAllowedListPopcountForTest(t, got)
+	if childPop != online {
+		t.Fatalf("execve'd image inherited a narrowed mask (childpop=%d, want online=%d): execve affinity leak not fixed; output %q", childPop, online, got)
+	}
+}
+
+// parseCpusAllowedListPopcountForTest finds the raw "Cpus_allowed_list:"
+// line the shell command NUMASoftAffinityExecParent execve's into prints
+// (after its own "execchild ..." line) and returns the number of CPUs it
+// lists.
+func parseCpusAllowedListPopcountForTest(t *testing.T, out string) int {
+	t.Helper()
+	for _, line := range strings.Split(out, "\n") {
+		if rest, ok := strings.CutPrefix(strings.TrimSpace(line), "Cpus_allowed_list:"); ok {
+			var cpus []int
+			for _, part := range strings.Split(strings.TrimSpace(rest), ",") {
+				part = strings.TrimSpace(part)
+				if part == "" {
+					continue
+				}
+				if lo, hi, ok := strings.Cut(part, "-"); ok {
+					loN, err1 := strconv.Atoi(lo)
+					hiN, err2 := strconv.Atoi(hi)
+					if err1 != nil || err2 != nil {
+						continue
+					}
+					for c := loN; c <= hiN; c++ {
+						cpus = append(cpus, c)
+					}
+				} else if c, err := strconv.Atoi(part); err == nil {
+					cpus = append(cpus, c)
+				}
+			}
+			return len(cpus)
+		}
+	}
+	t.Fatalf("no %q line in output %q", "Cpus_allowed_list:", out)
+	return -1
+}
+
+// TestNUMASoftAffinitySetDefaultGOMAXPROCS (final review F2) exercises
+// the getCPUCount fix (os_linux.go): SetDefaultGOMAXPROCS, forced on a
+// soft-affinity-narrowed M, must not collapse GOMAXPROCS to that node's
+// CPU count -- getCPUCount substitutes numaStartupAffinity's popcount
+// instead of reading the live, narrowed thread mask whenever the
+// calling M is soft-narrowed.
+func TestNUMASoftAffinitySetDefaultGOMAXPROCS(t *testing.T) {
+	if runtime.NumaNumAllowedNodes() <= 1 {
+		t.Skip("not multi-node")
+	}
+	if !runtime.NumaHasSetAffinityForTest() {
+		t.Skip("no sched_setaffinity plumbing on this arch")
+	}
+	got := runTestProg(t, "testprog", "NUMASoftAffinitySetDefaultGOMAXPROCS", "GOMAXPROCS="+strconv.Itoa(runtime.NumCPU()))
+	var after, numcpu int
+	found := false
+	for _, line := range strings.Split(got, "\n") {
+		if strings.HasPrefix(line, "sagmp ") {
+			if strings.Contains(line, "SKIP") {
+				t.Skipf("probe skipped: %q", line)
+			}
+			if _, err := fmt.Sscanf(line, "sagmp after=%d numcpu=%d", &after, &numcpu); err != nil {
+				t.Fatalf("bad probe line %q: %v", line, err)
+			}
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Fatalf("no %q line in output %q", "sagmp", got)
+	}
+	if after != numcpu {
+		t.Fatalf("GOMAXPROCS after SetDefaultGOMAXPROCS on a soft-narrowed M = %d, want NumCPU=%d (collapsed to node CPU count instead of the full online count): output %q", after, numcpu, got)
 	}
 }
 

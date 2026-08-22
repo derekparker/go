@@ -26,13 +26,18 @@ func init() {
 	register("NUMAStandDownDefaultGOMAXPROCS", NUMAStandDownDefaultGOMAXPROCS)
 	register("NUMASoftAffinity", NUMASoftAffinity)
 	register("NUMASoftAffinityForkParent", NUMASoftAffinityForkParent)
+	register("NUMASoftAffinityExecParent", NUMASoftAffinityExecParent)
+	register("NUMASoftAffinitySetDefaultGOMAXPROCS", NUMASoftAffinitySetDefaultGOMAXPROCS)
 }
 
-// getMempolicySyscall: get_mempolicy(2) numbers differ per arch.
-var getMempolicySyscall = map[string]uintptr{
-	"amd64": 239,
-	"arm64": 236,
-}[runtime.GOARCH]
+// getMempolicySyscall: get_mempolicy(2)'s syscall number differs per
+// arch. Rather than hand-maintain a second per-arch table alongside
+// package syscall's own generated one (final review F3: an earlier
+// version of this table only covered amd64/arm64, matching
+// numa_linux_affinity.go's original build-tag scope; both are now
+// linux-wide), use syscall.SYS_GET_MEMPOLICY directly -- it is
+// generated for every linux GOARCH in src/syscall/zsysnum_linux_*.go.
+var getMempolicySyscall = uintptr(syscall.SYS_GET_MEMPOLICY)
 
 const mpolModeFlags = 0xe000 // MPOL_F_* flag bits get_mempolicy may OR into mode
 
@@ -386,6 +391,102 @@ func NUMASoftAffinityForkParent() {
 	}
 	childPop := parseCpusAllowedListPopcount(string(out))
 	fmt.Printf("forkchild parentpop=%d childpop=%d online=%d\n", parentPop, childPop, online)
+}
+
+// NUMASoftAffinityExecParent probes the execve affinity-leak fix
+// directly (final review F1, numaWidenBeforeClone called from
+// syscall_runtime_BeforeExec in proc.go): waits for its own (single,
+// unlocked -- see NUMASoftAffinityForkParent's doc comment for why this
+// matters) M to be soft-affinity-narrowed to some node, then calls
+// syscall.Exec directly -- the execve(2) path syscall.Exec uses, which
+// replaces this process's own image in place and never goes through
+// os/exec's ForkExec/syscall_runtime_BeforeFork at all -- while still
+// narrowed, and reports the child image's own affinity popcount.
+//
+// Unlike NUMASoftAffinityForkParent (which forks a child and inherits
+// the parent's mask via fork(2)/clone(2)), this exercises inheritance
+// across execve specifically: execve does not create a new thread, so
+// without the BeforeExec-site fix, the replaced process image would
+// simply keep running under this same thread's already-narrowed kernel
+// affinity mask.
+//
+// The replacement image is a plain shell (not a re-invocation of this
+// binary), for the same reason NUMASoftAffinityForkParent's doc comment
+// gives: a shell has no Go scheduler and no soft affinity of its own to
+// confound the reading with self-narrowing.
+//
+// Prints "execchild parentpop=<N> online=<P>" BEFORE the exec call
+// (nothing after it runs in this binary -- the process image is gone),
+// then, if the exec succeeds, the shell command itself prints a raw
+// "Cpus_allowed_list:\t..." line (parsed by
+// parseCpusAllowedListPopcount, the same helper
+// NUMASoftAffinityForkParent's caller test uses) to the same inherited
+// stdout.
+func NUMASoftAffinityExecParent() {
+	online := runtime.NumCPU()
+	var parentPop int
+	narrowed := false
+	deadline := time.Now().Add(2 * time.Second)
+	for time.Now().Before(deadline) {
+		runtime.Gosched()
+		if pop, ok := ownAffinityPopcount(); ok && pop > 0 && pop < online {
+			parentPop = pop
+			narrowed = true
+			break
+		}
+		time.Sleep(2 * time.Millisecond)
+	}
+	if !narrowed {
+		fmt.Println("execchild SKIP parent never narrowed")
+		return
+	}
+	fmt.Printf("execchild parentpop=%d online=%d\n", parentPop, online)
+	err := syscall.Exec("/bin/sh", []string{"/bin/sh", "-c", "grep Cpus_allowed_list: /proc/self/status"}, os.Environ())
+	// Only reached if the exec itself failed to start; on success this
+	// process image is replaced and nothing after Exec ever runs.
+	fmt.Printf("execchild ERR exec failed: %v\n", err)
+}
+
+// NUMASoftAffinitySetDefaultGOMAXPROCS probes the SetDefaultGOMAXPROCS /
+// soft-affinity interplay fix (final review F2, getCPUCount in
+// os_linux.go): a soft-affinity-narrowed M's LIVE sched_getaffinity mask
+// must not leak into defaultGOMAXPROCS's recompute when
+// SetDefaultGOMAXPROCS forces one.
+//
+// Run with GOMAXPROCS = NumCPU() (via env, the same technique
+// NUMASoftAffinity uses) so fill-one-socket confinement (Workstream A)
+// never engages -- isolating node-mask soft affinity's own interplay
+// with SetDefaultGOMAXPROCS specifically, the same way
+// TestNUMAConfineSkipsNarrowedAffinity isolates confinement from Layer
+// 1. Like NUMASoftAffinityForkParent, main's own M is never
+// LockOSThread'd, so every Gosched here does reach numaNoteSchedule.
+// Polls until this M's own affinity narrows to a single node, then
+// calls runtime.SetDefaultGOMAXPROCS() on the very next line (no
+// intervening scheduler point, so still the same M) and reports the
+// resulting GOMAXPROCS. Before the fix, SetDefaultGOMAXPROCS's recompute
+// reads this M's live, narrowed mask and collapses GOMAXPROCS to the
+// node's CPU count; after the fix it reads numaStartupAffinity instead
+// and recovers the full online count.
+//
+// Prints one line: "sagmp after=<GOMAXPROCS> numcpu=<online>".
+func NUMASoftAffinitySetDefaultGOMAXPROCS() {
+	online := runtime.NumCPU()
+	narrowed := false
+	deadline := time.Now().Add(2 * time.Second)
+	for time.Now().Before(deadline) {
+		runtime.Gosched()
+		if pop, ok := ownAffinityPopcount(); ok && pop > 0 && pop < online {
+			narrowed = true
+			break
+		}
+		time.Sleep(2 * time.Millisecond)
+	}
+	if !narrowed {
+		fmt.Println("sagmp SKIP never narrowed")
+		return
+	}
+	runtime.SetDefaultGOMAXPROCS()
+	fmt.Printf("sagmp after=%d numcpu=%d\n", runtime.GOMAXPROCS(0), online)
 }
 
 // parseCpusAllowedListPopcount parses a single "Cpus_allowed_list:\t..."
