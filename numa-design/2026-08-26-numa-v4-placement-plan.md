@@ -227,6 +227,188 @@ git commit -m "numa-design: v4 stage-2 placement design locked and implementatio
 
 ---
 
+### Task 3: placement state + quota + predicate (pure parts, no scheduler wiring)
+
+Appended per Task 2 Step 3; code-level spec is `numa-design/v4-placement-design.md`
+(post-review). This task builds everything that has no call-site wiring yet.
+
+**Files:**
+- Create: `src/runtime/numa_pstate_on.go`, `src/runtime/numa_pstate_off.go`
+  (design §1 verbatim: on = real struct + home/setHome/clearHome with the +1
+  idiom; off = `struct{}` + no-op methods; both all-GOOS)
+- Modify: `src/runtime/runtime2.go` — embed `numa pNUMAState` in `p`
+  **immediately before `xRegs`** (design §1/review m2), with the off-build
+  byte-identity comment mirroring `m.numa`'s
+- Modify: `src/runtime/numa_linux.go` — `numaPlacementEligible` var,
+  `numaPlacementActive()`, `numaPlacementInit()` (eligibility computation, design
+  §2 including the C1 `numaMaxHeapNodes` node-id bound and GODEBUG=numa=1 decline
+  prints), `numaPlacementQuotas`, `numaAssignPHomes`
+- Modify: `src/runtime/stubs_nonlinux.go` — no-op `numaPlacementInit`,
+  `numaAssignPHomes`, false `numaPlacementActive` (review m4)
+- Modify: `src/runtime/export_numa_test.go` — quota + predicate hooks
+- Test: `src/runtime/numa_linux_test.go`
+
+**Interfaces:**
+- Consumes: `numaMaxHeapNodes`, `numaTopology`, `numaHeapStreamsEnabled`,
+  `numaStartupFullAffinity`, `numaConfined`, `numaStoodDown`, the topology
+  per-node CPU-count helper `numaShouldConfine` already uses.
+- Produces: `numaPlacementActive() bool` (the pairing-rule predicate every
+  consumer checks), `numaAssignPHomes(nprocs int32)` (procresize/schedinit),
+  `pp.numa.home() (int8, bool)`.
+
+- [ ] **Step 1: failing quota test** — `TestNUMAPlacementQuota`, table from design
+  §9 (incl. (4,[1000,1,1,1])→1/1/1/1 rule-fires and (2,[128,128,128,128])→1/1/0/0
+  rule-must-not-fire). Run: `cd src && GOEXPERIMENT=numa go test -run
+  TestNUMAPlacementQuota runtime` → FAIL (undefined hook).
+- [ ] **Step 2: implement** `numaPlacementQuotas` (int64 products; largest
+  remainder with per-node single bump, ties → lower id; ≥1 redistribution loop
+  with donor-must-have->1 guard) + `numaAssignPHomes` (clear-on-inactive branch;
+  contiguous walk over quotas) + pNUMAState files + p embed + predicate/init +
+  stubs + export hooks. Reference implementation for the quota core:
+
+```go
+func numaPlacementQuotas(nprocs int32, cpus, quotas []int32) {
+	clear(quotas)
+	var total int64
+	for _, c := range cpus {
+		total += int64(c)
+	}
+	if total == 0 || nprocs <= 0 {
+		return
+	}
+	var assigned int32
+	for i, c := range cpus {
+		q := int32(int64(nprocs) * int64(c) / total)
+		quotas[i] = q
+		assigned += q
+	}
+	var bumped [numaMaxHeapNodes]bool
+	for assigned < nprocs {
+		best, bestRem := -1, int64(-1)
+		for i, c := range cpus {
+			if c == 0 || bumped[i] {
+				continue
+			}
+			if rem := int64(nprocs) * int64(c) % total; rem > bestRem {
+				best, bestRem = i, rem
+			}
+		}
+		if best < 0 {
+			break // unreachable: remainder count < CPU-bearing node count
+		}
+		bumped[best] = true
+		quotas[best]++
+		assigned++
+	}
+	for {
+		zero := -1
+		for i, c := range cpus {
+			if c > 0 && quotas[i] == 0 {
+				zero = i
+				break
+			}
+		}
+		if zero < 0 {
+			return
+		}
+		donor, max := -1, int32(1)
+		for i, q := range quotas {
+			if q > max {
+				donor, max = i, q
+			}
+		}
+		if donor < 0 {
+			return // nprocs < CPU-bearing nodes: some nodes stay at 0
+		}
+		quotas[donor]--
+		quotas[zero]++
+	}
+}
+```
+
+- [ ] **Step 3: tests pass** (`TestNUMAPlacementQuota`, plus
+  `TestNUMAPlacementActivePredicate` combos via hooks), `go_diagnostics` clean,
+  off-build compiles (`go build runtime` without GOEXPERIMENT), p-size guard test
+  (design §1) added and passing.
+- [ ] **Step 4: commit** — `runtime: add NUMA P-placement state, quotas, and
+  engagement predicate`.
+
+### Task 4: wiring — schedinit, procresize, numaNoteSchedule, numaGrowNode
+
+**Files:**
+- Modify: `src/runtime/proc.go` — `numaPlacementInit()` + `numaAssignPHomes(procs)`
+  in schedinit immediately after `numaConfineIfSmall` (review M1; guarded
+  `if goexperiment.Numa`); `numaAssignPHomes(nprocs)` in procresize after the
+  init-new-Ps loop (design §3); both call sites comment-disciplined like the
+  existing numa hooks.
+- Modify: `src/runtime/numa_linux.go` — `numaNoteSchedule` placement path (design
+  §4 post-review verbatim: steady-state byte compare, nextCheck-throttled apply,
+  no-home falls through to getcpu path); `numaGrowNode` placement branch (design
+  §5 post-review verbatim, with the defensive `numaMaxHeapNodes` bound).
+- Test: `src/runtime/numa_linux_test.go` — `TestNUMAPlacementProcresize`
+  (GOMAXPROCS churn 1→256→2→128 asserting recomputed contiguous homes via hook).
+
+**Interfaces:** consumes Task 3's symbols; produces the live placement behavior
+G2 measures. No new exported API.
+
+- [ ] **Step 1: failing procresize test** (hook reads allp homes; churn asserts).
+- [ ] **Step 2: wire the four sites** per design §§2–5.
+- [ ] **Step 3:** `go_diagnostics` clean; `GOEXPERIMENT=numa go test -run
+  'TestNUMA' runtime` green locally; off-build census spot-check (objdump
+  function diff vs Task 3 commit — zero function-level changes off).
+- [ ] **Step 4: commit** — `runtime: assign and enforce NUMA P home nodes`.
+
+### Task 5: stealWork same-node-first pass
+
+**Files:** Modify `src/runtime/proc.go` (`stealWork`, design §6 verbatim: hoisted
+`stealHome`, pass-0 filter after `pp == p2`); test via existing sched micros.
+
+- [ ] **Step 1: implement** (filter only; no runqsteal/timer changes).
+- [ ] **Step 2:** `go_diagnostics`; `GOEXPERIMENT=numa go test -run
+  'TestNUMA|TestSteal|TestSchedule' runtime`; local (non-NUMA box) sanity:
+  `go test -bench 'PingPongHog|CreateGoroutines' -count=5 runtime` experiment-on
+  vs off — informational only (the real gate is G2-sched-micros on numa-dell).
+- [ ] **Step 3: commit** — `runtime: prefer same-node victims on the first
+  work-stealing pass`.
+
+### Task 6: hardware tests + local battery
+
+**Files:** `src/runtime/testdata/testprog/numa.go` (`NUMAPlacementSpread` probe,
+design §9), `src/runtime/numa_linux_test.go` (spread test + unpinned refill
+locality ≥90% metrics test, both hardware-gated with the existing TestNUMA* skip
+guards), `src/runtime/export_numa_test.go` as needed.
+
+- [ ] **Step 1:** write both tests (spread probe asserts every worker thread's
+  `Cpus_allowed_list` equals exactly one node's CPU list AND both nodes
+  represented — the anti-collapse assertion from the C1-regression class).
+- [ ] **Step 2:** local: full `GOEXPERIMENT=numa go test runtime` (hardware tests
+  skip), `-race -timeout=20m` pass, off-build function census vs stage start
+  (zero diffs), `go vet`.
+- [ ] **Step 3:** numa-dell: `make push && make build`, full TestNUMA* battery
+  including the two new hardware tests; `go version -m` verification.
+- [ ] **Step 4: commit** — `runtime: NUMA placement hardware tests`.
+
+### Task 7: G2 gate campaign (pre-registered; single-session sweeps)
+
+Runs only after Tasks 3–6 are green on numa-dell. Gates and bars are locked in
+"Stage 2 decision gates" above — this task instantiates the sweeps:
+
+- [ ] **G2-primary:** `pathology-sweep.sh` garbage `-benchmem=4096` GOMAXPROCS=256,
+  arms stock-unpinned (B) vs experiment-unpinned (C), n≥10 rotating, benchstat;
+  PASS = C-vs-B wall sec/op ≥5% improvement, significant.
+- [ ] **G2-locality:** metrics sweep at GOMAXPROCS ∈ {2,8,32,128,256} unpinned,
+  local-refill share ≥90% at every point (driver script archived with raws).
+- [ ] **G2-IMC:** IMC remote-share reduction ≥10% relative vs stock, same
+  methodology as the v3 Task 11 gate (perf uncore counters, round-level analysis).
+- [ ] **G2-sched-micros:** PingPongHog / CreateGoroutines{,Parallel,Capture}
+  ≤+2% at 256P, n≥10 interleaved, benchstat.
+- [ ] **G2-cost:** 1P json (≤+2% both metrics); 1P alloc micro vs stock ≤+2%
+  (**the standing +3.73% FAIL must clear or stage 2 fails this gate**); 256P json
+  user+sys with `BENCH_DISABLE_CPUPROF=1` harness ≤+2%; `-race`; census.
+- [ ] **RESULTS.md** section per gate with raws under
+  `numa-design/bench-data/v4-g2-*/`, one commit per battery; ledger updated;
+  verdict recorded (ship / fail-and-stop per Global Constraints).
+
 ### Task L (stage 3, conditional): lock-callchain attribution
 
 Scope, arms, method, and n are locked in the stage-3 decision block above. This task is instantiated (appended to this plan with concrete steps) only when a gate FAIL after stages 1–2 gives it a target; if all gates pass it collapses to one archived confirmation capture noted in RESULTS.md.
