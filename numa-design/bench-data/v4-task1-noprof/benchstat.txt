@@ -1,0 +1,219 @@
+===== PRIMARY: off-noprof vs numa-noprof =====
+pkg: golang.org/x/benchmarks
+goos: linux
+goarch: amd64
+         │ off-noprof.out │        numa-noprof.out         │
+         │     sec/op     │    sec/op     vs base          │
+JSON-256     2.609m ± 32%   3.335m ± 37%  ~ (p=0.143 n=10)
+
+         │    off-noprof.out    │            numa-noprof.out             │
+         │ GC-bytes-from-system │ GC-bytes-from-system  vs base          │
+JSON-256          26.25Mi ± 58%         30.11Mi ± 187%  ~ (p=0.052 n=10)
+
+         │ off-noprof.out │        numa-noprof.out         │
+         │   STW-sec/GC   │  STW-sec/GC   vs base          │
+JSON-256     33.56m ± 44%   37.45m ± 19%  ~ (p=0.631 n=10)
+
+         │ off-noprof.out │         numa-noprof.out         │
+         │   STW-sec/op   │  STW-sec/op    vs base          │
+JSON-256     172.8µ ± 19%   275.4µ ± 100%  ~ (p=0.353 n=10)
+
+         │   off-noprof.out   │           numa-noprof.out            │
+         │ allocated-bytes/op │ allocated-bytes/op  vs base          │
+JSON-256        8.178Mi ± 26%        8.821Mi ± 33%  ~ (p=0.315 n=10)
+
+         │ off-noprof.out │        numa-noprof.out        │
+         │   allocs/op    │  allocs/op   vs base          │
+JSON-256      26.81k ± 0%   26.81k ± 0%  ~ (p=0.423 n=10)
+
+         │  off-noprof.out   │           numa-noprof.out           │
+         │ bytes-from-system │ bytes-from-system  vs base          │
+JSON-256       5.682Gi ± 26%      4.315Gi ± 144%  ~ (p=0.247 n=10)
+
+         │     off-noprof.out     │             numa-noprof.out              │
+         │ heap-bytes-from-system │ heap-bytes-from-system  vs base          │
+JSON-256            5.574Gi ± 26%           4.202Gi ± 147%  ~ (p=0.247 n=10)
+
+         │     off-noprof.out      │              numa-noprof.out              │
+         │ other-bytes-from-system │ other-bytes-from-system  vs base          │
+JSON-256              69.33Mi ± 5%             66.63Mi ± 44%  ~ (p=0.579 n=10)
+
+         │ off-noprof.out │         numa-noprof.out          │
+         │ peak-RSS-bytes │ peak-RSS-bytes  vs base          │
+JSON-256    5.638Gi ± 26%   4.260Gi ± 142%  ~ (p=0.190 n=10)
+
+         │ off-noprof.out │         numa-noprof.out          │
+         │ peak-VM-bytes  │ peak-VM-bytes   vs base          │
+JSON-256    6.887Gi ± 21%   5.541Gi ± 111%  ~ (p=0.247 n=10)
+
+         │     off-noprof.out      │              numa-noprof.out              │
+         │ stack-bytes-from-system │ stack-bytes-from-system  vs base          │
+JSON-256             17.92Mi ± 10%              17.66Mi ± 9%  ~ (p=0.869 n=10)
+
+         │ off-noprof.out  │          numa-noprof.out          │
+         │ user+sys-sec/op │ user+sys-sec/op  vs base          │
+JSON-256      183.2m ± 30%      172.6m ± 44%  ~ (p=0.853 n=10)
+===== REPLICATION: off-prof vs numa-prof =====
+pkg: golang.org/x/benchmarks
+goos: linux
+goarch: amd64
+         │ off-prof.out │         numa-prof.out          │
+         │    sec/op    │    sec/op     vs base          │
+JSON-256   2.166m ± 51%   2.322m ± 53%  ~ (p=0.796 n=10)
+
+         │     off-prof.out     │             numa-prof.out              │
+         │ GC-bytes-from-system │ GC-bytes-from-system  vs base          │
+JSON-256         27.88Mi ± 128%          47.38Mi ± 72%  ~ (p=0.052 n=10)
+
+         │ off-prof.out │         numa-prof.out          │
+         │  STW-sec/GC  │  STW-sec/GC   vs base          │
+JSON-256   38.53m ± 46%   44.58m ± 16%  ~ (p=0.280 n=10)
+
+         │ off-prof.out │         numa-prof.out          │
+         │  STW-sec/op  │  STW-sec/op   vs base          │
+JSON-256   158.5µ ± 45%   123.3µ ± 44%  ~ (p=0.105 n=10)
+
+         │    off-prof.out    │            numa-prof.out             │
+         │ allocated-bytes/op │ allocated-bytes/op  vs base          │
+JSON-256        6.870Mi ± 19%        6.037Mi ± 20%  ~ (p=0.105 n=10)
+
+         │ off-prof.out │         numa-prof.out         │
+         │  allocs/op   │  allocs/op   vs base          │
+JSON-256    26.83k ± 0%   26.81k ± 0%  ~ (p=0.343 n=10)
+
+         │   off-prof.out    │            numa-prof.out            │
+         │ bytes-from-system │ bytes-from-system  vs base          │
+JSON-256      5.972Gi ± 109%       7.889Gi ± 79%  ~ (p=0.105 n=10)
+
+         │      off-prof.out      │              numa-prof.out               │
+         │ heap-bytes-from-system │ heap-bytes-from-system  vs base          │
+JSON-256           5.862Gi ± 110%            7.738Gi ± 79%  ~ (p=0.105 n=10)
+
+         │      off-prof.out       │               numa-prof.out               │
+         │ other-bytes-from-system │ other-bytes-from-system  vs base          │
+JSON-256             69.82Mi ± 72%             88.65Mi ± 55%  ~ (p=0.165 n=10)
+
+         │  off-prof.out  │          numa-prof.out           │
+         │ peak-RSS-bytes │ peak-RSS-bytes  vs base          │
+JSON-256   5.933Gi ± 105%    7.756Gi ± 79%  ~ (p=0.105 n=10)
+
+         │ off-prof.out  │          numa-prof.out          │
+         │ peak-VM-bytes │ peak-VM-bytes  vs base          │
+JSON-256   7.108Gi ± 92%   9.048Gi ± 69%  ~ (p=0.089 n=10)
+
+         │      off-prof.out       │               numa-prof.out               │
+         │ stack-bytes-from-system │ stack-bytes-from-system  vs base          │
+JSON-256             17.41Mi ± 11%             16.58Mi ± 16%  ~ (p=0.543 n=10)
+
+         │  off-prof.out   │           numa-prof.out           │
+         │ user+sys-sec/op │ user+sys-sec/op  vs base          │
+JSON-256      161.1m ± 52%      162.8m ± 77%  ~ (p=0.912 n=10)
+===== PROFILER EFFECT WITHIN ARMS: off prof vs noprof / numa prof vs noprof =====
+pkg: golang.org/x/benchmarks
+goos: linux
+goarch: amd64
+         │ off-prof.out │         off-noprof.out         │
+         │    sec/op    │    sec/op     vs base          │
+JSON-256   2.166m ± 51%   2.609m ± 32%  ~ (p=0.393 n=10)
+
+         │     off-prof.out     │             off-noprof.out             │
+         │ GC-bytes-from-system │ GC-bytes-from-system  vs base          │
+JSON-256         27.88Mi ± 128%          26.25Mi ± 58%  ~ (p=0.436 n=10)
+
+         │ off-prof.out │         off-noprof.out         │
+         │  STW-sec/GC  │  STW-sec/GC   vs base          │
+JSON-256   38.53m ± 46%   33.56m ± 44%  ~ (p=0.075 n=10)
+
+         │ off-prof.out │         off-noprof.out         │
+         │  STW-sec/op  │  STW-sec/op   vs base          │
+JSON-256   158.5µ ± 45%   172.8µ ± 19%  ~ (p=0.529 n=10)
+
+         │    off-prof.out    │            off-noprof.out            │
+         │ allocated-bytes/op │ allocated-bytes/op  vs base          │
+JSON-256        6.870Mi ± 19%        8.178Mi ± 26%  ~ (p=0.247 n=10)
+
+         │ off-prof.out │        off-noprof.out         │
+         │  allocs/op   │  allocs/op   vs base          │
+JSON-256    26.83k ± 0%   26.81k ± 0%  ~ (p=0.127 n=10)
+
+         │   off-prof.out    │           off-noprof.out            │
+         │ bytes-from-system │ bytes-from-system  vs base          │
+JSON-256      5.972Gi ± 109%       5.682Gi ± 26%  ~ (p=0.579 n=10)
+
+         │      off-prof.out      │              off-noprof.out              │
+         │ heap-bytes-from-system │ heap-bytes-from-system  vs base          │
+JSON-256           5.862Gi ± 110%            5.574Gi ± 26%  ~ (p=0.579 n=10)
+
+         │      off-prof.out       │              off-noprof.out               │
+         │ other-bytes-from-system │ other-bytes-from-system  vs base          │
+JSON-256             69.82Mi ± 72%              69.33Mi ± 5%  ~ (p=0.529 n=10)
+
+         │  off-prof.out  │          off-noprof.out          │
+         │ peak-RSS-bytes │ peak-RSS-bytes  vs base          │
+JSON-256   5.933Gi ± 105%    5.638Gi ± 26%  ~ (p=0.579 n=10)
+
+         │ off-prof.out  │         off-noprof.out          │
+         │ peak-VM-bytes │ peak-VM-bytes  vs base          │
+JSON-256   7.108Gi ± 92%   6.887Gi ± 21%  ~ (p=0.579 n=10)
+
+         │      off-prof.out       │              off-noprof.out               │
+         │ stack-bytes-from-system │ stack-bytes-from-system  vs base          │
+JSON-256             17.41Mi ± 11%             17.92Mi ± 10%  ~ (p=0.393 n=10)
+
+         │  off-prof.out   │          off-noprof.out           │
+         │ user+sys-sec/op │ user+sys-sec/op  vs base          │
+JSON-256      161.1m ± 52%      183.2m ± 30%  ~ (p=0.436 n=10)
+pkg: golang.org/x/benchmarks
+goos: linux
+goarch: amd64
+         │ numa-prof.out │        numa-noprof.out         │
+         │    sec/op     │    sec/op     vs base          │
+JSON-256    2.322m ± 53%   3.335m ± 37%  ~ (p=0.143 n=10)
+
+         │    numa-prof.out     │            numa-noprof.out             │
+         │ GC-bytes-from-system │ GC-bytes-from-system  vs base          │
+JSON-256          47.38Mi ± 72%         30.11Mi ± 187%  ~ (p=0.123 n=10)
+
+         │ numa-prof.out │           numa-noprof.out            │
+         │  STW-sec/GC   │  STW-sec/GC   vs base                │
+JSON-256    44.58m ± 16%   37.45m ± 19%  -15.99% (p=0.023 n=10)
+
+         │ numa-prof.out │            numa-noprof.out             │
+         │  STW-sec/op   │  STW-sec/op    vs base                 │
+JSON-256    123.3µ ± 44%   275.4µ ± 100%  +123.29% (p=0.009 n=10)
+
+         │   numa-prof.out    │              numa-noprof.out               │
+         │ allocated-bytes/op │ allocated-bytes/op  vs base                │
+JSON-256        6.037Mi ± 20%        8.821Mi ± 33%  +46.12% (p=0.007 n=10)
+
+         │ numa-prof.out │        numa-noprof.out        │
+         │   allocs/op   │  allocs/op   vs base          │
+JSON-256     26.81k ± 0%   26.81k ± 0%  ~ (p=1.000 n=10)
+
+         │   numa-prof.out   │              numa-noprof.out              │
+         │ bytes-from-system │ bytes-from-system  vs base                │
+JSON-256       7.889Gi ± 79%      4.315Gi ± 144%  -45.30% (p=0.011 n=10)
+
+         │     numa-prof.out      │                numa-noprof.out                 │
+         │ heap-bytes-from-system │ heap-bytes-from-system  vs base                │
+JSON-256            7.738Gi ± 79%           4.202Gi ± 147%  -45.69% (p=0.011 n=10)
+
+         │      numa-prof.out      │                 numa-noprof.out                 │
+         │ other-bytes-from-system │ other-bytes-from-system  vs base                │
+JSON-256             88.65Mi ± 55%             66.63Mi ± 44%  -24.84% (p=0.015 n=10)
+
+         │ numa-prof.out  │            numa-noprof.out             │
+         │ peak-RSS-bytes │ peak-RSS-bytes  vs base                │
+JSON-256    7.756Gi ± 79%   4.260Gi ± 142%  -45.07% (p=0.011 n=10)
+
+         │ numa-prof.out │            numa-noprof.out             │
+         │ peak-VM-bytes │ peak-VM-bytes   vs base                │
+JSON-256   9.048Gi ± 69%   5.541Gi ± 111%  -38.76% (p=0.011 n=10)
+
+         │      numa-prof.out      │              numa-noprof.out              │
+         │ stack-bytes-from-system │ stack-bytes-from-system  vs base          │
+JSON-256             16.58Mi ± 16%              17.66Mi ± 9%  ~ (p=0.363 n=10)
+
+         │  numa-prof.out  │          numa-noprof.out          │
+         │ user+sys-sec/op │ user+sys-sec/op  vs base          │
+JSON-256      162.8m ± 77%      172.6m ± 44%  ~ (p=0.971 n=10)

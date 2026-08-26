@@ -4280,3 +4280,60 @@ syscall stays"), the raw-syscall `getcpu` implementation is retained
 as-is; vDSO/rseq work does not proceed. Task 14's heading in
 `numa-design/2026-08-20-numa-v3-locality-plan.md` is marked
 **DEFERRED (profile gate not met at Task 11)**.
+
+---
+
+# v4 Task 1 — 256P user+sys cost gate, re-adjudicated with profiler-off harness
+
+Plan: `2026-08-26-numa-v4-placement-plan.md` (pre-registered at 873dc29245, committed
+before execution). Tree/toolchain: `873dc29245` (go1.28-devel_873dc29245, numa arm
+`X:numa`; `bench-data/v4-task1-noprof/go-version-m.txt`). Harness: x/benchmarks
+pinned `v0.0.0-20260819172200-70693762b6a0`, copied from numa-dell's module cache and
+patched ONLY with an env-gated guard (`BENCH_DISABLE_CPUPROF`) around
+`pprof.StartCPUProfile`/`StopCPUProfile` in `driver.runBenchmarkOnce`
+(22-line diff: `bench-data/v4-task1-noprof/driver-noprof.patch`). One binary pair
+serves all four arms (prof/noprof selected by env, zero build variance within a
+toolchain). Sweep: `v4-task1-noprof-sweep.sh`, GOMAXPROCS=256, -benchmem=512
+-benchtime=3s, four arms (off-prof, numa-prof, off-noprof, numa-noprof), n=10
+rounds, rotating arm order, single session, idle-checked, numa_balancing=1 verified
+before and after. Raws + benchstat in `bench-data/v4-task1-noprof/`.
+
+## Pre-registered primary: user+sys-sec/op, off-noprof vs numa-noprof
+
+    183.2m ± 30%  vs  172.6m ± 44%   ~ (p=0.853, n=10)   point estimate −5.8%
+
+**VERDICT: PASS** per the pre-registered rule (≤ +2% or not significant). Per the
+plan's decision rule, the 256P user+sys hard gate is recorded as
+**PASS-under-noprof-harness**, and every later 256P json gate in the v4 plan runs
+with `BENCH_DISABLE_CPUPROF=1`.
+
+## Honesty constraints on that PASS
+
+- **Power:** this session's per-arm relative spread is ±30–77% (all four arms share
+  a 113M–289M envelope with visible multi-round drift regimes; see per-round values
+  in the raws). At n=10 the MDE is roughly ~30% — the session could NOT have
+  detected the original +19.96% reading even if real. The PASS rests on the point
+  estimate being ~0/negative and on the pre-registered rule, not on a tight CI.
+- **Replication arm did not reproduce the v3 FAIL:** off-prof vs numa-prof
+  user+sys 161.1m vs 162.8m, ~ (p=0.912), point estimate +1.1% — the original
+  +19.96% (v3 Task 11 Gate 2c) did not appear in this session even WITH the
+  profiler on. Consistent with (a) the original reading being session-specific,
+  and/or (b) today's variance regime masking it. Either way the +19.96% is not a
+  robust property of the WS-B tree; no cross-session inference is drawn (v3
+  constraint), both sessions' raws stand in the archive.
+- **Profiler-interaction estimate (secondary, pre-registered):**
+  (NUMA−OFF)under-prof ≈ +1.7m vs (NUMA−OFF)under-noprof ≈ −10.6m → interaction
+  ≈ −12m (~−7% of base), all CIs wide, inconclusive in this session.
+
+## Exploratory (labeled, no claims)
+
+- sec/op off-noprof 2.609m vs numa-noprof 3.335m, ~ (p=0.143): numa throughput
+  point estimate +27.8% but not significant at this variance; G2's own gates will
+  adjudicate throughput on the stage-2 tree.
+- Within the numa binary, prof vs noprof shows significant differences in
+  allocated-bytes/op (+46%, profiler allocations counted per op), peak-RSS (−45%
+  under noprof), STW-sec/op (+123% under noprof) — harness-mechanics observations
+  recorded for completeness; no runtime claims attach.
+
+**Standing after Task 1:** the 1P alloc micro +3.73% FAIL is untouched and remains
+the live cost question for stages 2/4 (G2-cost measures it against stock).

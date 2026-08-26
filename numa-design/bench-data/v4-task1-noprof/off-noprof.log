@@ -1,0 +1,63 @@
+2026/08/26 19:20:12 Benchmarking 1 iterations
+2026/08/26 19:20:12 Benchmarking 100 iterations
+2026/08/26 19:20:13 Benchmarking 1000 iterations
+2026/08/26 19:20:15 Benchmarking 2000 iterations
+2026/08/26 19:20:20 go tool pprof cpuprof failed: exit status 2
+/tmp/11.cpuprof: parsing profile: empty input file
+failed to fetch any source profiles
+2026/08/26 19:20:39 Benchmarking 1 iterations
+2026/08/26 19:20:39 Benchmarking 100 iterations
+2026/08/26 19:20:40 Benchmarking 2000 iterations
+2026/08/26 19:20:43 Benchmarking 5000 iterations
+2026/08/26 19:20:54 go tool pprof cpuprof failed: exit status 2
+/tmp/11.cpuprof: parsing profile: empty input file
+failed to fetch any source profiles
+2026/08/26 19:21:14 Benchmarking 1 iterations
+2026/08/26 19:21:15 Benchmarking 100 iterations
+2026/08/26 19:21:15 Benchmarking 1000 iterations
+2026/08/26 19:21:19 go tool pprof cpuprof failed: exit status 2
+/tmp/8.cpuprof: parsing profile: empty input file
+failed to fetch any source profiles
+2026/08/26 19:21:51 Benchmarking 1 iterations
+2026/08/26 19:21:51 Benchmarking 100 iterations
+2026/08/26 19:21:52 Benchmarking 1000 iterations
+2026/08/26 19:21:55 go tool pprof cpuprof failed: exit status 2
+/tmp/8.cpuprof: parsing profile: empty input file
+failed to fetch any source profiles
+2026/08/26 19:22:06 Benchmarking 1 iterations
+2026/08/26 19:22:06 Benchmarking 100 iterations
+2026/08/26 19:22:07 Benchmarking 1000 iterations
+2026/08/26 19:22:09 Benchmarking 2000 iterations
+2026/08/26 19:22:14 go tool pprof cpuprof failed: exit status 2
+/tmp/11.cpuprof: parsing profile: empty input file
+failed to fetch any source profiles
+2026/08/26 19:22:25 Benchmarking 1 iterations
+2026/08/26 19:22:25 Benchmarking 100 iterations
+2026/08/26 19:22:25 Benchmarking 2000 iterations
+2026/08/26 19:22:30 go tool pprof cpuprof failed: exit status 2
+/tmp/8.cpuprof: parsing profile: empty input file
+failed to fetch any source profiles
+2026/08/26 19:22:40 Benchmarking 1 iterations
+2026/08/26 19:22:40 Benchmarking 100 iterations
+2026/08/26 19:22:41 Benchmarking 2000 iterations
+2026/08/26 19:22:46 go tool pprof cpuprof failed: exit status 2
+/tmp/8.cpuprof: parsing profile: empty input file
+failed to fetch any source profiles
+2026/08/26 19:23:52 Benchmarking 1 iterations
+2026/08/26 19:23:52 Benchmarking 100 iterations
+2026/08/26 19:23:53 Benchmarking 1000 iterations
+2026/08/26 19:23:56 go tool pprof cpuprof failed: exit status 2
+/tmp/8.cpuprof: parsing profile: empty input file
+failed to fetch any source profiles
+2026/08/26 19:24:16 Benchmarking 1 iterations
+2026/08/26 19:24:16 Benchmarking 100 iterations
+2026/08/26 19:24:17 Benchmarking 1000 iterations
+2026/08/26 19:24:20 go tool pprof cpuprof failed: exit status 2
+/tmp/8.cpuprof: parsing profile: empty input file
+failed to fetch any source profiles
+2026/08/26 19:24:43 Benchmarking 1 iterations
+2026/08/26 19:24:43 Benchmarking 100 iterations
+2026/08/26 19:24:44 Benchmarking 1000 iterations
+2026/08/26 19:24:47 go tool pprof cpuprof failed: exit status 2
+/tmp/8.cpuprof: parsing profile: empty input file
+failed to fetch any source profiles

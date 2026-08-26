@@ -1,0 +1,20 @@
+/home/deparker/v4-bins/off/json: go1.28-devel_873dc29245 Wed Aug 26 16:16:00 2026 -0700
+	path	golang.org/x/benchmarks/json
+	mod	golang.org/x/benchmarks	(devel)	
+	dep	golang.org/x/sys	v0.47.0	h1:o7XGOvZQCADBQQ4Y7VNq2dRWQR7JmOUW8Kxx4ZsNgWs=
+	build	-buildmode=exe
+	build	-compiler=gc
+	build	DefaultGODEBUG=netmarshal=0,tracebacklabels=0,x509sslcertoverrideplatform=0
+	build	CGO_ENABLED=1
+---
+/home/deparker/v4-bins/numa/json: go1.28-devel_873dc29245 Wed Aug 26 16:16:00 2026 -0700 X:numa
+	path	golang.org/x/benchmarks/json
+	mod	golang.org/x/benchmarks	(devel)	
+	dep	golang.org/x/sys	v0.47.0	h1:o7XGOvZQCADBQQ4Y7VNq2dRWQR7JmOUW8Kxx4ZsNgWs=
+	build	-buildmode=exe
+	build	-compiler=gc
+	build	DefaultGODEBUG=netmarshal=0,tracebacklabels=0,x509sslcertoverrideplatform=0
+	build	CGO_ENABLED=1
+---
+873dc29245ac445e8caf495cb97a5ee1d9362b70
+go version go1.28-devel_873dc29245 Wed Aug 26 16:16:00 2026 -0700 linux/amd64

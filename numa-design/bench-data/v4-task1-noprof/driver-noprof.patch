@@ -1,0 +1,22 @@
+--- /home/deparker/go/pkg/mod/golang.org/x/benchmarks@v0.0.0-20260819172200-70693762b6a0/driver/driver.go	2026-08-19 17:42:51.407519154 -0400
++++ /home/deparker/xbench-noprof/driver/driver.go	2026-08-26 19:16:48.438078856 -0400
+@@ -236,13 +236,17 @@
+ 		log.Fatalf("Failed to create profile file '%v': %v", res.Files["cpuprof"], err)
+ 	}
+ 	defer cpuprof.Close()
+-	pprof.StartCPUProfile(cpuprof)
++	if os.Getenv("BENCH_DISABLE_CPUPROF") == "" {
++		pprof.StartCPUProfile(cpuprof)
++	}
+ 	t0 := time.Now()
+ 	f(N)
+ 	res.Duration = time.Since(t0)
+ 	res.RunTime = uint64(time.Since(t0)) / N
+ 	res.Metrics["ns/op"] = res.RunTime
+-	pprof.StopCPUProfile()
++	if os.Getenv("BENCH_DISABLE_CPUPROF") == "" {
++		pprof.StopCPUProfile()
++	}
+ 
+ 	latencyCollect(&res)
+ 	ss.Collect(&res)
