@@ -143,3 +143,18 @@ func NumaPlacementQuotasForTest(nprocs int32, cpus []int32) []int32 {
 // NumaPlacementActiveForTest reports whether P-home placement is
 // currently consumed (see numaPlacementActive in numa_linux.go).
 func NumaPlacementActiveForTest() bool { return numaPlacementActive() }
+
+// NumaPHomesForTest snapshots every current P's assigned NUMA home
+// (-1 = unassigned). Reads allp without synchronization -- callers must
+// not race it against a concurrent GOMAXPROCS change.
+func NumaPHomesForTest() []int8 {
+	homes := make([]int8, gomaxprocs)
+	for i := range homes {
+		if home, ok := allp[i].numa.home(); ok {
+			homes[i] = home
+		} else {
+			homes[i] = -1
+		}
+	}
+	return homes
+}

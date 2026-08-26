@@ -877,6 +877,33 @@ func numaGrowNode() (stream int32, homed bool) {
 	if !numaHeapStreamsEnabled {
 		return 0, false
 	}
+	if goexperiment.Numa && numaPlacementActive() {
+		// The goexperiment.Numa guard is compile-time: without it the
+		// placement branch reads mutable vars the off build cannot fold
+		// away, growing this function past the inlining threshold and
+		// changing the off binary's function census (caught by the
+		// census gate during v4 Task 4).
+		//
+		// Placement path (v4 stage 2): key routing and growth homing by
+		// the current P's assigned home -- no syscall, and it is the
+		// node enforcement (numaNoteSchedule) converges this M to:
+		// memory goes where the consumer is KEPT, not where it happened
+		// to be observed. The home < numaMaxHeapNodes check is
+		// defensive (design review C1): placement eligibility already
+		// declines when any CPU-bearing node id >= numaMaxHeapNodes,
+		// but this function's contract -- node is always a valid index
+		// into the per-node spanSet/arenaHints/curArena arrays -- is
+		// enforced HERE for the getcpu path below and must be enforced
+		// for the placement key too, not inherited from a predicate
+		// computed once at startup.
+		gp := getg()
+		if gp != nil && gp.m != nil && gp.m.p != 0 {
+			if home, ok := gp.m.p.ptr().numa.home(); ok && int32(home) < numaMaxHeapNodes {
+				return int32(home), true
+			}
+		}
+		// No P (or no home): fall through to the getcpu observation.
+	}
 	node := numaCurrentNode()
 	if node < 0 || node >= numaMaxHeapNodes {
 		return 0, false
@@ -1175,6 +1202,36 @@ func numaNoteSchedule() {
 	}
 	if !numaSoftAffinityEligible() || numaConfined.Load() || numaStoodDown.Load() {
 		return
+	}
+	if numaPlacementActive() {
+		// Placement path (v4 stage 2): the node key is the current P's
+		// assigned home, not a getcpu observation -- deterministic, and
+		// it is the node routing/homing (numaGrowNode) already sends
+		// this M's memory to. Steady state (home already applied) is
+		// two byte loads and a compare: no getcpu, no nanotime. The
+		// nextCheck throttle guards only the APPLY (design review M2):
+		// numaApplySoftAffinity records lastNode only on success, so an
+		// unthrottled retry loop against a failing sched_setaffinity
+		// (e.g. a cpuset narrowed mid-run, the accepted-staleness
+		// model) would otherwise fire a syscall every schedule() pass.
+		if pp := mp.p.ptr(); pp != nil {
+			if home, ok := pp.numa.home(); ok {
+				if last, applied := mp.numa.softAffinityNode(); applied && last == home {
+					return // steady state
+				}
+				now := nanotime()
+				if !mp.numa.softAffinityCheckDue(now) {
+					return // bounded retry after a failed apply
+				}
+				mp.numa.armSoftAffinityCheck(now + numaSoftAffinityCheckInterval)
+				numaApplySoftAffinity(mp, int32(home))
+				return
+			}
+		}
+		// This P has no home. Should not happen while placement is
+		// active (schedinit and every procresize assign before Ps
+		// run); fall through to the getcpu path rather than silently
+		// losing soft affinity (design review M1).
 	}
 	now := nanotime()
 	if !mp.numa.softAffinityCheckDue(now) {

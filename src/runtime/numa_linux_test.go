@@ -631,3 +631,40 @@ func TestNUMAPlacementActivePredicate(t *testing.T) {
 		t.Fatal("placement active despite narrowed startup affinity")
 	}
 }
+
+// TestNUMAPlacementProcresize churns GOMAXPROCS and asserts the per-P
+// home assignment invariants after each change: with placement active,
+// homes are assigned contiguously (non-decreasing node ids, every P
+// covered); with placement inactive (single-node box, narrowed
+// affinity, confined, ...), every home is cleared. Exercises the
+// procresize call site (v4 placement design §3) on any Linux machine;
+// the quota VALUES are covered by TestNUMAPlacementQuota and the
+// multi-node behavior by the hardware tests.
+func TestNUMAPlacementProcresize(t *testing.T) {
+	defer runtime.GOMAXPROCS(runtime.GOMAXPROCS(0))
+	for _, n := range []int{1, 4, 2, 8} {
+		runtime.GOMAXPROCS(n)
+		homes := runtime.NumaPHomesForTest()
+		if len(homes) != n {
+			t.Fatalf("GOMAXPROCS(%d): got %d homes", n, len(homes))
+		}
+		if runtime.NumaPlacementActiveForTest() {
+			last := int8(0)
+			for i, h := range homes {
+				if h < 0 {
+					t.Fatalf("GOMAXPROCS(%d): P %d unassigned while placement active: %v", n, i, homes)
+				}
+				if h < last {
+					t.Fatalf("GOMAXPROCS(%d): homes not contiguous: %v", n, homes)
+				}
+				last = h
+			}
+		} else {
+			for i, h := range homes {
+				if h >= 0 {
+					t.Fatalf("GOMAXPROCS(%d): P %d has home %d while placement inactive", n, i, h)
+				}
+			}
+		}
+	}
+}
