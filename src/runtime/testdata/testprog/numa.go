@@ -28,6 +28,7 @@ func init() {
 	register("NUMASoftAffinityForkParent", NUMASoftAffinityForkParent)
 	register("NUMASoftAffinityExecParent", NUMASoftAffinityExecParent)
 	register("NUMASoftAffinitySetDefaultGOMAXPROCS", NUMASoftAffinitySetDefaultGOMAXPROCS)
+	register("NUMAPlacementSpread", NUMAPlacementSpread)
 }
 
 // getMempolicySyscall: get_mempolicy(2)'s syscall number differs per
@@ -518,4 +519,104 @@ func ownAffinityPopcount() (int, bool) {
 		}
 	}
 	return pop, true
+}
+
+// NUMAPlacementSpread (v4 stage 2) drives a parallel CPU+allocation
+// workload WITHOUT LockOSThread -- so worker Ms keep flowing through
+// schedule() and converge to their P's assigned home node -- then
+// classifies every thread's Cpus_allowed_list and reports per-node
+// counts. The assertions live in TestNUMAPlacementSpread: with
+// placement active, threads must be narrowed to node-sized masks on
+// MORE THAN ONE node (the anti-collapse shape from the soft-affinity
+// C1 regression), roughly tracking the proportional P partition.
+func NUMAPlacementSpread() {
+	nodeOf := readNodeCPUMap()
+	if len(nodeOf) == 0 {
+		fmt.Println("placementspread SKIP no /sys/devices/system/node data")
+		return
+	}
+	n := runtime.GOMAXPROCS(0)
+	var wg sync.WaitGroup
+	stop := make(chan struct{})
+	for i := 0; i < n; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for {
+				select {
+				case <-stop:
+					return
+				default:
+				}
+				buf := make([]byte, 4096)
+				for j := range buf {
+					buf[j] = byte(j)
+				}
+				sum := 0
+				for j := 0; j < 200000; j++ {
+					sum += j
+				}
+				_ = sum
+				runtime.Gosched()
+			}
+		}()
+	}
+	time.Sleep(3 * time.Second)
+	close(stop)
+	wg.Wait()
+
+	// Classify every readable thread: single-node mask -> that node's
+	// count; anything wider -> wide.
+	counts := map[int]int{}
+	wide, total := 0, 0
+	entries, err := os.ReadDir("/proc/self/task")
+	if err != nil {
+		fmt.Println("placementspread SKIP cannot read /proc/self/task")
+		return
+	}
+	for _, e := range entries {
+		data, err := os.ReadFile("/proc/self/task/" + e.Name() + "/status")
+		if err != nil {
+			continue // thread exited; skip
+		}
+		var cpus []int
+		for _, line := range strings.Split(string(data), "\n") {
+			if rest, ok := strings.CutPrefix(line, "Cpus_allowed_list:"); ok {
+				cpus = parseCPUList(strings.TrimSpace(rest))
+			}
+		}
+		if len(cpus) == 0 {
+			continue
+		}
+		total++
+		node, single := -1, true
+		for _, c := range cpus {
+			nd, ok := nodeOf[c]
+			if !ok {
+				single = false
+				break
+			}
+			if node == -1 {
+				node = nd
+			} else if nd != node {
+				single = false
+				break
+			}
+		}
+		if single && node >= 0 {
+			counts[node]++
+		} else {
+			wide++
+		}
+	}
+	var nodes []int
+	for nd := range counts {
+		nodes = append(nodes, nd)
+	}
+	sort.Ints(nodes)
+	parts := make([]string, len(nodes))
+	for i, nd := range nodes {
+		parts[i] = fmt.Sprintf("%d:%d", nd, counts[nd])
+	}
+	fmt.Printf("placementspread total=%d wide=%d gomaxprocs=%d counts=%s\n", total, wide, n, strings.Join(parts, ","))
 }

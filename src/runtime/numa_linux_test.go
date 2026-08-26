@@ -668,3 +668,120 @@ func TestNUMAPlacementProcresize(t *testing.T) {
 		}
 	}
 }
+
+// TestNUMAPlacementSpread (v4 stage 2) runs the NUMAPlacementSpread
+// testprog probe: a parallel workload at GOMAXPROCS=NumCPU with P-home
+// placement active must leave worker threads narrowed to node-sized
+// masks on MORE THAN ONE node (the anti-collapse assertion from the
+// soft-affinity C1 regression class), with each represented node
+// holding a non-trivial share -- the proportional partition, enforced
+// per-thread. Requires real multi-node hardware; skips elsewhere.
+func TestNUMAPlacementSpread(t *testing.T) {
+	if runtime.NumaNumAllowedNodes() <= 1 {
+		t.Skip("not multi-node")
+	}
+	if !runtime.NumaHasSetAffinityForTest() {
+		t.Skip("no sched_setaffinity plumbing on this arch")
+	}
+	if runtime.NumaHostAffinityNarrowedForTest() {
+		t.Skip("host/environment CPU affinity is already narrower than online CPUs")
+	}
+	if !runtime.NumaPlacementActiveForTest() {
+		// The child inherits this environment; if placement is not
+		// active here (e.g. heap streams disabled under -race) it will
+		// not be there either.
+		t.Skip("placement not active in this process; child would decline too")
+	}
+	got := runTestProg(t, "testprog", "NUMAPlacementSpread", "GOMAXPROCS="+strconv.Itoa(runtime.NumCPU()))
+	var line string
+	for _, l := range strings.Split(got, "\n") {
+		if strings.HasPrefix(l, "placementspread ") {
+			line = l
+			break
+		}
+	}
+	if line == "" {
+		t.Fatalf("no placementspread line in output %q", got)
+	}
+	if strings.Contains(line, "SKIP") {
+		t.Skipf("probe skipped: %q", line)
+	}
+	var total, wide, gomaxprocs int
+	var countsStr string
+	if _, err := fmt.Sscanf(line, "placementspread total=%d wide=%d gomaxprocs=%d counts=%s", &total, &wide, &gomaxprocs, &countsStr); err != nil {
+		t.Fatalf("bad probe line %q: %v", line, err)
+	}
+	counts := map[int]int{}
+	for _, part := range strings.Split(countsStr, ",") {
+		var nd, c int
+		if _, err := fmt.Sscanf(part, "%d:%d", &nd, &c); err != nil {
+			t.Fatalf("bad counts %q in %q: %v", countsStr, line, err)
+		}
+		counts[nd] = c
+	}
+	if len(counts) < 2 {
+		t.Fatalf("threads narrowed to %d distinct node(s), want >= 2 (process-wide collapse shape): %q", len(counts), line)
+	}
+	// Each represented node must hold a non-trivial share of the worker
+	// threads: at least gomaxprocs/8 (loose by design -- idle Ms,
+	// sysmon, and GC workers are counted too, and exact balance is the
+	// gate battery's job, not this test's).
+	floor := gomaxprocs / 8
+	for nd, c := range counts {
+		if c < floor {
+			t.Errorf("node %d holds only %d narrowed threads, want >= %d: %q", nd, c, floor, line)
+		}
+	}
+}
+
+// TestNUMAPlacementRefillLocality (v4 stage 2) asserts the in-process
+// version of gate G2-locality's property: with placement active and an
+// UNPINNED parallel allocation workload, the /numa/span-refills
+// counters must show >= 90% local refills over the workload window --
+// the deterministic P-home refill key plus per-thread enforcement is
+// exactly what makes unpinned locality hold (v3's getcpu-keyed routing
+// measured only 53-75% local here). Requires multi-node hardware.
+func TestNUMAPlacementRefillLocality(t *testing.T) {
+	if !runtime.NumaPlacementActiveForTest() {
+		t.Skip("placement not active (single-node, narrowed affinity, streams disabled, ...)")
+	}
+	before := readSpanRefillCounters(t)
+	var wg sync.WaitGroup
+	stop := make(chan struct{})
+	for i := 0; i < runtime.GOMAXPROCS(0); i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			sink := make([][]byte, 0, 512)
+			for {
+				select {
+				case <-stop:
+					return
+				default:
+				}
+				// Vary size classes and keep short-lived batches alive
+				// long enough to force span turnover and mcache refills.
+				for sz := 16; sz <= 8192; sz *= 4 {
+					sink = append(sink, make([]byte, sz))
+				}
+				if len(sink) >= 512 {
+					sink = sink[:0]
+				}
+			}
+		}()
+	}
+	time.Sleep(2 * time.Second)
+	close(stop)
+	wg.Wait()
+	after := readSpanRefillCounters(t)
+	dl := after.local - before.local
+	dr := after.remote - before.remote
+	if dl+dr < 1000 {
+		t.Skipf("only %d refills observed; workload too small to judge locality", dl+dr)
+	}
+	share := float64(dl) / float64(dl+dr)
+	t.Logf("refills local=%d remote=%d share=%.2f%%", dl, dr, share*100)
+	if share < 0.90 {
+		t.Errorf("unpinned local refill share %.2f%% < 90%% with placement active", share*100)
+	}
+}
