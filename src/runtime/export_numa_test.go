@@ -130,3 +130,16 @@ func NumaHostAffinityNarrowedForTest() bool {
 // automated-coverage gap TestNUMASoftAffinity's I2 distinct-node
 // assertion leaves under -race (see that test's doc comment).
 func NumaWidenCountForTest() uint64 { return numaWidenCount.Load() }
+
+// NumaPlacementQuotasForTest runs the pure quota partition function
+// behind numaAssignPHomes on an arbitrary topology (v4 stage 2).
+// len(cpus) must be <= numaMaxHeapNodes.
+func NumaPlacementQuotasForTest(nprocs int32, cpus []int32) []int32 {
+	quotas := make([]int32, len(cpus))
+	numaPlacementQuotas(nprocs, cpus, quotas)
+	return quotas
+}
+
+// NumaPlacementActiveForTest reports whether P-home placement is
+// currently consumed (see numaPlacementActive in numa_linux.go).
+func NumaPlacementActiveForTest() bool { return numaPlacementActive() }
