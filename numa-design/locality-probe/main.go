@@ -59,6 +59,9 @@ func main() {
 		go func() {
 			defer wg.Done()
 			sink := make([][]byte, 0, 512)
+			var retained [][]byte
+			retainBudget := *retainMB * 1 << 20 / max(*procs, 1)
+			retainedBytes := 0
 			for {
 				select {
 				case <-stop:
@@ -66,7 +69,13 @@ func main() {
 				default:
 				}
 				for sz := 16; sz <= 8192; sz *= 4 {
-					sink = append(sink, make([]byte, sz))
+					b := make([]byte, sz)
+					if retainedBytes < retainBudget {
+						retained = append(retained, b)
+						retainedBytes += sz
+					} else {
+						sink = append(sink, b)
+					}
 				}
 				if len(sink) >= 512 {
 					sink = sink[:0]

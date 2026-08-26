@@ -4337,3 +4337,40 @@ with `BENCH_DISABLE_CPUPROF=1`.
 
 **Standing after Task 1:** the 1P alloc micro +3.73% FAIL is untouched and remains
 the live cost question for stages 2/4 (G2-cost measures it against stock).
+
+---
+
+# v4 stage 2 interim — placement enforcement works; locality gated on the pages layer
+
+Tree `ae47d4fdf3` (Tasks 3–6 complete), numa-dell, 2026-08-26. Not a gate battery —
+interim hardware findings that re-scope the work, recorded per the corrections
+convention.
+
+- **TestNUMAPlacementSpread PASS** on numa-dell: with placement active at
+  GOMAXPROCS=256, worker threads converge to node-sized affinity masks on BOTH
+  nodes (anti-collapse assertion) with non-trivial per-node shares. Thread
+  placement — the piece v3's Task 11 identified as missing — demonstrably works.
+- **TestNUMAPlacementRefillLocality FAIL (standing RED test for stage 4):**
+  unpinned local refill share 69.22% at 256P, bar 90%. Probe sweep
+  (`locality-probe`, GOMAXPROCS set in-process to avoid the E1 confinement
+  confound): **63.5–66.6% local at EVERY width in {2,8,32,128,256} — flat.**
+  Flatness across width rules out thread migration as the driver (that would
+  scale with width, and the spread test shows threads are stable anyway).
+- **Retain experiment (attribution):** recycle-dominated (retain 0) 62.98% vs
+  growth-dominated (retain 8 GiB live, forcing continuous homed heap growth)
+  61.63% at 256P — **no difference**. Fresh, correctly-homed growth does not
+  raise the share, so the dilution is not span recycling: `pages.alloc`'s single
+  address-ordered search hands pages from ANY node's stream to ANY requesting P
+  (lowest free address wins), consuming each node's homed growth cross-node as
+  fast as it is created. The per-P page cache is filled by the same node-blind
+  path (`allocToCache`). This is the mechanism mcentral.go's review-I1 comment
+  anticipated, now measured in isolation.
+- **Consequence for the plan:** G2-locality (≥90% at every width) cannot pass
+  without stage 4 (node-aware page allocation). Execution order adapts, verdict
+  discipline does not: stage 4's design round starts now; the pre-registered G2
+  gates are adjudicated on the COMBINED stage-2+4 tree in one battery (G4
+  already re-runs G2-primary by construction). The stage-2-only battery is
+  dropped as it would spend a session establishing a FAIL this section already
+  documents; this deviation is recorded here before that battery would have run.
+- Local hygiene at ae47d4fdf3: full runtime suite green, -race TestNUMA green,
+  off-build census zero function diffs, remaining TestNUMA* on numa-dell green.
