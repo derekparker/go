@@ -20,3 +20,5 @@ func (s *pNUMAState) setHome(node int8)          {}
 func (s *pNUMAState) clearHome()                 {}
 
 const numaStealFilter = false
+
+const numaScheduleHook = false

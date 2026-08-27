@@ -47,3 +47,8 @@ func (s *pNUMAState) clearHome() { s.homeNode = 0 }
 // and the filter's contribution to the locality wins is unproven -- the
 // ablation re-runs the primary gate with it off to decide keep/drop.
 const numaStealFilter = false
+
+// numaScheduleHook gates the schedule()-path numaNoteSchedule call --
+// second ablation switch for the G2 sched-micro bisection (the steal
+// filter was exonerated: +15% persists with it off).
+const numaScheduleHook = false

@@ -3931,7 +3931,7 @@ func stealWork(now int64) (gp *g, inheritTime bool, rnow, pollUntil int64, newWo
 	// stealWork call; -1 (no home / placement inactive) disables the
 	// filter. Victims with no assigned home are never skipped.
 	stealHome := int8(-1)
-	if goexperiment.Numa && numaPlacementActive() {
+	if goexperiment.Numa && numaStealFilter && numaPlacementActive() {
 		if home, ok := pp.numa.home(); ok {
 			stealHome = home
 		}
@@ -4350,7 +4350,7 @@ top:
 	// every other precondition (multi-node, not confined, not stood
 	// down, started with full affinity) and fires the underlying
 	// sched_setaffinity syscall only on an actual NUMA node change.
-	if goexperiment.Numa {
+	if goexperiment.Numa && numaScheduleHook {
 		numaNoteSchedule()
 	}
 
