@@ -16,6 +16,7 @@ import (
 	"sync"
 	"testing"
 	"time"
+	"unsafe"
 )
 
 // mempolicy modes (numa_linux.go): 1 = MPOL_PREFERRED, 2 = MPOL_BIND.
@@ -824,5 +825,64 @@ func TestNUMAStreamWindows(t *testing.T) {
 	}
 	if len(wins) < 2 {
 		t.Fatalf("expected >= 2 valid stream windows, got %d", len(wins))
+	}
+}
+
+// TestNUMAPlacementLargeObjectLocality (v4 stage 4, gate G4's
+// large-object bar): large allocations bypass mcentral entirely, so
+// the span-refill counters never see them -- instead, compare each
+// large allocation's arena home tag against the allocating P's
+// placement home directly. Sampling is racy by nature (the goroutine
+// can migrate between reading the home and allocating), so the 90% bar
+// absorbs both genuine remote allocations and sampling skew.
+func TestNUMAPlacementLargeObjectLocality(t *testing.T) {
+	if !runtime.NumaPlacementActiveForTest() {
+		t.Skip("placement not active (single-node, narrowed affinity, streams disabled, ...)")
+	}
+	var mu sync.Mutex
+	match, total := 0, 0
+	var wg sync.WaitGroup
+	stop := make(chan struct{})
+	deadline := time.After(3 * time.Second)
+	go func() { <-deadline; close(stop) }()
+	for i := 0; i < runtime.GOMAXPROCS(0); i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			m, n := 0, 0
+			sink := make([][]byte, 0, 8)
+			for {
+				select {
+				case <-stop:
+					mu.Lock()
+					match += m
+					total += n
+					mu.Unlock()
+					return
+				default:
+				}
+				home := runtime.NumaCurrentPHomeForTest()
+				b := make([]byte, 256<<10) // 256 KiB: well past the large-object threshold
+				if home >= 0 {
+					if runtime.NumaArenaNodeOfForTest(uintptr(unsafe.Pointer(&b[0]))) == home {
+						m++
+					}
+					n++
+				}
+				sink = append(sink, b)
+				if len(sink) >= 8 {
+					sink = sink[:0]
+				}
+			}
+		}()
+	}
+	wg.Wait()
+	if total < 1000 {
+		t.Skipf("only %d sampled large allocations; too few to judge", total)
+	}
+	share := float64(match) / float64(total)
+	t.Logf("large allocations node-matched %d/%d = %.2f%%", match, total, share*100)
+	if share < 0.90 {
+		t.Errorf("large-object node-match share %.2f%% < 90%% with placement active", share*100)
 	}
 }
