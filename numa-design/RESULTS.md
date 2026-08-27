@@ -4558,3 +4558,33 @@ forever (+22% and unbounded VA growth in the A2 arm), because the
 out-of-window latch can only fire for valid windows. Both routed grow-once
 sites now guard on `numaWindowSpan` usability (valid + unlatched); the
 unarmed-sentinel bootstrap keeps its grow. Census clean; battery green.
+
+---
+
+# v4 Task LF — reducing the ON-build structural alloc cost: direction proven, first refactor null
+
+Raws in `bench-data/v4-taskLF/`; rotating n=12 sweeps, GOMAXPROCS=1.
+
+- **LF1 direction probe (ON build, numaMaxHeapNodes forced 8→1):** geomean
+  vs stock falls from **+4.54% to +1.93%** (Malloc16 +0.56%). More than half
+  the structural cost is attributable to the per-node array sizing.
+- **LF2 first refactor (mcentral primary/remote field split, keeping total
+  size):** geomean **+4.84% ≈ unrefactored +4.86% — null**. Reverted (no
+  measured benefit). The null is itself the attribution: LF2 reordered
+  fields but removed no bytes, while LF1 removed ~1.5 KiB × 136 size
+  classes from mheap.central PLUS the mheap-side per-node arrays
+  (arenaHints/curArena/high-water) and shrank every per-node loop bound.
+  The cost is **total cache/data footprint of the enlarged allocator
+  structures, not hot-field placement**.
+- **Viable next direction (not yet implemented):** make the remote-node
+  sets INDIRECT — one separate persistentalloc'd block, mcentral itself
+  stock-sized — so the 136-entry central array regains its stock footprint;
+  remote/sweeper paths pay a pointer chase. More invasive (NotInHeap
+  allocation at init, sweeper/metrics call sites), wants its own design
+  mini-round if the ~+4% → ~+2% recovery matters enough. Alternatively a
+  numaMaxHeapNodes=4 build variant halves the arrays for near-zero effort
+  but caps supported topologies.
+
+Standing verdict: the 1P alloc-micro gate remains FAIL at ~+4-5% geomean
+(ON build only; off build census-identical; 1P real-workload json +1.35%),
+with a proven path to ~+2% if pursued.
