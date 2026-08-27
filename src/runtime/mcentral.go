@@ -48,15 +48,32 @@ type mcentral struct {
 	// sweeper and mcentral that do consume from the unswept list may
 	// encounter swept spans, and these should be ignored.
 	//
-	// With the experiment off, numaMaxHeapNodes == 1 (I5) and every
-	// indexed access below (via the accessor functions' node/idx
-	// redirection, matching mheap.grow's own pattern) collapses to
-	// the single unindexed set these fields held before task 9, both
-	// in layout (a [1]spanSet array has the same size/alignment as a
-	// bare spanSet) and in the literal-constant-0 indexing the
-	// compiler generates for it.
-	partial [2][numaMaxHeapNodes]spanSet // list of spans with a free object, per node
-	full    [2][numaMaxHeapNodes]spanSet // list of spans with no free objects, per node
+	// Layout (Task LF3): these fields hold ONLY the primary (node 0)
+	// sets, in exactly the stock shape -- remote nodes' sets live in
+	// the global numaRemoteCentral array (below), indexed by
+	// spanclass. Task L's ablation ladder measured the earlier
+	// [2][numaMaxHeapNodes] in-struct layout as the dominant source of
+	// a ~+4% experiment-ON 1P alloc-micro cost that survives disabling
+	// every runtime NUMA mechanism: the enlarged 136-entry
+	// mheap.central array's cache footprint, not any executed
+	// behavior (collapsing numaMaxHeapNodes to 1 recovered more than
+	// half; reordering fields without shrinking them recovered
+	// nothing). With the experiment off this struct is byte-identical
+	// to a tree with no NUMA changes at all, and numaRemoteCentral is
+	// zero-size.
+	partial [2]spanSet // list of spans with a free object
+	full    [2]spanSet // list of spans with no free objects
+}
+
+// numaRemoteCentral holds the REMOTE nodes' (1..numaMaxHeapNodes-1)
+// span sets for every size class -- deliberately outside mcentral (Task
+// LF3, see the field comment above): one cold BSS block touched only by
+// the remote-fallback search and the sweeper's per-node loops, keeping
+// the hot central array at stock footprint. Zero-size with the
+// experiment off (numaMaxHeapNodes == 1).
+var numaRemoteCentral [numSpanClasses]struct {
+	partial [2][numaMaxHeapNodes - 1]spanSet
+	full    [2][numaMaxHeapNodes - 1]spanSet
 }
 
 // Initialize a single central free list.
@@ -70,13 +87,14 @@ type mcentral struct {
 func (c *mcentral) init(spc spanClass) {
 	c.spanclass = spc
 	for i := range c.partial {
-		for node := range c.partial[i] {
-			lockInit(&c.partial[i][node].spineLock, lockRankSpanSetSpine)
-		}
-	}
-	for i := range c.full {
-		for node := range c.full[i] {
-			lockInit(&c.full[i][node].spineLock, lockRankSpanSetSpine)
+		lockInit(&c.partial[i].spineLock, lockRankSpanSetSpine)
+		lockInit(&c.full[i].spineLock, lockRankSpanSetSpine)
+		if goexperiment.Numa {
+			r := &numaRemoteCentral[spc]
+			for node := range r.partial[i] {
+				lockInit(&r.partial[i][node].spineLock, lockRankSpanSetSpine)
+				lockInit(&r.full[i][node].spineLock, lockRankSpanSetSpine)
+			}
 		}
 	}
 }
@@ -84,41 +102,37 @@ func (c *mcentral) init(spc spanClass) {
 // partialUnswept returns the spanSet which holds partially-filled
 // unswept spans for this sweepgen and NUMA node.
 func (c *mcentral) partialUnswept(sweepgen uint32, node int32) *spanSet {
-	idx := int32(0)
-	if goexperiment.Numa {
-		idx = node
+	if goexperiment.Numa && node > 0 {
+		return &numaRemoteCentral[c.spanclass].partial[1-sweepgen/2%2][node-1]
 	}
-	return &c.partial[1-sweepgen/2%2][idx]
+	return &c.partial[1-sweepgen/2%2]
 }
 
 // partialSwept returns the spanSet which holds partially-filled
 // swept spans for this sweepgen and NUMA node.
 func (c *mcentral) partialSwept(sweepgen uint32, node int32) *spanSet {
-	idx := int32(0)
-	if goexperiment.Numa {
-		idx = node
+	if goexperiment.Numa && node > 0 {
+		return &numaRemoteCentral[c.spanclass].partial[sweepgen/2%2][node-1]
 	}
-	return &c.partial[sweepgen/2%2][idx]
+	return &c.partial[sweepgen/2%2]
 }
 
 // fullUnswept returns the spanSet which holds unswept spans without any
 // free slots for this sweepgen and NUMA node.
 func (c *mcentral) fullUnswept(sweepgen uint32, node int32) *spanSet {
-	idx := int32(0)
-	if goexperiment.Numa {
-		idx = node
+	if goexperiment.Numa && node > 0 {
+		return &numaRemoteCentral[c.spanclass].full[1-sweepgen/2%2][node-1]
 	}
-	return &c.full[1-sweepgen/2%2][idx]
+	return &c.full[1-sweepgen/2%2]
 }
 
 // fullSwept returns the spanSet which holds swept spans without any
 // free slots for this sweepgen and NUMA node.
 func (c *mcentral) fullSwept(sweepgen uint32, node int32) *spanSet {
-	idx := int32(0)
-	if goexperiment.Numa {
-		idx = node
+	if goexperiment.Numa && node > 0 {
+		return &numaRemoteCentral[c.spanclass].full[sweepgen/2%2][node-1]
 	}
-	return &c.full[sweepgen/2%2][idx]
+	return &c.full[sweepgen/2%2]
 }
 
 // numaSpanRefillLocal and numaSpanRefillRemote back the
