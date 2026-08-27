@@ -1,0 +1,97 @@
+== base round 1 ==
+2026/08/26 21:41:21 Benchmarking 1 iterations
+2026/08/26 21:41:21 Benchmarking 100 iterations
+2026/08/26 21:41:21 Benchmarking 5000 iterations
+2026/08/26 21:41:33 go tool pprof cpuprof failed: exit status 2
+/tmp/8.cpuprof: parsing profile: empty input file
+failed to fetch any source profiles
+40529728,,mem_load_l3_miss_retired.local_dram:u,869803592658,100.00,,
+38386235,,mem_load_l3_miss_retired.remote_dram:u,869803592658,100.00,,
+== numa-bin round 1 ==
+2026/08/26 21:41:33 Benchmarking 1 iterations
+2026/08/26 21:41:33 Benchmarking 100 iterations
+2026/08/26 21:41:34 Benchmarking 5000 iterations
+2026/08/26 21:41:42 Benchmarking 10000 iterations
+2026/08/26 21:42:00 go tool pprof cpuprof failed: exit status 2
+/tmp/11.cpuprof: parsing profile: empty input file
+failed to fetch any source profiles
+77103268,,mem_load_l3_miss_retired.local_dram:u,1938670277850,100.00,,
+71753369,,mem_load_l3_miss_retired.remote_dram:u,1938670277850,100.00,,
+== base round 2 ==
+2026/08/26 21:42:01 Benchmarking 1 iterations
+2026/08/26 21:42:01 Benchmarking 100 iterations
+2026/08/26 21:42:02 Benchmarking 5000 iterations
+2026/08/26 21:42:11 Benchmarking 10000 iterations
+2026/08/26 21:42:30 go tool pprof cpuprof failed: exit status 2
+/tmp/11.cpuprof: parsing profile: empty input file
+failed to fetch any source profiles
+81323508,,mem_load_l3_miss_retired.local_dram:u,2238813815569,100.00,,
+76047236,,mem_load_l3_miss_retired.remote_dram:u,2238813815569,100.00,,
+== numa-bin round 2 ==
+2026/08/26 21:42:31 Benchmarking 1 iterations
+2026/08/26 21:42:31 Benchmarking 100 iterations
+2026/08/26 21:42:31 Benchmarking 5000 iterations
+2026/08/26 21:42:36 Benchmarking 20000 iterations
+2026/08/26 21:43:11 go tool pprof cpuprof failed: exit status 2
+/tmp/11.cpuprof: parsing profile: empty input file
+failed to fetch any source profiles
+130096589,,mem_load_l3_miss_retired.local_dram:u,3194725761609,100.00,,
+120951792,,mem_load_l3_miss_retired.remote_dram:u,3194725761609,100.00,,
+== base round 3 ==
+2026/08/26 21:43:12 Benchmarking 1 iterations
+2026/08/26 21:43:13 Benchmarking 100 iterations
+2026/08/26 21:43:13 Benchmarking 5000 iterations
+2026/08/26 21:43:24 go tool pprof cpuprof failed: exit status 2
+/tmp/8.cpuprof: parsing profile: empty input file
+failed to fetch any source profiles
+28078321,,mem_load_l3_miss_retired.local_dram:u,749296835462,100.00,,
+26770626,,mem_load_l3_miss_retired.remote_dram:u,749296835462,100.00,,
+== numa-bin round 3 ==
+2026/08/26 21:43:24 Benchmarking 1 iterations
+2026/08/26 21:43:24 Benchmarking 100 iterations
+2026/08/26 21:43:25 Benchmarking 5000 iterations
+2026/08/26 21:43:33 Benchmarking 10000 iterations
+2026/08/26 21:43:51 go tool pprof cpuprof failed: exit status 2
+/tmp/11.cpuprof: parsing profile: empty input file
+failed to fetch any source profiles
+70739648,,mem_load_l3_miss_retired.local_dram:u,1923566469689,100.00,,
+64342820,,mem_load_l3_miss_retired.remote_dram:u,1923566469689,100.00,,
+== base round 4 ==
+2026/08/26 21:43:51 Benchmarking 1 iterations
+2026/08/26 21:43:51 Benchmarking 100 iterations
+2026/08/26 21:43:52 Benchmarking 5000 iterations
+2026/08/26 21:44:02 go tool pprof cpuprof failed: exit status 2
+/tmp/8.cpuprof: parsing profile: empty input file
+failed to fetch any source profiles
+24554327,,mem_load_l3_miss_retired.local_dram:u,748218463468,100.00,,
+22913935,,mem_load_l3_miss_retired.remote_dram:u,748218463468,100.00,,
+== numa-bin round 4 ==
+2026/08/26 21:44:03 Benchmarking 1 iterations
+2026/08/26 21:44:03 Benchmarking 100 iterations
+2026/08/26 21:44:04 Benchmarking 5000 iterations
+2026/08/26 21:44:13 Benchmarking 10000 iterations
+2026/08/26 21:44:30 go tool pprof cpuprof failed: exit status 2
+/tmp/11.cpuprof: parsing profile: empty input file
+failed to fetch any source profiles
+95130925,,mem_load_l3_miss_retired.local_dram:u,2106499660959,100.00,,
+88347008,,mem_load_l3_miss_retired.remote_dram:u,2106499660959,100.00,,
+== base round 5 ==
+2026/08/26 21:44:31 Benchmarking 1 iterations
+2026/08/26 21:44:31 Benchmarking 100 iterations
+2026/08/26 21:44:32 Benchmarking 5000 iterations
+2026/08/26 21:44:38 Benchmarking 20000 iterations
+2026/08/26 21:45:20 go tool pprof cpuprof failed: exit status 2
+/tmp/11.cpuprof: parsing profile: empty input file
+failed to fetch any source profiles
+158279898,,mem_load_l3_miss_retired.local_dram:u,3844690256010,100.00,,
+148234368,,mem_load_l3_miss_retired.remote_dram:u,3844690256010,100.00,,
+== numa-bin round 5 ==
+2026/08/26 21:45:21 Benchmarking 1 iterations
+2026/08/26 21:45:21 Benchmarking 100 iterations
+2026/08/26 21:45:22 Benchmarking 5000 iterations
+2026/08/26 21:45:31 Benchmarking 10000 iterations
+2026/08/26 21:45:48 go tool pprof cpuprof failed: exit status 2
+/tmp/11.cpuprof: parsing profile: empty input file
+failed to fetch any source profiles
+79466846,,mem_load_l3_miss_retired.local_dram:u,1991688675388,100.00,,
+73547819,,mem_load_l3_miss_retired.remote_dram:u,1991688675388,100.00,,

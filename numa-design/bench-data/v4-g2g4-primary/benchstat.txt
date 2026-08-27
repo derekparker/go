@@ -1,0 +1,54 @@
+pkg: golang.org/x/benchmarks
+goos: linux
+goarch: amd64
+                             │ /tmp/g2/primary/v4-g2-primary-armB-recorded.out │ /tmp/g2/primary/v4-g2-primary-armC-recorded.out │
+                             │                     sec/op                      │          sec/op           vs base               │
+Garbage/benchmem-MB=4096-256                                       3.121m ± 4%               2.868m ± 10%  -8.09% (p=0.000 n=10)
+
+                             │ /tmp/g2/primary/v4-g2-primary-armB-recorded.out │ /tmp/g2/primary/v4-g2-primary-armC-recorded.out │
+                             │              GC-bytes-from-system               │   GC-bytes-from-system    vs base               │
+Garbage/benchmem-MB=4096-256                                      130.7Mi ± 2%               135.1Mi ± 3%  +3.31% (p=0.000 n=10)
+
+                             │ /tmp/g2/primary/v4-g2-primary-armB-recorded.out │ /tmp/g2/primary/v4-g2-primary-armC-recorded.out │
+                             │                   STW-sec/GC                    │          STW-sec/GC            vs base          │
+Garbage/benchmem-MB=4096-256                                      30.28m ± 10%                    31.26m ± 19%  ~ (p=0.315 n=10)
+
+                             │ /tmp/g2/primary/v4-g2-primary-armB-recorded.out │ /tmp/g2/primary/v4-g2-primary-armC-recorded.out │
+                             │                   STW-sec/op                    │          STW-sec/op            vs base          │
+Garbage/benchmem-MB=4096-256                                       46.25µ ± 8%                    50.02µ ± 19%  ~ (p=0.165 n=10)
+
+                             │ /tmp/g2/primary/v4-g2-primary-armB-recorded.out │ /tmp/g2/primary/v4-g2-primary-armC-recorded.out │
+                             │               allocated-bytes/op                │      allocated-bytes/op        vs base          │
+Garbage/benchmem-MB=4096-256                                      5.934Mi ± 0%                    5.934Mi ± 0%  ~ (p=0.143 n=10)
+
+                             │ /tmp/g2/primary/v4-g2-primary-armB-recorded.out │ /tmp/g2/primary/v4-g2-primary-armC-recorded.out │
+                             │                    allocs/op                    │           allocs/op            vs base          │
+Garbage/benchmem-MB=4096-256                                       145.2k ± 0%                     145.2k ± 0%  ~ (p=0.085 n=10)
+
+                             │ /tmp/g2/primary/v4-g2-primary-armB-recorded.out │ /tmp/g2/primary/v4-g2-primary-armC-recorded.out │
+                             │                bytes-from-system                │       bytes-from-system        vs base          │
+Garbage/benchmem-MB=4096-256                                      9.157Gi ± 4%                    9.122Gi ± 1%  ~ (p=0.912 n=10)
+
+                             │ /tmp/g2/primary/v4-g2-primary-armB-recorded.out │ /tmp/g2/primary/v4-g2-primary-armC-recorded.out │
+                             │             heap-bytes-from-system              │    heap-bytes-from-system      vs base          │
+Garbage/benchmem-MB=4096-256                                      8.826Gi ± 4%                    8.786Gi ± 1%  ~ (p=0.912 n=10)
+
+                             │ /tmp/g2/primary/v4-g2-primary-armB-recorded.out │ /tmp/g2/primary/v4-g2-primary-armC-recorded.out │
+                             │             other-bytes-from-system             │    other-bytes-from-system     vs base          │
+Garbage/benchmem-MB=4096-256                                      194.6Mi ± 3%                    192.5Mi ± 1%  ~ (p=0.089 n=10)
+
+                             │ /tmp/g2/primary/v4-g2-primary-armB-recorded.out │ /tmp/g2/primary/v4-g2-primary-armC-recorded.out │
+                             │                 peak-RSS-bytes                  │        peak-RSS-bytes          vs base          │
+Garbage/benchmem-MB=4096-256                                      9.014Gi ± 4%                    8.952Gi ± 1%  ~ (p=0.739 n=10)
+
+                             │ /tmp/g2/primary/v4-g2-primary-armB-recorded.out │ /tmp/g2/primary/v4-g2-primary-armC-recorded.out │
+                             │                  peak-VM-bytes                  │         peak-VM-bytes          vs base          │
+Garbage/benchmem-MB=4096-256                                      10.33Gi ± 3%                    10.33Gi ± 1%  ~ (p=0.796 n=10)
+
+                             │ /tmp/g2/primary/v4-g2-primary-armB-recorded.out │ /tmp/g2/primary/v4-g2-primary-armC-recorded.out │
+                             │             stack-bytes-from-system             │    stack-bytes-from-system     vs base          │
+Garbage/benchmem-MB=4096-256                                      15.16Mi ± 3%                    15.12Mi ± 2%  ~ (p=0.695 n=10)
+
+                             │ /tmp/g2/primary/v4-g2-primary-armB-recorded.out │ /tmp/g2/primary/v4-g2-primary-armC-recorded.out │
+                             │                 user+sys-sec/op                 │        user+sys-sec/op         vs base          │
+Garbage/benchmem-MB=4096-256                                       241.3m ± 6%                     237.0m ± 5%  ~ (p=0.143 n=10)

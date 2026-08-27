@@ -1,0 +1,113 @@
+pkg: golang.org/x/benchmarks
+goos: linux
+goarch: amd64
+       │ /home/deparker/v4-cost/1p-off.out │   /home/deparker/v4-cost/1p-on.out   │
+       │              sec/op               │    sec/op      vs base               │
+JSON-1                        16.02m ± 99%   16.23m ± 101%  +1.35% (p=0.029 n=10)
+
+       │ /home/deparker/v4-cost/1p-off.out │       /home/deparker/v4-cost/1p-on.out        │
+       │       GC-bytes-from-system        │ GC-bytes-from-system  vs base                 │
+JSON-1                        2.569Mi ± 6%           7.862Mi ± 1%  +206.01% (p=0.000 n=10)
+
+       │ /home/deparker/v4-cost/1p-off.out │    /home/deparker/v4-cost/1p-on.out    │
+       │            STW-sec/GC             │  STW-sec/GC    vs base                 │
+JSON-1                        8.810µ ± 99%   28.708µ ± 89%  +225.85% (p=0.000 n=10)
+
+       │ /home/deparker/v4-cost/1p-off.out │   /home/deparker/v4-cost/1p-on.out    │
+       │            STW-sec/op             │  STW-sec/op   vs base                 │
+JSON-1                       2.237µ ± 104%   6.998µ ± 93%  +212.90% (p=0.000 n=10)
+
+       │ /home/deparker/v4-cost/1p-off.out │   /home/deparker/v4-cost/1p-on.out   │
+       │        allocated-bytes/op         │ allocated-bytes/op  vs base          │
+JSON-1                        4.282Mi ± 4%         4.196Mi ± 3%  ~ (p=0.247 n=10)
+
+       │ /home/deparker/v4-cost/1p-off.out │ /home/deparker/v4-cost/1p-on.out │
+       │             allocs/op             │   allocs/op     vs base          │
+JSON-1                         26.78k ± 0%      26.78k ± 0%  ~ (p=0.986 n=10)
+
+       │ /home/deparker/v4-cost/1p-off.out │     /home/deparker/v4-cost/1p-on.out      │
+       │         bytes-from-system         │ bytes-from-system  vs base                │
+JSON-1                        64.94Mi ± 7%       74.11Mi ± 16%  +14.12% (p=0.022 n=10)
+
+       │ /home/deparker/v4-cost/1p-off.out │     /home/deparker/v4-cost/1p-on.out     │
+       │      heap-bytes-from-system       │ heap-bytes-from-system  vs base          │
+JSON-1                        59.72Mi ± 7%            63.67Mi ± 19%  ~ (p=0.863 n=10)
+
+       │ /home/deparker/v4-cost/1p-off.out │     /home/deparker/v4-cost/1p-on.out      │
+       │      other-bytes-from-system      │ other-bytes-from-system  vs base          │
+JSON-1                        2.309Mi ± 7%              2.315Mi ± 6%  ~ (p=0.684 n=10)
+
+       │ /home/deparker/v4-cost/1p-off.out │ /home/deparker/v4-cost/1p-on.out │
+       │          peak-RSS-bytes           │ peak-RSS-bytes  vs base          │
+JSON-1                        55.79Mi ± 8%    53.61Mi ± 11%  ~ (p=0.481 n=10)
+
+       │ /home/deparker/v4-cost/1p-off.out │   /home/deparker/v4-cost/1p-on.out   │
+       │           peak-VM-bytes           │ peak-VM-bytes  vs base               │
+JSON-1                        1.236Gi ± 5%    1.238Gi ± 0%  +0.13% (p=0.000 n=10)
+
+       │ /home/deparker/v4-cost/1p-off.out │     /home/deparker/v4-cost/1p-on.out      │
+       │      stack-bytes-from-system      │ stack-bytes-from-system  vs base          │
+JSON-1                       256.0Ki ± 12%             256.0Ki ± 12%  ~ (p=1.000 n=10)
+
+       │ /home/deparker/v4-cost/1p-off.out │    /home/deparker/v4-cost/1p-on.out    │
+       │          user+sys-sec/op          │ user+sys-sec/op  vs base               │
+JSON-1                        16.02m ± 99%     16.23m ± 101%  +1.31% (p=0.035 n=10)
+pkg: golang.org/x/benchmarks
+goos: linux
+goarch: amd64
+         │ /home/deparker/v4-cost/256p-off.out │ /home/deparker/v4-cost/256p-on.out │
+         │               sec/op                │      sec/op       vs base          │
+JSON-256                          2.498m ± 37%       2.174m ± 57%  ~ (p=0.631 n=10)
+
+         │ /home/deparker/v4-cost/256p-off.out │   /home/deparker/v4-cost/256p-on.out   │
+         │        GC-bytes-from-system         │ GC-bytes-from-system  vs base          │
+JSON-256                         31.34Mi ± 41%          33.19Mi ± 31%  ~ (p=0.481 n=10)
+
+         │ /home/deparker/v4-cost/256p-off.out │ /home/deparker/v4-cost/256p-on.out │
+         │             STW-sec/GC              │    STW-sec/GC     vs base          │
+JSON-256                          35.30m ± 41%       36.20m ± 12%  ~ (p=1.000 n=10)
+
+         │ /home/deparker/v4-cost/256p-off.out │  /home/deparker/v4-cost/256p-on.out   │
+         │             STW-sec/op              │  STW-sec/op    vs base                │
+JSON-256                          144.0µ ± 48%   212.6µ ± 102%  +47.64% (p=0.029 n=10)
+
+         │ /home/deparker/v4-cost/256p-off.out │  /home/deparker/v4-cost/256p-on.out  │
+         │         allocated-bytes/op          │ allocated-bytes/op  vs base          │
+JSON-256                         6.845Mi ± 29%        8.709Mi ± 33%  ~ (p=0.143 n=10)
+
+         │ /home/deparker/v4-cost/256p-off.out │ /home/deparker/v4-cost/256p-on.out │
+         │              allocs/op              │    allocs/op      vs base          │
+JSON-256                           26.81k ± 0%        26.81k ± 0%  ~ (p=0.147 n=10)
+
+         │ /home/deparker/v4-cost/256p-off.out │ /home/deparker/v4-cost/256p-on.out  │
+         │          bytes-from-system          │ bytes-from-system  vs base          │
+JSON-256                         5.902Gi ± 74%       5.735Gi ± 23%  ~ (p=0.436 n=10)
+
+         │ /home/deparker/v4-cost/256p-off.out │    /home/deparker/v4-cost/256p-on.out    │
+         │       heap-bytes-from-system        │ heap-bytes-from-system  vs base          │
+JSON-256                         5.789Gi ± 74%            5.614Gi ± 23%  ~ (p=0.436 n=10)
+
+         │ /home/deparker/v4-cost/256p-off.out │    /home/deparker/v4-cost/256p-on.out     │
+         │       other-bytes-from-system       │ other-bytes-from-system  vs base          │
+JSON-256                         69.55Mi ± 42%              68.16Mi ± 5%  ~ (p=0.353 n=10)
+
+         │ /home/deparker/v4-cost/256p-off.out │ /home/deparker/v4-cost/256p-on.out │
+         │           peak-RSS-bytes            │  peak-RSS-bytes   vs base          │
+JSON-256                         5.861Gi ± 74%      5.680Gi ± 30%  ~ (p=0.315 n=10)
+
+         │ /home/deparker/v4-cost/256p-off.out │ /home/deparker/v4-cost/256p-on.out │
+         │            peak-VM-bytes            │  peak-VM-bytes    vs base          │
+JSON-256                         7.046Gi ± 62%      6.955Gi ± 20%  ~ (p=0.436 n=10)
+
+         │ /home/deparker/v4-cost/256p-off.out │    /home/deparker/v4-cost/256p-on.out     │
+         │       stack-bytes-from-system       │ stack-bytes-from-system  vs base          │
+JSON-256                         16.53Mi ± 13%             18.09Mi ± 12%  ~ (p=0.288 n=10)
+
+         │ /home/deparker/v4-cost/256p-off.out │ /home/deparker/v4-cost/256p-on.out │
+         │           user+sys-sec/op           │ user+sys-sec/op   vs base          │
+JSON-256                          167.5m ± 39%       153.8m ± 49%  ~ (p=0.971 n=10)
+         │ /home/deparker/v4-cost/malloc-off.out │ /home/deparker/v4-cost/malloc-on.out │
+         │                sec/op                 │    sec/op      vs base               │
+Malloc8                             14.88n ±  3%    15.99n ± 52%  +7.53% (p=0.014 n=10)
+Malloc16                            23.92n ± 52%    24.98n ± 53%       ~ (p=0.089 n=10)
+geomean                             18.86n          19.99n        +5.96%

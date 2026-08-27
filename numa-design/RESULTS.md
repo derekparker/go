@@ -4434,3 +4434,81 @@ iteration (3 clean repeats after) — watch.
 G2-locality's pre-registered shape (≥90% at every width, steady-state
 protocol per the plan's recorded clarification) is met on the P4 evidence;
 the formal gate adjudication happens in the P5 combined battery.
+
+---
+
+# v4 Task P5 — combined G2+G4 gate battery: VERDICTS
+
+Final tree `cf2bbbfff1` (steal filter and hysteresis deleted per ablation
+verdicts — see the commit message and the ablation section below; enforcement
+hook ON in its reviewed M2 form). All sweeps single-session, interleaved/
+rotating, benchstat, idle-checked, numa_balancing=1 verified after. Raws:
+`bench-data/v4-g2g4-{primary,imc,cost}/` (+ locality under
+`v4-p4-verification/`). Toolchain stamps verified per battery.
+
+| Gate | Bar | Reading | Verdict |
+|---|---|---|---|
+| G2-primary (garbage 4GiB 256P wall, B-vs-C) | ≥5% better, sig. | **−8.09%** (p=0.000, n=10) | **PASS** |
+| G4-RSS (same arms, peak-RSS) | ≤ +10% | ~ (p=0.739; −0.7% pt) | **PASS** |
+| G2-locality (steady-state refill share) | ≥90% every width | 25/25 launches ≥90%; medians 92.8–97.4% | **PASS** |
+| G4 large-object (arena-tag vs P-home) | ≥90% | battery test green ×3 | **PASS** |
+| G2-cost 1P json | ≤ +2% both metrics | +1.35% ns/op (p=0.029), +1.31% user+sys (p=0.035) | **PASS** |
+| G2-cost 256P json (noprof harness) | ≤ +2% | ~ sec/op (p=0.631), ~ user+sys (p=0.971) | **PASS** |
+| G2-IMC (L3-miss DRAM remote share) | ≥10% rel. drop | json −0.4%; garbage (expl.) −4.4% | **FAIL** |
+| G2-sched-micros (4 benchmarks 256P) | ≤ +2% | CreateGoroutines +15–19%, Capture +6.5–10.4% (PingPongHog, Parallel ~) | **FAIL** (hook-on) |
+| G2-cost 1P alloc micro vs stock | ≤ +2% | Malloc8 +7.53% (p=0.014, ±52% spread), Malloc16 ~ (p=0.089), geomean +5.96% | **FAIL** |
+| Off census / -race / TestNUMA | zero diffs / green | verified at every commit | PASS |
+
+Corroboration: over 3 sampled primary rounds, stock arm B took 2,780,209
+NUMA balancer hint faults; arm C took **0** (Layer-1 VMA exemption) — while
+being 8% faster.
+
+## G2-IMC FAIL — attribution (stage-3 role, executed inline)
+
+The proxy (`mem_load_l3_miss_retired.remote_dram` share) does not measure what
+the stage changes: a workload with **96% span-refill locality and minimal GC**
+(the churn probe) still reads **43.8%** remote — the load-miss numerator is
+dominated by loads to shared runtime/global state, which allocation placement
+cannot move on ANY workload. json (shared corpus) reads −0.4%; garbage −4.4%
+(clean separation, matching v3 WS-B's −4.49%). The mechanisms the stage
+targets are measured directly by the refill counters (63→95% local) and by
+wall time (−8%). Recorded as: gate proxy insensitive to the treatment;
+bar not met as written.
+
+## G2-sched-micros FAIL — the enforcement fork (bisected, decomposed)
+
+Build-constant ablations isolated the entire regression to the
+schedule()-path enforcement hook (steal filter exonerated → deleted; hook-on
+~893ns vs hook-off ~736ns CreateGoroutines, complete separation). perf stat
+decomposition: user cycles/op only +6.7% while wall is +23% — **most of the
+cost is off-CPU wake latency inherent to mask narrowing** (a narrowed M
+cannot be woken onto the other node's idle CPUs). Hysteresis was implemented,
+measured (no benefit — LIFO P reuse converges streaks), and deleted. The
+pre-registered gates therefore fork on one switch:
+
+|  | G2-primary | G2-sched-micros |
+|---|---|---|
+| Hook ON (current tree) | **PASS −8.09%** (p=0.000) | FAIL (+15–19% CreateGoroutines) |
+| Hook OFF (ablation session) | FAIL −3.39% (p=0.005; < 5% bar) | PASS |
+
+Locality counters read ~95% either way (they compare span-home to P-home, not
+to the executing CPU); the wall-time difference is the enforcement's real
+DRAM effect. **Either configuration fails exactly one pre-registered gate;
+the ship-config choice is a recorded decision, not a measurement.**
+
+## G2-cost 1P alloc micro FAIL
+
+Malloc8 +7.53% (p=0.014) against stock on the combined tree — worse than
+WS-B's standing +3.73%. Caveats recorded: 1P bimodality (±52% spreads;
+Malloc16 not significant), and the routed windowed path IS active at 1P on
+numa-dell (confined ⇒ homing active ⇒ explicit-node refills take
+allocNode-first). Attribution not yet run — this is Task L's remaining
+target if the cost matters for the intended deployments.
+
+## Exploratory (labeled, no claims)
+
+1P: GC-bytes-from-system +206% (2.6→7.9 MiB absolute — 8-stream metadata),
+STW-sec/GC +226% / STW-sec/op +213% (tens of µs absolute; 1P STW was already
+a v3 exploratory flag). 256P: STW-sec/op +47.6% (p=0.029). These follow the
+per-node-stream design (more, smaller streams to sweep/manage) and warrant a
+look if STW matters at the target deployment sizes.

@@ -1,0 +1,36 @@
+== base round 1 ==
+2026/08/26 21:46:37 Benchmarking 1 iterations
+2026/08/26 21:46:38 Benchmarking 100 iterations
+2026/08/26 21:46:38 Benchmarking 10000 iterations
+258778072,,mem_load_l3_miss_retired.local_dram:u,2697786387702,100.00,,
+245903092,,mem_load_l3_miss_retired.remote_dram:u,2697786387702,100.00,,
+== numa-bin round 1 ==
+2026/08/26 21:47:29 Benchmarking 1 iterations
+2026/08/26 21:47:30 Benchmarking 100 iterations
+2026/08/26 21:47:30 Benchmarking 10000 iterations
+265937840,,mem_load_l3_miss_retired.local_dram:u,2877946153167,100.00,,
+233144891,,mem_load_l3_miss_retired.remote_dram:u,2877946153167,100.00,,
+== base round 2 ==
+2026/08/26 21:48:26 Benchmarking 1 iterations
+2026/08/26 21:48:26 Benchmarking 100 iterations
+2026/08/26 21:48:27 Benchmarking 10000 iterations
+240169185,,mem_load_l3_miss_retired.local_dram:u,2729159517666,100.00,,
+231299561,,mem_load_l3_miss_retired.remote_dram:u,2729159517666,100.00,,
+== numa-bin round 2 ==
+2026/08/26 21:49:23 Benchmarking 1 iterations
+2026/08/26 21:49:23 Benchmarking 100 iterations
+2026/08/26 21:49:24 Benchmarking 10000 iterations
+267241726,,mem_load_l3_miss_retired.local_dram:u,2780483844585,100.00,,
+231830933,,mem_load_l3_miss_retired.remote_dram:u,2780483844585,100.00,,
+== base round 3 ==
+2026/08/26 21:50:19 Benchmarking 1 iterations
+2026/08/26 21:50:19 Benchmarking 100 iterations
+2026/08/26 21:50:20 Benchmarking 10000 iterations
+253436657,,mem_load_l3_miss_retired.local_dram:u,2927813574289,100.00,,
+242367820,,mem_load_l3_miss_retired.remote_dram:u,2927813574289,100.00,,
+== numa-bin round 3 ==
+2026/08/26 21:51:16 Benchmarking 1 iterations
+2026/08/26 21:51:17 Benchmarking 100 iterations
+2026/08/26 21:51:18 Benchmarking 10000 iterations
+260820487,,mem_load_l3_miss_retired.local_dram:u,2884434758481,100.00,,
+239870250,,mem_load_l3_miss_retired.remote_dram:u,2884434758481,100.00,,
