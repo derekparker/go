@@ -4708,3 +4708,26 @@ two attributed FAILs that no configuration changes — G2-IMC (proxy
 insensitive to the treatment; mechanism measured directly by the refill
 counters and wall time) and the 1P alloc micro (~+4.2% ON-build structural
 cost, WS-B-era, Task LF direction proven at ~+1.9% if pursued).
+
+## LF3 verdict + dose–response: the cost is the per-N bundle, ~linear in capacity
+
+- **LF3 (remote sets to a global spanclass-indexed block): perf-NULL.**
+  Tight-mode n=24: geomean +5.46% vs stock — no better than the in-struct
+  layout. LF3 is RETAINED anyway for its structural property (mcentral is
+  now byte-identical to upstream by construction, remote sets live in one
+  gated global — the more reviewable upstream shape), with this null
+  explicitly recorded so the commit's footprint rationale is not read as a
+  measured win.
+- **Dose–response (same sessions, tight mode):** numaMaxHeapNodes = 1 →
+  +1.9%; 4 → +3.53%; 8 → +5.46%. The ON-build 1P alloc cost is a ~linear
+  function (~+0.5%/node) of the compile-time node capacity, dispersed
+  across every N-sized structure and loop bound (mheap arenaHints/curArena/
+  high-water, pageAlloc windows, sweeper and fallback loops) — no single
+  extraction recovers it (LF2 and LF3 both null), only shrinking N does.
+- **Task LF final standing:** the ≤+2% 1P alloc-micro bar is reachable only
+  near N=1–2 (extrapolated N=2 ≈ +2.1%, at the bar). The capacity constant
+  is therefore an explicit UPSTREAM DECISION POINT: N=4 covers the dominant
+  1–4-node deployments at ~+3.5% micro cost (real-workload 1P json remains
+  +1.35%); N=8 supports big boxes at ~+5.5%; a per-variant constant is
+  possible but adds build-matrix complexity. Gate remains FAIL as
+  pre-registered at the shipped N=8, fully attributed and quantified.
