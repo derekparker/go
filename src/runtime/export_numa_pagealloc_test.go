@@ -97,3 +97,30 @@ func (p *PageAlloc) FindFrom(npages, from uintptr) (addr, searchAddr uintptr) {
 	})
 	return
 }
+
+// NumaLongestHintRunForTest exports the pure stream-run finder used by
+// numaInitStreamWindows (v4 stage 4 Task P2).
+func NumaLongestHintRunForTest(addrs []uintptr) (start, n int, spacing uintptr) {
+	return numaLongestHintRun(addrs)
+}
+
+// NumaStreamWindowForTest returns the REAL heap's stream window for
+// node, as computed by mallocinit; lo == hi means no valid window.
+func NumaStreamWindowForTest(node int32) (lo, hi uintptr) {
+	w := mheap_.pages.numaWindows[node]
+	return w.lo.addr(), w.hi.addr()
+}
+
+// NumaFirstArenaHintForTest returns the address of node's first arena
+// hint (0 if none) -- the hint growth will consume first, which the
+// NEW-1 reorder guarantees is in-window whenever a valid window exists.
+func NumaFirstArenaHintForTest(node int32) uintptr {
+	if h := mheap_.arenaHints[node]; h != nil {
+		return h.addr
+	}
+	return 0
+}
+
+// PallocChunkBytesForTest exports the palloc chunk size for alignment
+// assertions.
+func PallocChunkBytesForTest() uintptr { return pallocChunkBytes }

@@ -49,6 +49,7 @@ package runtime
 
 import (
 	"internal/goarch"
+	"internal/goexperiment"
 	"internal/runtime/atomic"
 	"internal/runtime/gc"
 	"unsafe"
@@ -423,6 +424,14 @@ func (p *pageAlloc) grow(base, size uintptr) {
 	// new address, just like in free.
 	if b := (offAddr{base}); b.lessThan(p.searchAddr) {
 		p.searchAddr = b
+	}
+	if goexperiment.Numa && numaHeapHomingActive() {
+		// Windowed mirror (v4 stage 4, design §4): growth into a
+		// stream window arms/lowers that window's searchAddr. Gated on
+		// homing (multi-node) so experiment-on single-node hosts pay
+		// nothing; compile-time guard keeps the off build
+		// byte-identical.
+		p.numaWindowLower(base)
 	}
 
 	// Add entries into chunks, which is sparse, if needed. Then,
@@ -969,6 +978,14 @@ func (p *pageAlloc) free(base, npages uintptr) {
 	// If we're freeing pages below the p.searchAddr, update searchAddr.
 	if b := (offAddr{base}); b.lessThan(p.searchAddr) {
 		p.searchAddr = b
+	}
+	if goexperiment.Numa && numaHeapHomingActive() {
+		// Windowed mirror of the lowering above (v4 stage 4, design
+		// §4): a free into a stream window re-arms that window's
+		// searchAddr. Gated on homing (multi-node) so experiment-on
+		// single-node hosts pay nothing; compile-time guard keeps the
+		// off build byte-identical.
+		p.numaWindowLower(base)
 	}
 	limit := base + npages*pageSize - 1
 	if npages == 1 {

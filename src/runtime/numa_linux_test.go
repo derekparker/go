@@ -785,3 +785,38 @@ func TestNUMAPlacementRefillLocality(t *testing.T) {
 		t.Errorf("unpinned local refill share %.2f%% < 90%% with placement active", share*100)
 	}
 }
+
+// TestNUMAStreamWindows checks the REAL mallocinit-computed stream
+// windows (v4 stage 4 Task P2): with heap streams enabled, every valid
+// window is chunk-aligned and pairwise disjoint, and each node's first
+// arena hint lies inside its window (the NEW-1 reorder guarantees
+// in-window hints come first).
+func TestNUMAStreamWindows(t *testing.T) {
+	if !runtime.NumaHeapStreamsEnabledForTest() {
+		t.Skip("heap streams disabled (race build or constrained VA layout)")
+	}
+	type win struct{ lo, hi uintptr }
+	var wins []win
+	for n := int32(0); n < runtime.NumaMaxHeapNodesForTest(); n++ {
+		lo, hi := runtime.NumaStreamWindowForTest(n)
+		if lo == hi {
+			continue // no valid window
+		}
+		if lo%runtime.PallocChunkBytesForTest() != 0 || hi%runtime.PallocChunkBytesForTest() != 0 {
+			t.Errorf("node %d window [%#x, %#x) not chunk-aligned", n, lo, hi)
+		}
+		first := runtime.NumaFirstArenaHintForTest(n)
+		if first != 0 && (first < lo || first >= hi) {
+			t.Errorf("node %d first hint %#x outside window [%#x, %#x) (NEW-1 reorder)", n, first, lo, hi)
+		}
+		for _, w := range wins {
+			if lo < w.hi && w.lo < hi {
+				t.Errorf("node %d window [%#x, %#x) overlaps [%#x, %#x)", n, lo, hi, w.lo, w.hi)
+			}
+		}
+		wins = append(wins, win{lo, hi})
+	}
+	if len(wins) < 2 {
+		t.Fatalf("expected >= 2 valid stream windows, got %d", len(wins))
+	}
+}

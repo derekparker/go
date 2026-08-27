@@ -200,3 +200,55 @@ func TestPageAllocFindFromEquivalence(t *testing.T) {
 		FreePageAlloc(p)
 	}
 }
+
+func TestNUMALongestHintRun(t *testing.T) {
+	const d = uintptr(1) << 38 // randomized-layout spacing on amd64
+	mk := func(base uintptr, n int) []uintptr {
+		out := make([]uintptr, n)
+		for i := range out {
+			out[i] = base + uintptr(i)*d
+		}
+		return out
+	}
+	tests := []struct {
+		name      string
+		addrs     []uintptr
+		wantStart int
+		wantLen   int
+		wantD     uintptr
+	}{
+		{"full8", mk(0x1000000000, 8), 0, 8, d},
+		{"aix7", mk(0x2000000000, 7), 0, 7, d},
+		// Wrap after 3 hints: high-prefix tail wraps to low addresses.
+		// The two runs are 3 and 5 long; longest wins.
+		{"wrapAt3", append(mk(0xff00000000000, 3), mk(0x10000000000, 5)...), 3, 5, d},
+		// Wrap after 6: longest is the leading 6.
+		{"wrapAt6", append(mk(0xff00000000000, 6), mk(0x10000000000, 2)...), 0, 6, d},
+		{"single", mk(0x1000000000, 1), 0, 1, 0},
+		{"twoRunsTie", append(mk(0xff00000000000, 4), mk(0x10000000000, 4)...), 0, 4, d},
+	}
+	for _, tt := range tests {
+		start, n, sp := NumaLongestHintRunForTest(tt.addrs)
+		if start != tt.wantStart || n != tt.wantLen || sp != tt.wantD {
+			t.Errorf("%s: got (start=%d len=%d d=%#x), want (start=%d len=%d d=%#x)",
+				tt.name, start, n, sp, tt.wantStart, tt.wantLen, tt.wantD)
+		}
+	}
+	// Simulated wrapped-prefix sweep (design C1): for every wrap point,
+	// the derived window [addrs[start], addrs[start+len-1]+d) must be
+	// disjoint from a neighboring stream's window built the same way.
+	for wrap := 1; wrap < 8; wrap++ {
+		s0 := append(mk(0xfff0000000000, wrap), mk(0x8000000000, 8-wrap)...)
+		s1 := mk(0x8000000000+8*d, 8) // next stream, contiguous
+		st0, n0, d0 := NumaLongestHintRunForTest(s0)
+		st1, n1, d1 := NumaLongestHintRunForTest(s1)
+		if n0 < 1 || n1 != 8 {
+			t.Fatalf("wrap=%d: run lengths %d, %d", wrap, n0, n1)
+		}
+		lo0, hi0 := s0[st0], s0[st0+n0-1]+d0
+		lo1, hi1 := s1[st1], s1[st1+n1-1]+d1
+		if lo0 < hi1 && lo1 < hi0 {
+			t.Errorf("wrap=%d: windows overlap: [%#x,%#x) vs [%#x,%#x)", wrap, lo0, hi0, lo1, hi1)
+		}
+	}
+}

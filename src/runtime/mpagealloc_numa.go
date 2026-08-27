@@ -354,3 +354,122 @@ nextLevel:
 	foundFree(offAddr{searchAddr}, chunkBase(ci+1)-searchAddr)
 	return addr, p.findMappedAddr(firstFree.base)
 }
+
+// numaLongestHintRun finds, over a stream's hint addresses in chain
+// (ascending-i) order, the longest run of consecutive addresses with a
+// constant positive spacing -- the stream's contiguous address window
+// (design C1). The spacing is inferred as the most common positive
+// delta (ties to the smaller), which is layout-independent: every hint
+// layout uses a constant per-i spacing, broken at most once per stream
+// by the randomized-prefix mod-256 wrap, whose delta is a one-off.
+// n <= numaMaxHeapNodes*... in practice <= 8+; O(n^2) is fine.
+//
+// Returns the run's start index and length within addrs, and the
+// inferred spacing (0 when no positive delta exists; callers treat
+// length < 2 as "no valid window").
+func numaLongestHintRun(addrs []uintptr) (start, n int, spacing uintptr) {
+	if len(addrs) == 0 {
+		return 0, 0, 0
+	}
+	if len(addrs) == 1 {
+		return 0, 1, 0
+	}
+	bestCount := 0
+	for i := 1; i < len(addrs); i++ {
+		if addrs[i] <= addrs[i-1] {
+			continue
+		}
+		d := addrs[i] - addrs[i-1]
+		c := 0
+		for j := 1; j < len(addrs); j++ {
+			if addrs[j] > addrs[j-1] && addrs[j]-addrs[j-1] == d {
+				c++
+			}
+		}
+		if c > bestCount || (c == bestCount && (spacing == 0 || d < spacing)) {
+			spacing, bestCount = d, c
+		}
+	}
+	if bestCount == 0 {
+		return 0, 1, 0
+	}
+	runStart, runLen := 0, 1
+	curStart, curLen := 0, 1
+	for i := 1; i < len(addrs); i++ {
+		if addrs[i] > addrs[i-1] && addrs[i]-addrs[i-1] == spacing {
+			curLen++
+		} else {
+			curStart, curLen = i, 1
+		}
+		if curLen > runLen {
+			runStart, runLen = curStart, curLen
+		}
+	}
+	return runStart, runLen, spacing
+}
+
+// numaInitStreamWindows computes every stream's address window from the
+// hint chains mallocinit just built, arms the windowed searchAddrs at
+// the unarmed sentinel, and -- when a stream's hints are NOT one
+// contiguous run (the randomized-prefix wrap, design review NEW-1) --
+// reorders that stream's hint chain so the in-window run's hints come
+// FIRST: growth consumes hints in chain order, so without the reorder
+// the node's very first grow could use an out-of-window hint and fire
+// the permanent numaWindowLatch immediately (zero windowed locality for
+// that node, on ~12% of launches). Post-reorder, the latch fires only
+// on genuine run exhaustion.
+//
+// Called once from mallocinit, single-threaded, only when
+// numaHeapStreamsEnabled (behind the compile-time goexperiment.Numa
+// guard at the call site -- this function must not exist in the off
+// binary's census).
+func numaInitStreamWindows() {
+	for node := int32(0); node < numaMaxHeapNodes; node++ {
+		var addrs [16]uintptr
+		var hints [16]*arenaHint
+		n := 0
+		for h := mheap_.arenaHints[node]; h != nil && n < len(addrs); h = h.next {
+			addrs[n] = h.addr
+			hints[n] = h
+			n++
+		}
+		if n < 2 {
+			continue // no valid window (lo == hi zero value stands)
+		}
+		start, runLen, d := numaLongestHintRun(addrs[:n])
+		if runLen < 2 {
+			continue
+		}
+		mheap_.pages.numaWindows[node].lo = offAddr{addrs[start]}
+		mheap_.pages.numaWindows[node].hi = offAddr{addrs[start+runLen-1] + d}
+		mheap_.pages.numaSearchAddr[node] = maxSearchAddr()
+		if runLen < n {
+			// Reorder: in-window run first, remaining hints after,
+			// relative order preserved within each group.
+			var head, tail *arenaHint
+			appendHint := func(h *arenaHint) {
+				if head == nil {
+					head = h
+				} else {
+					tail.next = h
+				}
+				tail = h
+			}
+			for i := start; i < start+runLen; i++ {
+				appendHint(hints[i])
+			}
+			for i := 0; i < n; i++ {
+				if i < start || i >= start+runLen {
+					appendHint(hints[i])
+				}
+			}
+			tail.next = nil
+			mheap_.arenaHints[node] = head
+		}
+		if debug.numa > 0 {
+			println("numa: stream window node", node,
+				"lo", hex(addrs[start]), "hi", hex(addrs[start+runLen-1]+d),
+				"hints", n, "run", runLen)
+		}
+	}
+}
