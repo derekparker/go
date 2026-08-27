@@ -4806,3 +4806,28 @@ run on the final tree in both modes — the trybot-equivalent breadth the
 proposal needs. (Note: an all.bash run with GOEXPERIMENT set bakes that
 default into the installed toolchain; the local toolchain was rebuilt
 plain afterwards.)
+
+---
+
+# Upstream gap item 6 — the two unreproduced local test FAILs: closed as not-reproducible
+
+Date: 2026-08-27. Tree: `68cbbd30f2`+docs.
+
+Dedicated stress chase on the final tree: the local gating subset
+(`TestNUMA|TestPageAlloc|TestPageCache|TestArenaHint|TestArenaCollision`)
+run 60× in each build mode with full (untruncated) output capture —
+**0 failures in 120 runs**.
+
+Context: both original observations (one during the P4 pollution-fix
+iteration, one during the A5 gate battery) lost their detail to output
+truncation (the process lesson already recorded) and predate two
+subsequently-fixed real bugs, including the baseline randomized-heap-base
+prefix-mask bug fixed today — which made hint-chain layout a
+launch-to-launch lottery (duplicate hints, stream-endpoint sharing) on
+~75% of launches at the time the flakes were seen. That is a plausible
+mechanism (not a proven attribution) for rare launch-dependent
+weirdness.
+
+Disposition: closed as not-reproducible on the final tree after a
+120-run budget; the watch note stands — any future occurrence must be
+captured with full output (no truncation) and filed with logs.
