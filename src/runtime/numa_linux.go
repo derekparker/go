@@ -1202,9 +1202,6 @@ const numaSoftAffinityCheckInterval = 4 * 1e6 // 4ms in nanotime() units
 // dead-code-eliminates out of an experiment-off binary instead of
 // costing a function call that immediately returns.
 func numaNoteSchedule() {
-	if numaHookAblate == 1 {
-		return
-	}
 	mp := getg().m
 	if mp.locks != 0 {
 		// Defensive only -- see the doc comment above; findRunnable is
@@ -1215,9 +1212,6 @@ func numaNoteSchedule() {
 		return
 	}
 	if !numaSoftAffinityEligible() || numaConfined.Load() || numaStoodDown.Load() {
-		return
-	}
-	if numaHookAblate == 2 {
 		return
 	}
 	if numaPlacementActive() {
@@ -1236,24 +1230,12 @@ func numaNoteSchedule() {
 				if last, applied := mp.numa.softAffinityNode(); applied && last == home {
 					return // steady state
 				}
-				if !mp.numa.homeStreakAdvance(home) {
-					// Hysteresis (sched-micro gate fix): an M that just
-					// picked up a differently-homed P applies nothing --
-					// only a stable pairing (numaHomeStreakThreshold
-					// consecutive same-home passes) pays the clock read
-					// and the throttled syscall below. Bouncing Ms (the
-					// goroutine-creation churn regime, +15-21% before
-					// this) cost two byte compares per pass here.
-					return
-				}
 				now := nanotime()
 				if !mp.numa.softAffinityCheckDue(now) {
 					return // bounded retry after a failed apply
 				}
 				mp.numa.armSoftAffinityCheck(now + numaSoftAffinityCheckInterval)
-				if numaHookAblate != 3 {
-					numaApplySoftAffinity(mp, int32(home))
-				}
+				numaApplySoftAffinity(mp, int32(home))
 				return
 			}
 		}

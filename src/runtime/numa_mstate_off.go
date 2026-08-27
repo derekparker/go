@@ -26,9 +26,3 @@ func (s *mNUMAState) clearSoftAffinityNode()                 {}
 
 func (s *mNUMAState) softAffinityCheckDue(now int64) bool { return false }
 func (s *mNUMAState) armSoftAffinityCheck(deadline int64) {}
-
-// homeStreakAdvance's real implementation (hysteresis for the placement
-// hook) lives in numa_mstate_on.go; with the experiment off its only
-// caller (numaNoteSchedule's placement path) is dead code, but
-// numa_linux.go still compiles, so the method must exist.
-func (s *mNUMAState) homeStreakAdvance(home int8) bool { return false }

@@ -17,11 +17,6 @@ package runtime
 type mNUMAState struct {
 	bindAllDone bool // this thread's placement converged after stand-down
 
-	// pendingHome ((node id + 1), 0 = none) and homeStreak implement
-	// the placement hook's hysteresis -- see homeStreakAdvance below.
-	pendingHome int8
-	homeStreak  int8
-
 	// lastNode stores (node id + 1): the node numaNoteSchedule last
 	// narrowed this M's CPU affinity to, or 0 (its zero value) if
 	// numaNoteSchedule has never narrowed this M at all. The +1 offset
@@ -101,35 +96,3 @@ func (s *mNUMAState) softAffinityCheckDue(now int64) bool { return now >= s.next
 func (s *mNUMAState) armSoftAffinityCheck(deadline int64) {
 	s.nextCheck = deadline
 }
-
-// pendingHome/homeStreak implement the placement hook's hysteresis (v4
-// stage 2, sched-micro gate fix): numaNoteSchedule only pays nanotime +
-// the (throttled) sched_setaffinity apply once this M has observed the
-// SAME P home for numaHomeStreakThreshold consecutive passes. An M
-// bouncing between differently-homed Ps at wake/park frequency -- the
-// goroutine-creation microbenchmark regime, where applying is pure
-// waste because the next P is random anyway -- never converges a
-// streak and pays two byte compares per pass, no clock read, no
-// syscall. An M holding one P (the steady macro regime the enforcement
-// exists for) converges within the threshold and then sits in the
-// applied==home steady state. pendingHome uses the same +1
-// zero-value-safe encoding as lastNode.
-func (s *mNUMAState) homeStreakAdvance(home int8) (apply bool) {
-	if s.pendingHome != home+1 {
-		s.pendingHome = home + 1
-		s.homeStreak = 1
-		return false
-	}
-	if s.homeStreak < numaHomeStreakThreshold {
-		s.homeStreak++
-		return s.homeStreak >= numaHomeStreakThreshold
-	}
-	return true
-}
-
-// numaHomeStreakThreshold is the number of consecutive same-home
-// schedule() passes before the placement hook applies thread affinity.
-// With Ps picked ~uniformly at random by waking Ms on a 2-node box,
-// the chance of a spurious convergence is ~2^-8 per pass; a stable M
-// converges in 8 passes (microseconds under load).
-const numaHomeStreakThreshold = 8

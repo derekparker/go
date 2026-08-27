@@ -3920,23 +3920,6 @@ func stealWork(now int64) (gp *g, inheritTime bool, rnow, pollUntil int64, newWo
 
 	ranTimer := false
 
-	// NUMA P-home placement (v4 stage 2, design §6): when active, the
-	// first steal pass skips victims homed on a different node, so work
-	// prefers to stay where its memory (and this M's soft affinity)
-	// already is. Passes 1..3 are exactly the unrestricted order, so a
-	// cross-node victim gets 3 unrestricted probes instead of today's 4
-	// -- still work-conserving: the filter only ever skips, never
-	// blocks or adds tries, and the timer/runnext last pass is
-	// untouched. stealHome is hoisted to one predicate load per
-	// stealWork call; -1 (no home / placement inactive) disables the
-	// filter. Victims with no assigned home are never skipped.
-	stealHome := int8(-1)
-	if goexperiment.Numa && numaStealFilter && numaPlacementActive() {
-		if home, ok := pp.numa.home(); ok {
-			stealHome = home
-		}
-	}
-
 	const stealTries = 4
 	for i := 0; i < stealTries; i++ {
 		stealTimersOrRunNextG := i == stealTries-1
@@ -3949,11 +3932,6 @@ func stealWork(now int64) (gp *g, inheritTime bool, rnow, pollUntil int64, newWo
 			p2 := allp[enum.position()]
 			if pp == p2 {
 				continue
-			}
-			if goexperiment.Numa && i == 0 && stealHome >= 0 && numaStealFilter {
-				if vHome, ok := p2.numa.home(); ok && vHome != stealHome {
-					continue // pass 0: same-node victims only
-				}
 			}
 
 			// Steal timers from p2. This call to checkTimers is the only place
@@ -4350,7 +4328,7 @@ top:
 	// every other precondition (multi-node, not confined, not stood
 	// down, started with full affinity) and fires the underlying
 	// sched_setaffinity syscall only on an actual NUMA node change.
-	if goexperiment.Numa && numaScheduleHook {
+	if goexperiment.Numa {
 		numaNoteSchedule()
 	}
 
