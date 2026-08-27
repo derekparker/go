@@ -245,7 +245,7 @@ func TestNUMASoftAffinity(t *testing.T) {
 	if !runtime.NumaHasSetAffinityForTest() {
 		t.Skip("no sched_setaffinity plumbing on this arch")
 	}
-	got := runTestProg(t, "testprog", "NUMASoftAffinity", "GOMAXPROCS="+strconv.Itoa(runtime.NumCPU()))
+	got := runTestProg(t, "testprog", "NUMASoftAffinity", "GOMAXPROCS="+strconv.Itoa(runtime.NumCPU()), "GODEBUG=numaenforce=1")
 	narrowed, total, gomaxprocs, nodes := parseSoftAffinity(t, got)
 	if total == 0 {
 		t.Fatalf("no threads observed; output %q", got)
@@ -337,7 +337,7 @@ func TestNUMASoftAffinityForkRegression(t *testing.T) {
 	if !runtime.NumaHasSetAffinityForTest() {
 		t.Skip("no sched_setaffinity plumbing on this arch")
 	}
-	got := runTestProg(t, "testprog", "NUMASoftAffinityForkParent", "GOMAXPROCS="+strconv.Itoa(runtime.NumCPU()))
+	got := runTestProg(t, "testprog", "NUMASoftAffinityForkParent", "GOMAXPROCS="+strconv.Itoa(runtime.NumCPU()), "GODEBUG=numaenforce=1")
 	var parentPop, childPop, online int
 	found := false
 	for _, line := range strings.Split(got, "\n") {
@@ -382,7 +382,7 @@ func TestNUMASoftAffinityExecRegression(t *testing.T) {
 	if !runtime.NumaHasSetAffinityForTest() {
 		t.Skip("no sched_setaffinity plumbing on this arch")
 	}
-	got := runTestProg(t, "testprog", "NUMASoftAffinityExecParent", "GOMAXPROCS="+strconv.Itoa(runtime.NumCPU()))
+	got := runTestProg(t, "testprog", "NUMASoftAffinityExecParent", "GOMAXPROCS="+strconv.Itoa(runtime.NumCPU()), "GODEBUG=numaenforce=1")
 	var parentPop, online int
 	found := false
 	for _, line := range strings.Split(got, "\n") {
@@ -459,7 +459,7 @@ func TestNUMASoftAffinitySetDefaultGOMAXPROCS(t *testing.T) {
 	if !runtime.NumaHasSetAffinityForTest() {
 		t.Skip("no sched_setaffinity plumbing on this arch")
 	}
-	got := runTestProg(t, "testprog", "NUMASoftAffinitySetDefaultGOMAXPROCS", "GOMAXPROCS="+strconv.Itoa(runtime.NumCPU()))
+	got := runTestProg(t, "testprog", "NUMASoftAffinitySetDefaultGOMAXPROCS", "GOMAXPROCS="+strconv.Itoa(runtime.NumCPU()), "GODEBUG=numaenforce=1")
 	var after, numcpu int
 	found := false
 	for _, line := range strings.Split(got, "\n") {
@@ -693,7 +693,7 @@ func TestNUMAPlacementSpread(t *testing.T) {
 		// not be there either.
 		t.Skip("placement not active in this process; child would decline too")
 	}
-	got := runTestProg(t, "testprog", "NUMAPlacementSpread", "GOMAXPROCS="+strconv.Itoa(runtime.NumCPU()))
+	got := runTestProg(t, "testprog", "NUMAPlacementSpread", "GOMAXPROCS="+strconv.Itoa(runtime.NumCPU()), "GODEBUG=numaenforce=1")
 	var line string
 	for _, l := range strings.Split(got, "\n") {
 		if strings.HasPrefix(l, "placementspread ") {
@@ -907,19 +907,24 @@ func TestNUMAEnforceStateMachine(t *testing.T) {
 	under := runtime.NumaWakeRateTripForTest() - 1
 	win := int64(100e6)
 
+	streak := int(runtime.NumaEnforceTripStreakForTest())
 	epoch0 := runtime.NumaEnforceEpochForTest()
-	runtime.NumaEnforceEvalForTest(over, win)
-	if runtime.NumaEnforceStoodDownForTest() {
-		t.Fatal("tripped after one over-threshold window; streak requirement is 2")
+	for i := 0; i < streak-1; i++ {
+		runtime.NumaEnforceEvalForTest(over, win)
 	}
-	runtime.NumaEnforceEvalForTest(under, win)
-	runtime.NumaEnforceEvalForTest(over, win)
+	if runtime.NumaEnforceStoodDownForTest() {
+		t.Fatalf("tripped after %d over-threshold windows; streak requirement is %d", streak-1, streak)
+	}
+	runtime.NumaEnforceEvalForTest(under, win) // breaks the streak
+	for i := 0; i < streak-1; i++ {
+		runtime.NumaEnforceEvalForTest(over, win)
+	}
 	if runtime.NumaEnforceStoodDownForTest() {
 		t.Fatal("tripped without CONSECUTIVE over-threshold windows")
 	}
 	runtime.NumaEnforceEvalForTest(over, win)
 	if !runtime.NumaEnforceStoodDownForTest() {
-		t.Fatal("did not trip after two consecutive over-threshold windows")
+		t.Fatalf("did not trip after %d consecutive over-threshold windows", streak)
 	}
 	if got := runtime.NumaEnforceEpochForTest(); got != epoch0+1 {
 		t.Fatalf("epoch = %d after trip, want %d", got, epoch0+1)
@@ -951,8 +956,9 @@ func TestNUMAEnforceStateMachine(t *testing.T) {
 
 	// Lifetime cap: trips 2..8, then permanent.
 	for trip := 2; trip <= 8; trip++ {
-		runtime.NumaEnforceEvalForTest(over, win)
-		runtime.NumaEnforceEvalForTest(over, win)
+		for i := 0; i < streak; i++ {
+			runtime.NumaEnforceEvalForTest(over, win)
+		}
 		if !runtime.NumaEnforceStoodDownForTest() {
 			t.Fatalf("trip %d did not latch", trip)
 		}

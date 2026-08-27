@@ -1682,14 +1682,19 @@ var (
 
 const (
 	// numaWakeRateTrip is the elapsed-normalized M-wake rate (wakes per
-	// second) at or above which a window counts toward tripping.
-	// FROZEN FROM CALIBRATION (RESULTS.md, tree ebc788c5a1): the
-	// primary garbage regime measured 49-84 wakes/s, the losing storm
-	// regimes 7,813-12,294; 1024 is ~the geometric mean.
-	numaWakeRateTrip = 1024
-	// numaEnforceTripStreak windows over threshold, consecutively,
-	// before a trip (single-anomalous-window robustness).
-	numaEnforceTripStreak = 2
+	// second) at or above which a window counts toward tripping, and
+	// numaEnforceTripStreak is how many CONSECUTIVE such windows trip.
+	// FROZEN FROM FULL-TRACE CALIBRATION (RESULTS.md, corrected entry
+	// at abc2bb8443): instantaneous rate alone cannot separate the
+	// regimes -- the primary garbage workload's GC wake herds BURST to
+	// 13.9k-36k/s, above the storm regimes' sustained 7.8k-12.3k/s --
+	// but sustainment does: garbage's over-threshold runs die within 4
+	// consecutive 100ms windows across a full unperturbed trace, while
+	// a storm exceeds the threshold in every window indefinitely. The
+	// streak of 8 (~800ms sustained) is 2x garbage's worst observed
+	// run; the threshold sits 3.8x below the storms' minimum.
+	numaWakeRateTrip      = 2048
+	numaEnforceTripStreak = 8
 	// numaEnforceCooldownNs of accumulated below-threshold time while
 	// latched before re-arming.
 	numaEnforceCooldownNs = 10 * 1e9

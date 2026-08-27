@@ -190,5 +190,7 @@ func NumaEnforceReleaseForTest() {
 	numaEnforceSysmonMasked.Store(false)
 }
 
-// NumaWakeRateTripForTest exports the frozen threshold.
-func NumaWakeRateTripForTest() int64 { return numaWakeRateTrip }
+// NumaWakeRateTripForTest / NumaEnforceTripStreakForTest export the
+// frozen detection constants.
+func NumaWakeRateTripForTest() int64      { return numaWakeRateTrip }
+func NumaEnforceTripStreakForTest() int32 { return numaEnforceTripStreak }

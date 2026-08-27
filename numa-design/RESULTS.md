@@ -4620,3 +4620,33 @@ Verdicts, per the design's pre-registered calibration rules:
 - The reviewer's guessed-constants warning was quantitatively right in both
   directions: the drafted 41k/s threshold sat 5× ABOVE the real storms —
   the detector as originally drafted would never have tripped at all.
+
+---
+
+# v4 Task A5 — calibration CORRECTION and re-freeze (sampling-bias caught by first hardware trial)
+
+The prior calibration entry ("rate-only detection frozen at 1024 wakes/s")
+was built on **tail-biased sampling**: the diagnostic capture piped windows
+through `tail -8`, which sampled only each run's steady-state tail. The first
+hardware trial of the implemented detector caught it — the garbage primary
+regime tripped at startup, and a full unperturbed 434-window trace
+(`GODEBUG=numa=2,numaenforce=1`, archived reading) shows garbage's GC wake
+herds BURST to 13.9k–36k wakes/s — ABOVE the storms' sustained 7.8k–12.3k —
+for up to 3–4 consecutive 100ms windows, with quiet gaps between.
+
+**Corrected discriminator: sustainment, not instantaneous rate.** A storm
+exceeds any workable threshold in EVERY window indefinitely; garbage's
+bursts die within 400ms. Re-frozen constants: `numaWakeRateTrip = 2048`
+(3.8× below the storms' minimum) with `numaEnforceTripStreak = 8`
+consecutive windows (~800ms sustained; 2× garbage's worst observed run of
+4). The rate-only decision itself stands — the EWMA remains useless — but
+the streak, not the threshold, is what separates the regimes.
+
+Also from the first trial: the enforcement-MECHANISM hardware tests
+(soft-affinity/spread testprog children are themselves M-wake storms) now
+pin `GODEBUG=numaenforce=1` in the child — they test the mechanism; the
+detector has its own state-machine test.
+
+Process note, recorded per the corrections convention: diagnostic captures
+feeding frozen constants must archive the FULL trace, never a tail/head
+sample. The window data for this correction is the first full-trace archive.
