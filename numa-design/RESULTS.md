@@ -4374,3 +4374,63 @@ convention.
   documents; this deviation is recorded here before that battery would have run.
 - Local hygiene at ae47d4fdf3: full runtime suite green, -race TestNUMA green,
   off-build census zero function diffs, remaining TestNUMA* on numa-dell green.
+
+---
+
+# v4 Task P4 — stage-4 hardware verification: windowed page allocation works
+
+Tree `e037f33fe7`, numa-dell, 2026-08-26. Stage 4 (node-aware page allocation,
+design `v4-pagealloc-design.md` rev 2 + post-rev-2 correction) implemented as
+Tasks P1–P3 plus a four-bug hardening arc, every bug root-caused with a
+regression test:
+
+1. `13420cedbb` — pageCache.flush and the scavenger's free-back bypass
+   `pageAlloc.free`, leaving the windowed searchAddr stale-high → "bad summary
+   data" crash. Both sites now mirror their global searchAddr lowering; hook
+   gate became the pageAlloc-local `numaWindowsActive`.
+2. `d4ad33eb97` — invariant base case: arming (numaSchedinit) postdates
+   mallocinit-era heap growth, so the first post-arm lowering left pre-arm
+   free pages below the searchAddr → second crash signature. `numaArmWindows`
+   now seeds each window from its lowest in-window inUse address.
+3. `5bd2d22634` — `findFrom(npages>1)` failure DISCARDS firstFree; treating
+   its maxSearchAddr return as a candidate falsely exhausted windows over
+   surviving smaller runs (the design's rev-2-approved NEW-2 text was wrong in
+   this sub-case; corrected). Root-caused by a new CHURN PROPERTY TEST (mixed
+   windowed+global alloc/free/cache ops, invariant scan after every op, 3
+   seeds × 8000 steps) that reproduces in milliseconds; fix mirrors stock
+   alloc's npages==1-only poisoning asymmetry.
+4. `e037f33fe7` — bimodal ~72%-vs-94% locality across launches (GODEBUG
+   diagnosis: full-size windows, zero latches on the bad launches) was a
+   pollution cascade: a transient windowed page-cache fill miss fell to the
+   plain fill, which takes the lowest free addresses (another node's window),
+   and every span carved from that cache stayed remote and recycled into the
+   wrong node's spanSets. The cache fill now grows homed once on miss (M1
+   shape, skipped when latched).
+
+**Verification (raws in `bench-data/v4-p4-verification/`):**
+
+- Full `TestNUMA` battery on numa-dell: **3/3 consecutive runs green**,
+  including the formerly-RED `TestNUMAPlacementRefillLocality` (stage 2's
+  standing red test, 69% then) and the new `TestNUMAPlacementSpread` /
+  `TestNUMAPlacementLargeObjectLocality`.
+- Crash loop: 30/30 probe launches crash-free (pre-fix: crashed by iter 2).
+- **Locality sweep (steady-state protocol, 5 widths × 5 launches — every
+  individual launch, not just medians, ≥90%):** medians 2P **95.91%**, 8P
+  **95.05%**, 32P **92.83%**, 128P **93.52%**, 256P **97.37%**. Stage-2-only
+  was flat 63–67%; v3's getcpu routing measured 53–75%.
+- **Retain re-run (growth-dominated attribution workload):** 95.82%
+  steady-state / 97.30% ramp-inclusive at 256P — was **61.63%** before stage 4,
+  the reading that indicted pages.alloc.
+- Flake check after fix 4: 10/10 single launches 91.75–97.29% (bimodality
+  gone).
+
+Residuals recorded honestly: (a) the window-run inference sometimes computes
+run=2 (512 GiB windows) instead of run=8 on layouts where the reason is not
+yet understood — harmless for every gate workload (≤15 GiB/node) and the
+disjointness/alignment invariants hold, but understand before upstreaming;
+(b) one unreproduced local test FAIL observed once during the pollution-fix
+iteration (3 clean repeats after) — watch.
+
+G2-locality's pre-registered shape (≥90% at every width, steady-state
+protocol per the plan's recorded clarification) is met on the P4 evidence;
+the formal gate adjudication happens in the P5 combined battery.
