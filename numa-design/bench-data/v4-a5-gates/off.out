@@ -1,0 +1,90 @@
+goos: linux
+goarch: amd64
+pkg: runtime
+cpu: INTEL(R) XEON(R) PLATINUM 8592+
+BenchmarkPingPongHog-256                  	 1211287	      1216 ns/op
+BenchmarkCreateGoroutines-256             	 1736246	       724.1 ns/op
+BenchmarkCreateGoroutinesParallel-256     	 6639787	       190.8 ns/op
+BenchmarkCreateGoroutinesCapture-256      	  148282	      7795 ns/op	     145 B/op	       5 allocs/op
+PASS
+goos: linux
+goarch: amd64
+pkg: runtime
+cpu: INTEL(R) XEON(R) PLATINUM 8592+
+BenchmarkPingPongHog-256                  	  942693	      1147 ns/op
+BenchmarkCreateGoroutines-256             	 1628484	       745.3 ns/op
+BenchmarkCreateGoroutinesParallel-256     	 6957638	       176.9 ns/op
+BenchmarkCreateGoroutinesCapture-256      	  225428	      8106 ns/op	     144 B/op	       5 allocs/op
+PASS
+goos: linux
+goarch: amd64
+pkg: runtime
+cpu: INTEL(R) XEON(R) PLATINUM 8592+
+BenchmarkPingPongHog-256                  	 1233458	      1055 ns/op
+BenchmarkCreateGoroutines-256             	 1544052	       742.1 ns/op
+BenchmarkCreateGoroutinesParallel-256     	 6144362	       194.7 ns/op
+BenchmarkCreateGoroutinesCapture-256      	  171754	      8300 ns/op	     144 B/op	       5 allocs/op
+PASS
+goos: linux
+goarch: amd64
+pkg: runtime
+cpu: INTEL(R) XEON(R) PLATINUM 8592+
+BenchmarkPingPongHog-256                  	 1070582	      1174 ns/op
+BenchmarkCreateGoroutines-256             	 1556308	       751.5 ns/op
+BenchmarkCreateGoroutinesParallel-256     	 5614376	       189.0 ns/op
+BenchmarkCreateGoroutinesCapture-256      	  162525	      7681 ns/op	     145 B/op	       5 allocs/op
+PASS
+goos: linux
+goarch: amd64
+pkg: runtime
+cpu: INTEL(R) XEON(R) PLATINUM 8592+
+BenchmarkPingPongHog-256                  	  963163	      1075 ns/op
+BenchmarkCreateGoroutines-256             	 1599630	       743.8 ns/op
+BenchmarkCreateGoroutinesParallel-256     	 6409318	       199.1 ns/op
+BenchmarkCreateGoroutinesCapture-256      	  208533	      8187 ns/op	     145 B/op	       5 allocs/op
+PASS
+goos: linux
+goarch: amd64
+pkg: runtime
+cpu: INTEL(R) XEON(R) PLATINUM 8592+
+BenchmarkPingPongHog-256                  	 1043365	      1245 ns/op
+BenchmarkCreateGoroutines-256             	 1643079	       721.6 ns/op
+BenchmarkCreateGoroutinesParallel-256     	 6879343	       210.8 ns/op
+BenchmarkCreateGoroutinesCapture-256      	  166322	      8297 ns/op	     145 B/op	       5 allocs/op
+PASS
+goos: linux
+goarch: amd64
+pkg: runtime
+cpu: INTEL(R) XEON(R) PLATINUM 8592+
+BenchmarkPingPongHog-256                  	 1062380	      1151 ns/op
+BenchmarkCreateGoroutines-256             	 1607056	       772.3 ns/op
+BenchmarkCreateGoroutinesParallel-256     	 7274698	       191.8 ns/op
+BenchmarkCreateGoroutinesCapture-256      	  139909	      7579 ns/op	     145 B/op	       5 allocs/op
+PASS
+goos: linux
+goarch: amd64
+pkg: runtime
+cpu: INTEL(R) XEON(R) PLATINUM 8592+
+BenchmarkPingPongHog-256                  	 1052439	      1125 ns/op
+BenchmarkCreateGoroutines-256             	 1582152	       726.9 ns/op
+BenchmarkCreateGoroutinesParallel-256     	 5665496	       211.3 ns/op
+BenchmarkCreateGoroutinesCapture-256      	  162871	      8105 ns/op	     145 B/op	       5 allocs/op
+PASS
+goos: linux
+goarch: amd64
+pkg: runtime
+cpu: INTEL(R) XEON(R) PLATINUM 8592+
+BenchmarkPingPongHog-256                  	 1176742	      1099 ns/op
+BenchmarkCreateGoroutines-256             	 1666394	       757.7 ns/op
+BenchmarkCreateGoroutinesParallel-256     	 6072613	       211.6 ns/op
+BenchmarkCreateGoroutinesCapture-256      	  203787	      8112 ns/op	     145 B/op	       5 allocs/op
+PASS
+goos: linux
+goarch: amd64
+pkg: runtime
+cpu: INTEL(R) XEON(R) PLATINUM 8592+
+BenchmarkPingPongHog-256                  	 1069065	      1196 ns/op
+BenchmarkCreateGoroutines-256             	 1651730	       726.8 ns/op
+BenchmarkCreateGoroutinesParallel-256     	 5896656	       180.9 ns/op
+BenchmarkCreateGoroutinesCapture-256      	  192008	      7462 ns/op	     145 B/op	       5 allocs/op
+PASS

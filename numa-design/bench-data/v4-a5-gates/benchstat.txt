@@ -1,0 +1,74 @@
+pkg: golang.org/x/benchmarks
+goos: linux
+goarch: amd64
+                             │ /tmp/g2/a5-primary/v4-a5-primary-armB-recorded.out │ /tmp/g2/a5-primary/v4-a5-primary-armC-recorded.out │
+                             │                       sec/op                       │           sec/op             vs base               │
+Garbage/benchmem-MB=4096-256                                          3.095m ± 7%                   2.844m ± 3%  -8.11% (p=0.000 n=10)
+
+                             │ /tmp/g2/a5-primary/v4-a5-primary-armB-recorded.out │ /tmp/g2/a5-primary/v4-a5-primary-armC-recorded.out │
+                             │                GC-bytes-from-system                │    GC-bytes-from-system      vs base               │
+Garbage/benchmem-MB=4096-256                                         129.9Mi ± 2%                  135.0Mi ± 7%  +3.90% (p=0.000 n=10)
+
+                             │ /tmp/g2/a5-primary/v4-a5-primary-armB-recorded.out │ /tmp/g2/a5-primary/v4-a5-primary-armC-recorded.out │
+                             │                     STW-sec/GC                     │            STW-sec/GC             vs base          │
+Garbage/benchmem-MB=4096-256                                          28.95m ± 7%                        29.81m ± 8%  ~ (p=0.353 n=10)
+
+                             │ /tmp/g2/a5-primary/v4-a5-primary-armB-recorded.out │ /tmp/g2/a5-primary/v4-a5-primary-armC-recorded.out │
+                             │                     STW-sec/op                     │            STW-sec/op             vs base          │
+Garbage/benchmem-MB=4096-256                                          45.45µ ± 3%                        46.48µ ± 9%  ~ (p=0.123 n=10)
+
+                             │ /tmp/g2/a5-primary/v4-a5-primary-armB-recorded.out │ /tmp/g2/a5-primary/v4-a5-primary-armC-recorded.out │
+                             │                 allocated-bytes/op                 │        allocated-bytes/op         vs base          │
+Garbage/benchmem-MB=4096-256                                         5.934Mi ± 0%                       5.934Mi ± 0%  ~ (p=0.105 n=10)
+
+                             │ /tmp/g2/a5-primary/v4-a5-primary-armB-recorded.out │ /tmp/g2/a5-primary/v4-a5-primary-armC-recorded.out │
+                             │                     allocs/op                      │            allocs/op              vs base          │
+Garbage/benchmem-MB=4096-256                                          145.2k ± 0%                        145.2k ± 0%  ~ (p=0.118 n=10)
+
+                             │ /tmp/g2/a5-primary/v4-a5-primary-armB-recorded.out │ /tmp/g2/a5-primary/v4-a5-primary-armC-recorded.out │
+                             │                 bytes-from-system                  │      bytes-from-system       vs base               │
+Garbage/benchmem-MB=4096-256                                         9.035Gi ± 4%                  9.199Gi ± 3%  +1.82% (p=0.029 n=10)
+
+                             │ /tmp/g2/a5-primary/v4-a5-primary-armB-recorded.out │ /tmp/g2/a5-primary/v4-a5-primary-armC-recorded.out │
+                             │               heap-bytes-from-system               │      heap-bytes-from-system       vs base          │
+Garbage/benchmem-MB=4096-256                                         8.706Gi ± 4%                       8.863Gi ± 3%  ~ (p=0.052 n=10)
+
+                             │ /tmp/g2/a5-primary/v4-a5-primary-armB-recorded.out │ /tmp/g2/a5-primary/v4-a5-primary-armC-recorded.out │
+                             │              other-bytes-from-system               │     other-bytes-from-system       vs base          │
+Garbage/benchmem-MB=4096-256                                         194.8Mi ± 3%                       192.2Mi ± 3%  ~ (p=0.190 n=10)
+
+                             │ /tmp/g2/a5-primary/v4-a5-primary-armB-recorded.out │ /tmp/g2/a5-primary/v4-a5-primary-armC-recorded.out │
+                             │                   peak-RSS-bytes                   │          peak-RSS-bytes           vs base          │
+Garbage/benchmem-MB=4096-256                                         8.966Gi ± 4%                       9.124Gi ± 4%  ~ (p=0.063 n=10)
+
+                             │ /tmp/g2/a5-primary/v4-a5-primary-armB-recorded.out │ /tmp/g2/a5-primary/v4-a5-primary-armC-recorded.out │
+                             │                   peak-VM-bytes                    │        peak-VM-bytes         vs base               │
+Garbage/benchmem-MB=4096-256                                         10.17Gi ± 3%                  10.42Gi ± 2%  +2.45% (p=0.035 n=10)
+
+                             │ /tmp/g2/a5-primary/v4-a5-primary-armB-recorded.out │ /tmp/g2/a5-primary/v4-a5-primary-armC-recorded.out │
+                             │              stack-bytes-from-system               │     stack-bytes-from-system       vs base          │
+Garbage/benchmem-MB=4096-256                                         15.05Mi ± 2%                       15.11Mi ± 2%  ~ (p=0.925 n=10)
+
+                             │ /tmp/g2/a5-primary/v4-a5-primary-armB-recorded.out │ /tmp/g2/a5-primary/v4-a5-primary-armC-recorded.out │
+                             │                  user+sys-sec/op                   │         user+sys-sec/op           vs base          │
+Garbage/benchmem-MB=4096-256                                          240.9m ± 4%                        245.9m ± 6%  ~ (p=0.436 n=10)
+goos: linux
+goarch: amd64
+pkg: runtime
+cpu: INTEL(R) XEON(R) PLATINUM 8592+
+                             │ /home/deparker/v4-a5-sched/off.out │  /home/deparker/v4-a5-sched/on.out  │
+                             │               sec/op               │    sec/op     vs base               │
+PingPongHog-256                                       1.149µ ± 6%   1.157µ ±  4%       ~ (p=0.871 n=10)
+CreateGoroutines-256                                  742.9n ± 3%   729.2n ±  3%       ~ (p=0.280 n=10)
+CreateGoroutinesParallel-256                          193.2n ± 9%   200.5n ± 13%       ~ (p=0.280 n=10)
+CreateGoroutinesCapture-256                           8.106µ ± 6%   8.104µ ±  5%       ~ (p=0.448 n=10)
+geomean                                               1.075µ        1.082µ        +0.64%
+
+                            │ /home/deparker/v4-a5-sched/off.out │ /home/deparker/v4-a5-sched/on.out │
+                            │                B/op                │      B/op        vs base          │
+CreateGoroutinesCapture-256                           145.0 ± 1%        145.0 ± 1%  ~ (p=1.000 n=10)
+
+                            │ /home/deparker/v4-a5-sched/off.out │ /home/deparker/v4-a5-sched/on.out │
+                            │             allocs/op              │   allocs/op    vs base            │
+CreateGoroutinesCapture-256                           5.000 ± 0%      5.000 ± 0%  ~ (p=1.000 n=10) ¹
+¹ all samples are equal

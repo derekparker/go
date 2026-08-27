@@ -4650,3 +4650,37 @@ detector has its own state-machine test.
 Process note, recorded per the corrections convention: diagnostic captures
 feeding frozen constants must archive the FULL trace, never a tail/head
 sample. The window data for this correction is the first full-trace archive.
+
+---
+
+# v4 Task A5 — GATE VERDICTS: both forked gates PASS on one tree
+
+Tree `398f49ef12` (adaptive enforcement stand-down: rate-sustainment detector,
+2048 wakes/s × 8 consecutive 100ms windows; epoch-based re-arm, 10s cooldown,
+lifetime cap 8; GODEBUG=numaenforce override). Fresh single sessions, n=10,
+raws + benchstat in `bench-data/v4-a5-gates/`.
+
+| Gate | Bar | Reading | Verdict |
+|---|---|---|---|
+| G2-sched-micros PingPongHog | ≤ +2% | ~ (p=0.871) | **PASS** |
+| G2-sched-micros CreateGoroutines | ≤ +2% | ~ (p=0.280; 729.2n vs 742.9n — point est. better) | **PASS** |
+| G2-sched-micros CreateGoroutinesParallel | ≤ +2% | ~ (p=0.280) | **PASS** |
+| G2-sched-micros CreateGoroutinesCapture | ≤ +2% | ~ (p=0.448) | **PASS** |
+| G2-primary (garbage 4GiB 256P wall) | ≥ 5% better | **−8.11%** (p=0.000) | **PASS** |
+| G4-RSS (same arms) | ≤ +10% | ~ (p=0.063, +1.8% pt) | **PASS** |
+
+The P5 enforcement fork ("either config fails exactly one gate") is
+RESOLVED: the detector leaves the primary regime untouched (−8.11% vs the
+pre-A5 −8.09%; a full garbage run takes 0 trips under GODEBUG verification)
+and stands enforcement down within ~800ms of a sustained wake storm
+(CreateGoroutines +15–19% before; all four micros now statistically
+indistinguishable from stock). Functional smokes: storm trips (1), garbage
+0 trips; full TestNUMA battery green on numa-dell including the hermetic
+state-machine test; off census zero function diffs at every commit; -race
+green.
+
+Standing after A5: every v4 gate now PASSES on the current tree except the
+two attributed FAILs that no configuration changes — G2-IMC (proxy
+insensitive to the treatment; mechanism measured directly by the refill
+counters and wall time) and the 1P alloc micro (~+4.2% ON-build structural
+cost, WS-B-era, Task LF direction proven at ~+1.9% if pursued).
