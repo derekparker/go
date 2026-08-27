@@ -593,6 +593,27 @@ func NextArenaHint() (uintptr, bool) {
 	return mheap_.arenaHints[0].addr, true
 }
 
+// ArenaHintAddrs returns every heap arena hint stream's remaining hint
+// addresses, in chain order. With the experiment off there is exactly
+// one stream.
+func ArenaHintAddrs() [][]uintptr {
+	out := make([][]uintptr, len(mheap_.arenaHints))
+	for i := range out {
+		// Preallocate: appending while holding the heap lock would
+		// allocate under mheap_.lock. mallocinit generates at most 64
+		// heap hints across all streams.
+		out[i] = make([]uintptr, 0, 128)
+	}
+	lock(&mheap_.lock)
+	for i := range mheap_.arenaHints {
+		for h := mheap_.arenaHints[i]; h != nil; h = h.next {
+			out[i] = append(out[i], h.addr)
+		}
+	}
+	unlock(&mheap_.lock)
+	return out
+}
+
 type G = g
 
 type Sudog = sudog

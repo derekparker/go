@@ -886,3 +886,30 @@ func TestScanAllocIssue77573(t *testing.T) {
 		verifyScanAlloc(t, func() { runtime.Escape(make([]*int, 3)) }, 3*goarch.PtrSize)
 	})
 }
+
+func TestArenaHintChainsSane(t *testing.T) {
+	// Regression test for the randomized-heap-base prefix mask:
+	// randHeapBasePrefixMask used to clear the top byte at
+	// heapAddrBits-8 while hint generation placed the random prefix
+	// byte at randHeapAddrBits-8, so two stray randHeapBase bits were
+	// OR'd into the prefix's low bits, collapsing distinct prefixes
+	// into duplicate hint addresses on most launches. Each hint
+	// stream must hold pairwise-distinct addresses with at most one
+	// non-ascending step (the prefix byte's single mod-256 wrap).
+	for node, addrs := range ArenaHintAddrs() {
+		seen := make(map[uintptr]bool, len(addrs))
+		descents := 0
+		for i, a := range addrs {
+			if seen[a] {
+				t.Errorf("stream %d: duplicate hint address %#x", node, a)
+			}
+			seen[a] = true
+			if i > 0 && a <= addrs[i-1] {
+				descents++
+			}
+		}
+		if descents > 1 {
+			t.Errorf("stream %d: %d non-ascending steps, want at most 1 (addrs %#x)", node, descents, addrs)
+		}
+	}
+}

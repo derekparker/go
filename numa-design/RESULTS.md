@@ -4738,3 +4738,52 @@ G2-primary no-regression (pre-registered LF gate), fresh single session
 n=10: **−8.77% (p=0.002)** — the placement win fully intact with LF3 in
 tree (raws `bench-data/v4-taskLF/v4-lf3-primary-*`). Full TestNUMA battery
 green on numa-dell. numa_balancing=1 verified.
+
+---
+
+# Upstream gap item 1 — window-run inference anomaly: RESOLVED
+
+Date: 2026-08-27. Tree: post-`8cb448ff24`.
+
+The anomaly (some launches inferring run=2 / 512 GiB stream windows
+instead of run=8 / 2 TiB) is a **baseline upstream bug** in the
+randomized-heap-base hint generation, not a defect in the window
+inference — the inference correctly described a genuinely corrupted
+hint layout.
+
+**Root cause.** `randHeapBasePrefixMask` cleared the top byte at
+`heapAddrBits-8` (bit 40), but hint generation places the randomized
+prefix byte at `randHeapAddrBits-8` (bit 38 on amd64:
+`heapAddrBits-1-IsAmd64-8`). Bits [38,40) of `randHeapBase` therefore
+survived the mask and were OR'd into the prefix's low two bits,
+forcing them set. With bit 38 set (the observed launch), every
+even/odd prefix pair collapses to one address: hint chains carry
+duplicate addresses in pairs at doubled (512 GiB) spacing, and
+adjacent streams share endpoint hints. 2 random bits ⇒ ~75% of
+launches corrupted to some degree — matching the observed
+launch-to-launch lottery. Diagnosed with a `GODEBUG=numa=2` hint-chain
+dump (retained): observed distinct prefixes 0x89, 0x8B, 0x8D, 0x8F —
+all odd, QED. Stock Go is affected too (duplicate/non-monotonic arena
+hints); harmless there because hints are only mmap fallbacks.
+
+**Fix.** `randHeapBasePrefixMask` now defined from a hoisted
+`randHeapAddrBits` const (the mallocinit local removed). Off-build
+census of the fix: exactly one changed function, `runtime.mallocinit`
+— an *intentional*, auditable baseline delta (first ever on this
+branch; the zero-diff discipline otherwise holds).
+
+**Verification.**
+- 60-launch histogram post-fix: 468/480 stream windows run=8 (2 TiB);
+  the 12 others run 4–7 = the documented NEW-1 mod-256 wrap trim at
+  its expected ~25%-of-launches/one-stream rate. run=2 gone.
+- New regression test `TestArenaHintChainsSane` (malloc_test.go, runs
+  in BOTH build modes): every hint stream pairwise-distinct with at
+  most one non-ascending step. Red-checked against the old mask
+  (fails across repeated process launches), green with the fix.
+- Local battery green both modes (ArenaHint/ArenaCollision/PageAlloc/
+  PageCache/NUMA).
+
+**Upstream note.** This is separable: a one-line stock-Go bug fix +
+regression test that should lead the CL series (it is not
+NUMA-specific), and the proposal's window-inference section can now
+state the layout invariant without caveats.

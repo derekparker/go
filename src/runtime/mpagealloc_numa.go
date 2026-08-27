@@ -452,6 +452,11 @@ func numaInitStreamWindows() {
 		if n < 2 {
 			continue // no valid window (lo == hi zero value stands)
 		}
+		if debug.numa > 1 {
+			for i := 0; i < n; i++ {
+				println("numa: hint chain node", node, "i", i, "addr", hex(addrs[i]))
+			}
+		}
 		start, runLen, d := numaLongestHintRun(addrs[:n])
 		if runLen < 2 {
 			continue

@@ -354,9 +354,21 @@ const (
 	// See comment in mallocinit for how the randomization is performed.
 	randomizeHeapBase = goexperiment.RandomizedHeapBase64 && goarch.PtrSize == 8 && !isSbrkPlatform && !raceenabled && !msanenabled && !asanenabled
 
-	// randHeapBasePrefixMask is used to extract the top byte of the randomized
-	// heap base address.
-	randHeapBasePrefixMask = ^uintptr(0xff << (heapAddrBits - 8))
+	// randHeapAddrBits is the number of address bits usable by the randomized
+	// heap base. heapAddrBits is 48 on most platforms, but we only use 47 of
+	// those bits in order to provide a good amount of room for the heap to
+	// grow contiguously. On amd64, there are 48 bits, but the top bit is sign
+	// extended, so we throw away another bit, just to be safe.
+	randHeapAddrBits = heapAddrBits - 1 - goarch.IsAmd64
+
+	// randHeapBasePrefixMask clears the top byte of the randomized heap base
+	// address — the byte hint generation replaces with randHeapBasePrefix+i.
+	// The prefix occupies bits [randHeapAddrBits-8, randHeapAddrBits), so the
+	// mask must be defined from randHeapAddrBits, not heapAddrBits: a wider
+	// mask would leak randHeapBase bits into the prefix byte's low bits via
+	// the OR in hint generation, forcing them set and collapsing distinct
+	// prefixes to duplicate hint addresses.
+	randHeapBasePrefixMask = ^uintptr(0xff << (randHeapAddrBits - 8))
 )
 
 // physPageSize is the size in bytes of the OS's physical pages.
@@ -590,11 +602,6 @@ func mallocinit() {
 
 		var randHeapBase uintptr
 		var randHeapBasePrefix byte
-		// heapAddrBits is 48 on most platforms, but we only use 47 of those
-		// bits in order to provide a good amount of room for the heap to grow
-		// contiguously. On amd64, there are 48 bits, but the top bit is sign
-		// extended, so we throw away another bit, just to be safe.
-		randHeapAddrBits := heapAddrBits - 1 - (goarch.IsAmd64 * 1)
 		if randomizeHeapBase {
 			// Generate a random value, and take the bottom heapAddrBits-logHeapArenaBytes
 			// bits, using them as the top bits for randHeapBase.
