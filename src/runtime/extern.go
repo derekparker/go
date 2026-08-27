@@ -166,8 +166,18 @@ It is a comma-separated list of name=val pairs setting these named variables:
 
 	numa: setting numa=1 causes the runtime to print, to standard error,
 	topology discovery, confinement, stand-down, and soft-affinity
-	decisions made under GOEXPERIMENT=numa. It has no effect when that
-	experiment is not enabled.
+	decisions made under GOEXPERIMENT=numa. numa=2 additionally prints
+	the per-window M-wake-rate readings the adaptive enforcement
+	detector evaluates. It has no effect when that experiment is not
+	enabled.
+
+	numaenforce: controls GOEXPERIMENT=numa's adaptive NUMA thread
+	affinity enforcement. numaenforce=0 (the default) lets the runtime
+	stand enforcement down automatically under sustained scheduler
+	wake storms and re-arm it when they subside. numaenforce=1 pins
+	enforcement on (the detector never stands it down). numaenforce=2
+	pins enforcement off. It has no effect when the experiment is not
+	enabled.
 
 	profstackdepth: profstackdepth=128 (the default) will set the maximum stack
 	depth used by all pprof profilers except for the CPU profiler to 128 frames.

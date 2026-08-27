@@ -136,3 +136,14 @@ func numaPlacementActive() bool {
 // call sites (schedinit, procresize) are gated on goexperiment.Numa.
 func numaAssignPHomes(nprocs int32) {
 }
+
+// numaEnforceEval is a no-op on non-Linux platforms: adaptive
+// enforcement stand-down acts on Linux-only thread affinity (see
+// numa_linux.go). Its caller (numaWakeSysmonTick) is goexperiment-gated.
+func numaEnforceEval(ratePerSec int64, elapsed int64) {
+}
+
+// numaEnforceParkBackstop is a no-op on non-Linux platforms, for the
+// same reason; see numa_linux.go.
+func numaEnforceParkBackstop(mp *m) {
+}

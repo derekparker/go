@@ -158,3 +158,37 @@ func NumaPHomesForTest() []int8 {
 	}
 	return homes
 }
+
+// A5 adaptive-enforcement test hooks: drive the sysmon-side trip/re-arm
+// state machine with synthetic window readings and observe the latch,
+// epoch, and trip counter. Callers must reset with
+// NumaEnforceResetForTest and are responsible for not racing real
+// sysmon activity in ways that matter (the state machine is
+// sysmon-single-writer in production; tests drive it from one
+// goroutine, which preserves that).
+func NumaEnforceEvalForTest(ratePerSec, elapsed int64) { numaEnforceEval(ratePerSec, elapsed) }
+func NumaEnforceStoodDownForTest() bool                { return numaEnforceStoodDown.Load() }
+func NumaEnforceEpochForTest() uint32                  { return numaEnforceEpoch.Load() }
+func NumaEnforceTripsForTest() int32                   { return numaEnforceTrips }
+func NumaEnforceResetForTest() {
+	numaEnforceSysmonMasked.Store(true) // hermetic: live sysmon evals off
+	numaEnforceStoodDown.Store(false)
+	numaEnforceOverStreak = 0
+	numaEnforceQuietNs = 0
+	numaEnforceTrips = 0
+	numaEnforcePermanent = false
+}
+
+// NumaEnforceReleaseForTest returns the state machine to live sysmon
+// ownership (deferred by tests after NumaEnforceResetForTest).
+func NumaEnforceReleaseForTest() {
+	numaEnforceStoodDown.Store(false)
+	numaEnforceOverStreak = 0
+	numaEnforceQuietNs = 0
+	numaEnforceTrips = 0
+	numaEnforcePermanent = false
+	numaEnforceSysmonMasked.Store(false)
+}
+
+// NumaWakeRateTripForTest exports the frozen threshold.
+func NumaWakeRateTripForTest() int64 { return numaWakeRateTrip }

@@ -886,3 +886,89 @@ func TestNUMAPlacementLargeObjectLocality(t *testing.T) {
 		t.Errorf("large-object node-match share %.2f%% < 90%% with placement active", share*100)
 	}
 }
+
+// TestNUMAEnforceStateMachine drives the A5 trip/re-arm state machine
+// (v4 Task A5) with synthetic window readings: two consecutive
+// over-threshold windows trip (one does not), quiet accumulation
+// re-arms with a bumped epoch left behind (so caches re-apply), an
+// over-threshold window resets the quiet clock, and the lifetime cap
+// makes the latch permanent. Skips unless the machine could enforce at
+// all (the eval gates on eligibility, review M5b).
+func TestNUMAEnforceStateMachine(t *testing.T) {
+	if runtime.NumaConfinedForTest() || runtime.NumaNumNodes() < 2 || runtime.NumaHostAffinityNarrowedForTest() {
+		t.Skip("enforcement not live here (single-node, confined, or narrowed affinity); eval correctly refuses to trip")
+	}
+	if !runtime.NumaHasSetAffinityForTest() {
+		t.Skip("no sched_setaffinity plumbing on this arch")
+	}
+	runtime.NumaEnforceResetForTest() // also masks live sysmon evals
+	defer runtime.NumaEnforceReleaseForTest()
+	over := runtime.NumaWakeRateTripForTest() + 1
+	under := runtime.NumaWakeRateTripForTest() - 1
+	win := int64(100e6)
+
+	epoch0 := runtime.NumaEnforceEpochForTest()
+	runtime.NumaEnforceEvalForTest(over, win)
+	if runtime.NumaEnforceStoodDownForTest() {
+		t.Fatal("tripped after one over-threshold window; streak requirement is 2")
+	}
+	runtime.NumaEnforceEvalForTest(under, win)
+	runtime.NumaEnforceEvalForTest(over, win)
+	if runtime.NumaEnforceStoodDownForTest() {
+		t.Fatal("tripped without CONSECUTIVE over-threshold windows")
+	}
+	runtime.NumaEnforceEvalForTest(over, win)
+	if !runtime.NumaEnforceStoodDownForTest() {
+		t.Fatal("did not trip after two consecutive over-threshold windows")
+	}
+	if got := runtime.NumaEnforceEpochForTest(); got != epoch0+1 {
+		t.Fatalf("epoch = %d after trip, want %d", got, epoch0+1)
+	}
+	if got := runtime.NumaEnforceTripsForTest(); got != 1 {
+		t.Fatalf("trips = %d, want 1", got)
+	}
+
+	// Quiet re-arm: 10s of below-threshold windows, with one
+	// over-threshold interruption resetting the clock.
+	for i := 0; i < 50; i++ { // 5s
+		runtime.NumaEnforceEvalForTest(under, win)
+	}
+	runtime.NumaEnforceEvalForTest(over, win) // resets quiet accumulation
+	for i := 0; i < 99; i++ {                 // 9.9s
+		runtime.NumaEnforceEvalForTest(under, win)
+	}
+	if !runtime.NumaEnforceStoodDownForTest() {
+		t.Fatal("re-armed before the quiet cooldown elapsed")
+	}
+	runtime.NumaEnforceEvalForTest(under, win) // 10.0s
+	if runtime.NumaEnforceStoodDownForTest() {
+		t.Fatal("did not re-arm after the quiet cooldown")
+	}
+	// Epoch stays bumped across re-arm: stale caches must re-apply.
+	if got := runtime.NumaEnforceEpochForTest(); got != epoch0+1 {
+		t.Fatalf("epoch = %d after re-arm, want %d (bump persists)", got, epoch0+1)
+	}
+
+	// Lifetime cap: trips 2..8, then permanent.
+	for trip := 2; trip <= 8; trip++ {
+		runtime.NumaEnforceEvalForTest(over, win)
+		runtime.NumaEnforceEvalForTest(over, win)
+		if !runtime.NumaEnforceStoodDownForTest() {
+			t.Fatalf("trip %d did not latch", trip)
+		}
+		if trip < 8 {
+			for i := 0; i < 100; i++ {
+				runtime.NumaEnforceEvalForTest(under, win)
+			}
+			if runtime.NumaEnforceStoodDownForTest() {
+				t.Fatalf("re-arm failed after trip %d", trip)
+			}
+		}
+	}
+	for i := 0; i < 200; i++ {
+		runtime.NumaEnforceEvalForTest(under, win)
+	}
+	if !runtime.NumaEnforceStoodDownForTest() {
+		t.Fatal("latch cleared after the lifetime cap; should be permanent")
+	}
+}

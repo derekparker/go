@@ -27,8 +27,5 @@ func (s *mNUMAState) clearSoftAffinityNode()                 {}
 func (s *mNUMAState) softAffinityCheckDue(now int64) bool { return false }
 func (s *mNUMAState) armSoftAffinityCheck(deadline int64) {}
 
-// Wake-stamp accessors are no-ops off; their caller (numa_wake.go via
-// goexperiment-gated sites) is dead code then, but numa_wake.go still
-// compiles.
-func (s *mNUMAState) stampWake(now int64)  {}
-func (s *mNUMAState) takeWakeStamp() int64 { return 0 }
+func (s *mNUMAState) appliedEpoch() uint32     { return 0 }
+func (s *mNUMAState) setAppliedEpoch(e uint32) {}

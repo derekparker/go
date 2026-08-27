@@ -1844,7 +1844,7 @@ func startTheWorldWithSema(now int64, w worldStop) int64 {
 			}
 			mp.nextp.set(p)
 			if goexperiment.Numa {
-				numaStampMWake(mp) // v4 Task A5 wake-latency stamp
+				numaCountMWake() // v4 Task A5 wake-rate count
 			}
 			notewakeup(&mp.park)
 		} else {
@@ -2036,9 +2036,10 @@ func mPark() {
 	notesleep(&gp.m.park)
 	noteclear(&gp.m.park)
 	if goexperiment.Numa {
-		// Fold this M's measured wake latency (v4 Task A5; zero-stamp
-		// wakes -- rwmutex, faketime -- never fold; see numa_wake.go).
-		numaNoteMWake(gp.m)
+		// v4 Task A5: while the enforcement stand-down latch is set,
+		// each parking M widens its own kernel mask and clears its own
+		// soft-affinity cache (see numaEnforceParkBackstop).
+		numaEnforceParkBackstop(gp.m)
 	}
 }
 
@@ -3217,7 +3218,7 @@ func startm(pp *p, spinning, lockheld bool) {
 	nmp.spinning = spinning
 	nmp.nextp.set(pp)
 	if goexperiment.Numa {
-		numaStampMWake(nmp) // v4 Task A5 wake-latency stamp
+		numaCountMWake() // v4 Task A5 wake-rate count
 	}
 	notewakeup(&nmp.park)
 	// Ownership transfer of pp committed by wakeup. Preemption is now
@@ -3389,7 +3390,7 @@ func startlockedm(gp *g) {
 	pp := releasep()
 	mp.nextp.set(pp)
 	if goexperiment.Numa {
-		numaStampMWake(mp) // v4 Task A5 wake-latency stamp
+		numaCountMWake() // v4 Task A5 wake-rate count
 	}
 	notewakeup(&mp.park)
 	stopm()

@@ -17,11 +17,11 @@ package runtime
 type mNUMAState struct {
 	bindAllDone bool // this thread's placement converged after stand-down
 
-	// wakeStamp is the nanotime a waker recorded just before this M's
-	// notewakeup(&mp.park), read-and-cleared by the M itself in mPark
-	// (v4 Task A5 wake-latency instrumentation; 0 = unstamped wake --
-	// see numa_wake.go).
-	wakeStamp int64
+	// enforceEpoch is the numaEnforceEpoch value current when this M
+	// last successfully applied placement affinity (v4 Task A5): a
+	// stand-down bumps the global, making every cache stale so Ms
+	// re-apply after a re-arm. Own-M writes only.
+	enforceEpoch uint32
 
 	// lastNode stores (node id + 1): the node numaNoteSchedule last
 	// narrowed this M's CPU affinity to, or 0 (its zero value) if
@@ -103,16 +103,7 @@ func (s *mNUMAState) armSoftAffinityCheck(deadline int64) {
 	s.nextCheck = deadline
 }
 
-// stampWake records the wake time a waker observed just before this
-// M's notewakeup, and takeWakeStamp reads-and-clears it on the wakee
-// side (v4 Task A5 calibration; see numa_wake.go for the zero-stamp
-// invariant that makes unstamped wakes safe). Plain fields: the waker's
-// store happens-before the wakee's load via the park note's own
-// wake/sleep synchronization, and mput-before-mPark ordering means a
-// new waker can only stamp after the previous fold completed.
-func (s *mNUMAState) stampWake(now int64) { s.wakeStamp = now }
-func (s *mNUMAState) takeWakeStamp() int64 {
-	st := s.wakeStamp
-	s.wakeStamp = 0
-	return st
-}
+// appliedEpoch / setAppliedEpoch cache the enforcement epoch at apply
+// time (v4 Task A5; see enforceEpoch's field comment).
+func (s *mNUMAState) appliedEpoch() uint32     { return s.enforceEpoch }
+func (s *mNUMAState) setAppliedEpoch(e uint32) { s.enforceEpoch = e }

@@ -663,7 +663,14 @@ func numaStandDownIfNeeded(procs int32, customGOMAXPROCS bool) bool {
 // free, world fully restarted via worldStarted()) -- never from
 // numaStandDownIfNeeded's detection site, which runs with mp.locks != 0
 // and must not make syscalls (see that function's doc comment).
-func numaStandDownWiden() {
+// numaWidenAllThreads is the eager, best-effort, affinity-only allm
+// walk shared by WS-A's confinement stand-down (numaStandDownWiden) and
+// A5's enforcement stand-down (numaEnforceStandDown): it restores every
+// reachable thread's kernel CPU mask to the saved startup-wide mask.
+// It deliberately touches NOTHING else -- no mempolicy, no per-M caches
+// (cross-M cache writes are races; owners converge themselves). See the
+// in-loop comments for the lock-free walk's accepted residuals.
+func numaWidenAllThreads() {
 	// Atomic head load, matching the tree's other lock-free allm walkers
 	// (e.g. NumCgoCall, totalMutexWaitTimeNanos in debug.go): allm is
 	// written under sched.lock (mcommoninit's atomicstorep, mexit's
@@ -703,6 +710,10 @@ func numaStandDownWiden() {
 			numaSetThreadAffinity(int32(tid), &numaSavedAffinity)
 		}
 	}
+}
+
+func numaStandDownWiden() {
+	numaWidenAllThreads()
 	// Best-effort re-read of the allowed-node mask before this thread's
 	// own convergence: numaSetProcessBindAll re-issues get_mempolicy
 	// (MPOL_F_MEMS_ALLOWED) and set_mempolicy, refreshing
@@ -1211,7 +1222,11 @@ func numaNoteSchedule() {
 		// not otherwise need to police.
 		return
 	}
-	if !numaSoftAffinityEligible() || numaConfined.Load() || numaStoodDown.Load() {
+	if !numaSoftAffinityEligible() || numaConfined.Load() || numaStoodDown.Load() || numaEnforceStoodDown.Load() {
+		// The last term is A5's enforcement stand-down: applies halt
+		// (both key paths) while the wake-storm latch is set; the
+		// placement memory side is untouched. Same rarely-written
+		// global cluster as the other gates.
 		return
 	}
 	if numaPlacementActive() {
@@ -1227,15 +1242,23 @@ func numaNoteSchedule() {
 		// model) would otherwise fire a syscall every schedule() pass.
 		if pp := mp.p.ptr(); pp != nil {
 			if home, ok := pp.numa.home(); ok {
-				if last, applied := mp.numa.softAffinityNode(); applied && last == home {
-					return // steady state
+				epoch := numaEnforceEpoch.Load()
+				if last, applied := mp.numa.softAffinityNode(); applied && last == home && mp.numa.appliedEpoch() == epoch {
+					// Steady state. The epoch term (design review H1)
+					// makes a post-re-arm cache stale: the eager
+					// stand-down walk widened this M's KERNEL mask but
+					// could not touch this cache, so without the epoch
+					// the M would never re-narrow after a re-arm.
+					return
 				}
 				now := nanotime()
 				if !mp.numa.softAffinityCheckDue(now) {
 					return // bounded retry after a failed apply
 				}
 				mp.numa.armSoftAffinityCheck(now + numaSoftAffinityCheckInterval)
-				numaApplySoftAffinity(mp, int32(home))
+				if numaApplySoftAffinity(mp, int32(home)) {
+					mp.numa.setAppliedEpoch(epoch)
+				}
 				return
 			}
 		}
@@ -1271,17 +1294,19 @@ func numaNoteSchedule() {
 // compiler cannot undo the split by inlining this back into its caller.
 //
 //go:noinline
-func numaApplySoftAffinity(mp *m, node int32) {
+func numaApplySoftAffinity(mp *m, node int32) bool {
 	var mask [numaCPUMaskBytes]byte
 	if !numaNodeAffinityMask(node, &mask) {
-		return
+		return false
 	}
 	if numaSetThreadAffinity(0, &mask) {
 		mp.numa.setSoftAffinityNode(int8(node))
 		if debug.numa > 0 {
 			println("numa: soft affinity narrowed M to node", node)
 		}
+		return true
 	}
+	return false
 }
 
 // numaWidenBeforeClone undoes node-mask soft affinity's per-M CPU
@@ -1618,5 +1643,152 @@ func numaAssignPHomes(nprocs int32) {
 			}
 		}
 		println()
+	}
+}
+
+// ---- adaptive enforcement stand-down (v4 Task A5) ----
+//
+// Design: numa-design/v4-a5-adaptive-enforcement-design.md (reviewed);
+// calibration verdict in RESULTS.md ("rate-only detection frozen"):
+// detection is the elapsed-normalized M-wake rate alone -- the latency
+// arm measurably cannot discriminate the regimes -- with the trip
+// threshold sitting ~12x above the primary regime's measured maximum
+// and ~7x below the storm regime's measured minimum.
+
+// numaEnforceStoodDown is the enforcement stand-down latch: while set,
+// numaNoteSchedule applies no thread affinity (the placement MEMORY
+// side -- P homes, refill keying, stream windows -- stays fully
+// active), and parking Ms widen themselves via the mPark backstop.
+// Written only by sysmon (numaEnforceEval) and read from the schedule()
+// path; distinct from WS-A's numaStoodDown (confinement) latch.
+var numaEnforceStoodDown atomic.Bool
+
+// numaEnforceEpoch is bumped at each enforcement stand-down. An M's
+// soft-affinity cache records the epoch at apply time, and
+// numaNoteSchedule's steady state requires an epoch match -- without
+// this, Ms widened by the eager walk would keep stale "already
+// narrowed" caches after a re-arm and never re-apply (design review
+// H1: the walk cannot write other Ms' caches without a data race).
+var numaEnforceEpoch atomic.Uint32
+
+// Trip/re-arm state, touched only by sysmon (single writer by
+// construction; the bounded-oscillation argument depends on it).
+var (
+	numaEnforceOverStreak int32 // consecutive over-threshold windows
+	numaEnforceQuietNs    int64 // accumulated below-threshold time while latched
+	numaEnforceTrips      int32 // lifetime trips
+	numaEnforcePermanent  bool  // cap reached: latch never clears
+)
+
+const (
+	// numaWakeRateTrip is the elapsed-normalized M-wake rate (wakes per
+	// second) at or above which a window counts toward tripping.
+	// FROZEN FROM CALIBRATION (RESULTS.md, tree ebc788c5a1): the
+	// primary garbage regime measured 49-84 wakes/s, the losing storm
+	// regimes 7,813-12,294; 1024 is ~the geometric mean.
+	numaWakeRateTrip = 1024
+	// numaEnforceTripStreak windows over threshold, consecutively,
+	// before a trip (single-anomalous-window robustness).
+	numaEnforceTripStreak = 2
+	// numaEnforceCooldownNs of accumulated below-threshold time while
+	// latched before re-arming.
+	numaEnforceCooldownNs = 10 * 1e9
+	// numaEnforceMaxTrips: after this many trips the latch is
+	// permanent -- oscillation is bounded by construction (at most
+	// this many transitions, each >= the cooldown apart).
+	numaEnforceMaxTrips = 8
+)
+
+// numaEnforceEval is sysmon's per-window decision (called from
+// numaWakeSysmonTick with the window's elapsed-normalized wake rate and
+// duration). Trips only while enforcement is live and meaningful
+// (design review M5b): a confined or stood-down process's enforcement
+// is already inert, and burning the lifetime cap on no-op stand-downs
+// would permanently latch a mechanism that was never the cause.
+// GODEBUG=numaenforce pins: 1 = always on (detector inert),
+// 2 = always off (latched from the first evaluation), 0/unset = auto.
+func numaEnforceEval(ratePerSec int64, elapsed int64) {
+	if debug.numaenforce == 1 {
+		return
+	}
+	if !numaSoftAffinityEligible() || numaConfined.Load() || numaStoodDown.Load() {
+		return
+	}
+	if debug.numaenforce == 2 {
+		if !numaEnforceStoodDown.Load() {
+			numaEnforceStandDown()
+			numaEnforcePermanent = true
+		}
+		return
+	}
+	if numaEnforceStoodDown.Load() {
+		if numaEnforcePermanent {
+			return
+		}
+		if ratePerSec >= numaWakeRateTrip {
+			numaEnforceQuietNs = 0
+			return
+		}
+		numaEnforceQuietNs += elapsed
+		if numaEnforceQuietNs >= numaEnforceCooldownNs {
+			// Re-arm: clear the latch only. Ms re-narrow lazily --
+			// their cached apply epoch no longer matches
+			// numaEnforceEpoch (bumped at stand-down), so the next
+			// schedule() pass re-applies.
+			numaEnforceStoodDown.Store(false)
+			numaEnforceQuietNs = 0
+			numaEnforceOverStreak = 0
+			if debug.numa > 0 {
+				println("numa: enforcement re-armed after quiet cooldown, trips so far", numaEnforceTrips)
+			}
+		}
+		return
+	}
+	if ratePerSec < numaWakeRateTrip {
+		numaEnforceOverStreak = 0
+		return
+	}
+	numaEnforceOverStreak++
+	if numaEnforceOverStreak < numaEnforceTripStreak {
+		return
+	}
+	numaEnforceStandDown()
+}
+
+// numaEnforceStandDown trips the latch: bump the epoch (so every M's
+// apply cache goes stale for the eventual re-arm), latch, count, and
+// eagerly widen every reachable thread's kernel mask (affinity-only --
+// design review M5a: no mempolicy, no BindAll refresh, no bindAllDone).
+func numaEnforceStandDown() {
+	numaEnforceEpoch.Add(1)
+	numaEnforceStoodDown.Store(true)
+	numaEnforceOverStreak = 0
+	numaEnforceQuietNs = 0
+	numaEnforceTrips++
+	if numaEnforceTrips >= numaEnforceMaxTrips {
+		numaEnforcePermanent = true
+	}
+	numaWidenAllThreads()
+	if debug.numa > 0 {
+		println("numa: enforcement stood down (wake-storm), trip", numaEnforceTrips, "permanent", numaEnforcePermanent)
+	}
+}
+
+// numaEnforceParkBackstop is each M's own convergence at park (called
+// behind goexperiment.Numa from mPark): while the latch is set, an M
+// whose kernel mask is still soft-narrowed widens itself and clears its
+// own cache (own-M writes -- safe; design review H1's second half).
+// An M that never parks keeps its narrow mask -- the same accepted
+// residual as WS-A's stand-down, and such an M is by definition not in
+// the wake-storm population.
+func numaEnforceParkBackstop(mp *m) {
+	if !numaEnforceStoodDown.Load() {
+		return
+	}
+	if _, applied := mp.numa.softAffinityNode(); !applied {
+		return
+	}
+	if numaSetThreadAffinity(0, &numaSavedAffinity) {
+		mp.numa.clearSoftAffinityNode()
 	}
 }
