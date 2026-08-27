@@ -14,12 +14,17 @@ package runtime
 // unconditional x8 there is ~180 KB) to every Go binary, including ones
 // built with the experiment off.
 //
-// 8 is a small, fixed stream count -- not sized to any particular
-// machine's node count. Real NUMA node ids at or beyond this bound do
+// 4 is a small, fixed stream count -- not sized to any particular
+// machine's node count. The measured structural cost of the ON build's
+// 1P allocation path is ~linear in this constant (~+0.5%/node over a
+// +1.9% floor at 1), so it is deliberately the smallest capacity that
+// covers the common 1-, 2- and 4-node deployments; larger boxes can
+// raise it at build time. Real NUMA node ids at or beyond this bound do
 // not get their own stream: I5 requires standing down to stream 0 for
 // them rather than sharing via node % numaMaxHeapNodes, which would
-// falsely suggest locality where none exists. See numaGrowNode.
-const numaMaxHeapNodes = 8
+// falsely suggest locality where none exists. See numaGrowNode and the
+// placement decline in numaPlacementInit.
+const numaMaxHeapNodes = 4
 
 // numaHeapArenaNodeBytes is the array length of heapArena.node
 // (controller adjudication): 1 on this build. See

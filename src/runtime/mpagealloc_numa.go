@@ -441,8 +441,10 @@ func numaLongestHintRun(addrs []uintptr) (start, n int, spacing uintptr) {
 // binary's census).
 func numaInitStreamWindows() {
 	for node := int32(0); node < numaMaxHeapNodes; node++ {
-		var addrs [16]uintptr
-		var hints [16]*arenaHint
+		// Sized to mallocinit's exact partition: the 0x40 heap hints
+		// are split evenly across the numaMaxHeapNodes streams.
+		var addrs [0x40 / numaMaxHeapNodes]uintptr
+		var hints [0x40 / numaMaxHeapNodes]*arenaHint
 		n := 0
 		for h := mheap_.arenaHints[node]; h != nil && n < len(addrs); h = h.next {
 			addrs[n] = h.addr

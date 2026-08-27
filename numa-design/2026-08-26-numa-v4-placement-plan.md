@@ -569,3 +569,42 @@ Constraints (stage 3 Task L instantiates against any surviving cost FAIL).
 - No placeholders in Tasks 1–2 (Task L / Task P are explicitly amendment-gated, which is the pre-registration mechanism, not a placeholder). ✓
 - Type/name consistency: `pNUMAState`/`pp.numa.homeNode`/`numaPlacementActive` used consistently across P1–P5 and Task 2. ✓
 - Every measurement step names its session discipline, primary metric, and archive path. ✓
+
+---
+
+## Upstream-prep Task N4 — node-capacity freeze at numaMaxHeapNodes=4 (pre-registered 2026-08-27, BEFORE measurement)
+
+**Decision being enacted** (upstream-readiness gap item 4, user-approved):
+ship `numaMaxHeapNodes = 4`. Basis: Task LF dose-response — the ON-build 1P
+alloc-micro cost is ~linear in the compile-time node capacity (N=1 → +1.9%,
+N=4 → +3.5%, N=8 → +5.5%); N=4 covers 1–4-node deployments, and N=8 is
+documented as a build-time variant for larger boxes. On 2-node numa-dell,
+runtime *behavior* is identical (only 2 streams ever used); the constant
+changes structural footprint (smaller arrays/loops) and the address layout
+(0x40/4 = 16 hints per stream → up to 4 TiB windows).
+
+**Code change**: `numa_heapstreams_on.go` const 8→4 (comment updated);
+`numaInitStreamWindows` hint-collection buffers sized `0x40/numaMaxHeapNodes`
+(the mallocinit partition size) instead of a bare 16, so the buffer is exact
+at any N.
+
+**Gates (all frozen before any run; standard discipline: numa-dell, single
+session per battery, interleaved with rotating arm order, benchstat
+Mann-Whitney authoritative, idle checks, no GODEBUG in measured runs,
+GOTOOLCHAIN=local, numa_balancing=1 verified after, raws archived under
+`bench-data/v4-n4-freeze/`):**
+
+- **N4-G1 primary preserved**: pathology-sweep, garbage `-benchmem=4096`,
+  GOMAXPROCS=256, arms B=stock C=numa@N4, n=10.
+  Bar: sec/op improvement preserved — benchstat p<0.05 AND delta ≤ −5%.
+- **N4-G2 micro cost**: `Malloc(8|16)` `-count=10` GOMAXPROCS=1, stock vs
+  numa@N4, same session. Expectation from dose-response ~+3.5% geomean.
+  Bar: geomean ≤ +4.5% (expectation + noise margin); above that, stop and
+  investigate before freezing. (The original Task-L ≤+2% bar remains a
+  standing FAIL at any N>1 and is not re-adjudicated here.)
+- **N4-G3 battery**: full `TestNUMA` battery green on numa-dell.
+- **N4-G4 census**: off-build zero-function diff (change is entirely inside
+  goexperiment-tagged code).
+- **N4-G5 windows**: local (dev box) window-inference histogram over ≥40
+  launches: streams get 16 hints; inferred runs = 16 except documented
+  wrap trims (≥8); windows 4 TiB, disjoint.
