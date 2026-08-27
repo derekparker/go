@@ -1,0 +1,3 @@
+idle_check: top process 'pgrep' at 366% CPU; sleeping 30s
+idle_check: top process 'pgrep' at 147% CPU; sleeping 30s
+sweep complete: /tmp/v4-n4-freeze/primary (archive under numa-design/bench-data/v4-n4-primary/)

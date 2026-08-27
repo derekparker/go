@@ -1,0 +1,34 @@
+v4-n4-primary-armB-r0: hint_faults=889830 pages_migrated=2462764
+hint_faults=889830 pages_migrated=2462764
+v4-n4-primary-armB-r10: hint_faults=1179021 pages_migrated=2986459
+hint_faults=1179021 pages_migrated=2986459
+v4-n4-primary-armB-r1: hint_faults=911346 pages_migrated=2508133
+hint_faults=911346 pages_migrated=2508133
+v4-n4-primary-armB-r2: hint_faults=558752 pages_migrated=2341980
+hint_faults=558752 pages_migrated=2341980
+v4-n4-primary-armB-r3: hint_faults=1082680 pages_migrated=2586158
+hint_faults=1082680 pages_migrated=2586158
+v4-n4-primary-armB-r4: hint_faults=576444 pages_migrated=1990187
+hint_faults=576444 pages_migrated=1990187
+v4-n4-primary-armB-r5: hint_faults=821746 pages_migrated=2461570
+hint_faults=821746 pages_migrated=2461570
+v4-n4-primary-armB-r6: hint_faults=561180 pages_migrated=1808479
+hint_faults=561180 pages_migrated=1808479
+v4-n4-primary-armB-r7: hint_faults=468731 pages_migrated=2277763
+hint_faults=468731 pages_migrated=2277763
+v4-n4-primary-armB-r8: hint_faults=766775 pages_migrated=2543864
+hint_faults=766775 pages_migrated=2543864
+v4-n4-primary-armB-r9: hint_faults=441622 pages_migrated=1936682
+hint_faults=441622 pages_migrated=1936682
+v4-n4-primary-armC-r0: hint_faults=0 pages_migrated=0
+v4-n4-primary-armC-r10: hint_faults=0 pages_migrated=0
+v4-n4-primary-armC-r1: hint_faults=0 pages_migrated=0
+v4-n4-primary-armC-r2: hint_faults=0 pages_migrated=0
+v4-n4-primary-armC-r3: hint_faults=0 pages_migrated=0
+v4-n4-primary-armC-r4: hint_faults=0 pages_migrated=0
+v4-n4-primary-armC-r5: hint_faults=2 pages_migrated=0
+hint_faults=2 pages_migrated=0
+v4-n4-primary-armC-r6: hint_faults=0 pages_migrated=0
+v4-n4-primary-armC-r7: hint_faults=0 pages_migrated=0
+v4-n4-primary-armC-r8: hint_faults=0 pages_migrated=0
+v4-n4-primary-armC-r9: hint_faults=0 pages_migrated=0

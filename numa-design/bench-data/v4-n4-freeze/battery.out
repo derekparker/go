@@ -1,0 +1,71 @@
+=== RUN   TestNUMALongestHintRun
+--- PASS: TestNUMALongestHintRun (0.00s)
+=== RUN   TestNUMAHeapArenaStreams
+--- PASS: TestNUMAHeapArenaStreams (0.00s)
+=== RUN   TestNUMAGetcpu
+--- PASS: TestNUMAGetcpu (0.00s)
+=== RUN   TestNUMATopologyDiscovery
+--- PASS: TestNUMATopologyDiscovery (0.00s)
+=== RUN   TestNUMABindAllTaskPolicy
+--- PASS: TestNUMABindAllTaskPolicy (0.00s)
+=== RUN   TestNUMASetThreadAffinitySelf
+--- PASS: TestNUMASetThreadAffinitySelf (0.00s)
+=== RUN   TestNUMAFillOneSocketConfined
+    crash_test.go:195: running /home/deparker/go-numa/bin/go build -o /tmp/go-build756889905/testprog.exe
+    crash_test.go:203: built testprog in 1.467564824s
+    numa_linux_test.go:90: /tmp/go-build756889905/testprog.exe NUMAPlacementInfo (5.535487ms): ok
+--- PASS: TestNUMAFillOneSocketConfined (1.50s)
+=== RUN   TestNUMAConfineSkipsNarrowedAffinity
+--- PASS: TestNUMAConfineSkipsNarrowedAffinity (0.01s)
+=== RUN   TestNUMAStandDownOnGOMAXPROCSGrowth
+    numa_linux_test.go:151: /tmp/go-build756889905/testprog.exe NUMAStandDown (8.046006ms): ok
+--- PASS: TestNUMAStandDownOnGOMAXPROCSGrowth (0.01s)
+=== RUN   TestNUMAStandDownOnSetDefaultGOMAXPROCS
+    numa_linux_test.go:201: /tmp/go-build756889905/testprog.exe NUMAStandDownDefaultGOMAXPROCS (6.09589ms): ok
+--- PASS: TestNUMAStandDownOnSetDefaultGOMAXPROCS (0.01s)
+=== RUN   TestNUMASoftAffinity
+    numa_linux_test.go:248: /tmp/go-build756889905/testprog.exe NUMASoftAffinity (3.101557035s): ok
+--- PASS: TestNUMASoftAffinity (3.10s)
+=== RUN   TestNUMASoftAffinityForkRegression
+    numa_linux_test.go:340: /tmp/go-build756889905/testprog.exe NUMASoftAffinityForkParent (42.91341ms): ok
+--- PASS: TestNUMASoftAffinityForkRegression (0.04s)
+=== RUN   TestNUMASoftAffinityExecRegression
+    numa_linux_test.go:385: /tmp/go-build756889905/testprog.exe NUMASoftAffinityExecParent (41.738635ms): ok
+--- PASS: TestNUMASoftAffinityExecRegression (0.04s)
+=== RUN   TestNUMASoftAffinitySetDefaultGOMAXPROCS
+    numa_linux_test.go:462: /tmp/go-build756889905/testprog.exe NUMASoftAffinitySetDefaultGOMAXPROCS (31.506748ms): ok
+--- PASS: TestNUMASoftAffinitySetDefaultGOMAXPROCS (0.03s)
+=== RUN   TestNUMAWidenCountUnderChurn
+--- PASS: TestNUMAWidenCountUnderChurn (0.10s)
+=== RUN   TestNUMAPlacementQuota
+--- PASS: TestNUMAPlacementQuota (0.00s)
+=== RUN   TestNUMAPlacementActivePredicate
+--- PASS: TestNUMAPlacementActivePredicate (0.00s)
+=== RUN   TestNUMAPlacementProcresize
+--- PASS: TestNUMAPlacementProcresize (0.00s)
+=== RUN   TestNUMAPlacementSpread
+    numa_linux_test.go:696: /tmp/go-build756889905/testprog.exe NUMAPlacementSpread (3.066427064s): ok
+--- PASS: TestNUMAPlacementSpread (3.07s)
+=== RUN   TestNUMAPlacementRefillLocality
+    numa_linux_test.go:790: steady-state refills local=294654 remote=16404 share=94.73%
+--- PASS: TestNUMAPlacementRefillLocality (4.08s)
+=== RUN   TestNUMAStreamWindows
+--- PASS: TestNUMAStreamWindows (0.00s)
+=== RUN   TestNUMAPlacementLargeObjectLocality
+    numa_linux_test.go:884: large allocations node-matched 96895/104634 = 92.60%
+--- PASS: TestNUMAPlacementLargeObjectLocality (3.01s)
+=== RUN   TestNUMAEnforceStateMachine
+--- PASS: TestNUMAEnforceStateMachine (0.00s)
+=== RUN   TestNUMASpanRefillMetrics
+=== RUN   TestNUMASpanRefillMetrics/ChurnIncrementsCounters
+=== RUN   TestNUMASpanRefillMetrics/OneProcLocalSanity
+    numa_refill_test.go:90: GOMAXPROCS=1 churn: local delta=4221 remote delta=101
+=== RUN   TestNUMASpanRefillMetrics/NodePureRouting
+=== RUN   TestNUMASpanRefillMetrics/CounterMatchesHomeNode
+--- PASS: TestNUMASpanRefillMetrics (0.21s)
+    --- PASS: TestNUMASpanRefillMetrics/ChurnIncrementsCounters (0.14s)
+    --- PASS: TestNUMASpanRefillMetrics/OneProcLocalSanity (0.06s)
+    --- PASS: TestNUMASpanRefillMetrics/NodePureRouting (0.00s)
+    --- PASS: TestNUMASpanRefillMetrics/CounterMatchesHomeNode (0.00s)
+PASS
+ok  	runtime	15.282s

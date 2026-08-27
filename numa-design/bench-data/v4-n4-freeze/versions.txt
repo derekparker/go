@@ -1,0 +1,31 @@
+/tmp/pb-n4/base/garbage: go1.28-devel_68cbbd30f2 Thu Aug 27 13:57:29 2026 -0700
+	path	golang.org/x/benchmarks/garbage
+	mod	golang.org/x/benchmarks	v0.0.0-20260819172200-70693762b6a0	h1:gLYsUQT0P6cI8zmysaoOoVgLhYFuBL6smDcVj/ojtiY=
+	dep	golang.org/x/sys	v0.47.0	h1:o7XGOvZQCADBQQ4Y7VNq2dRWQR7JmOUW8Kxx4ZsNgWs=
+	build	-buildmode=exe
+	build	-compiler=gc
+	build	DefaultGODEBUG=netmarshal=0,tracebacklabels=0,x509sslcertoverrideplatform=0
+	build	CGO_ENABLED=1
+	build	CGO_CFLAGS=
+	build	CGO_CPPFLAGS=
+	build	CGO_CXXFLAGS=
+	build	CGO_LDFLAGS=
+	build	GOARCH=amd64
+	build	GOOS=linux
+	build	GOAMD64=v1
+/tmp/pb-n4/numa/garbage: go1.28-devel_68cbbd30f2 Thu Aug 27 13:57:29 2026 -0700 X:numa
+	path	golang.org/x/benchmarks/garbage
+	mod	golang.org/x/benchmarks	v0.0.0-20260819172200-70693762b6a0	h1:gLYsUQT0P6cI8zmysaoOoVgLhYFuBL6smDcVj/ojtiY=
+	dep	golang.org/x/sys	v0.47.0	h1:o7XGOvZQCADBQQ4Y7VNq2dRWQR7JmOUW8Kxx4ZsNgWs=
+	build	-buildmode=exe
+	build	-compiler=gc
+	build	DefaultGODEBUG=netmarshal=0,tracebacklabels=0,x509sslcertoverrideplatform=0
+	build	CGO_ENABLED=1
+	build	CGO_CFLAGS=
+	build	CGO_CPPFLAGS=
+	build	CGO_CXXFLAGS=
+	build	CGO_LDFLAGS=
+	build	GOARCH=amd64
+	build	GOEXPERIMENT=numa
+	build	GOOS=linux
+	build	GOAMD64=v1

@@ -1,0 +1,80 @@
+goos: linux
+goarch: amd64
+pkg: runtime
+cpu: INTEL(R) XEON(R) PLATINUM 8592+
+BenchmarkMalloc8  	66866388	        15.09 ns/op
+BenchmarkMalloc16 	49294066	        22.71 ns/op
+PASS
+ok  	runtime	2.188s
+goos: linux
+goarch: amd64
+pkg: runtime
+cpu: INTEL(R) XEON(R) PLATINUM 8592+
+BenchmarkMalloc8  	67311219	        14.97 ns/op
+BenchmarkMalloc16 	49571332	        22.63 ns/op
+PASS
+ok  	runtime	2.188s
+goos: linux
+goarch: amd64
+pkg: runtime
+cpu: INTEL(R) XEON(R) PLATINUM 8592+
+BenchmarkMalloc8  	67046884	        14.98 ns/op
+BenchmarkMalloc16 	49375014	        22.85 ns/op
+PASS
+ok  	runtime	2.192s
+goos: linux
+goarch: amd64
+pkg: runtime
+cpu: INTEL(R) XEON(R) PLATINUM 8592+
+BenchmarkMalloc8  	161071212	         7.431 ns/op
+BenchmarkMalloc16 	99919888	        11.31 ns/op
+PASS
+ok  	runtime	2.893s
+goos: linux
+goarch: amd64
+pkg: runtime
+cpu: INTEL(R) XEON(R) PLATINUM 8592+
+BenchmarkMalloc8  	66837536	        15.01 ns/op
+BenchmarkMalloc16 	106797236	        11.25 ns/op
+PASS
+ok  	runtime	3.938s
+goos: linux
+goarch: amd64
+pkg: runtime
+cpu: INTEL(R) XEON(R) PLATINUM 8592+
+BenchmarkMalloc8  	157872614	         7.563 ns/op
+BenchmarkMalloc16 	97037352	        11.62 ns/op
+PASS
+ok  	runtime	2.860s
+goos: linux
+goarch: amd64
+pkg: runtime
+cpu: INTEL(R) XEON(R) PLATINUM 8592+
+BenchmarkMalloc8  	160464307	         7.438 ns/op
+BenchmarkMalloc16 	98892787	        11.51 ns/op
+PASS
+ok  	runtime	2.886s
+goos: linux
+goarch: amd64
+pkg: runtime
+cpu: INTEL(R) XEON(R) PLATINUM 8592+
+BenchmarkMalloc8  	135551140	         7.415 ns/op
+BenchmarkMalloc16 	99527979	        17.39 ns/op
+PASS
+ok  	runtime	3.379s
+goos: linux
+goarch: amd64
+pkg: runtime
+cpu: INTEL(R) XEON(R) PLATINUM 8592+
+BenchmarkMalloc8  	160996680	         7.405 ns/op
+BenchmarkMalloc16 	99948684	        11.28 ns/op
+PASS
+ok  	runtime	2.879s
+goos: linux
+goarch: amd64
+pkg: runtime
+cpu: INTEL(R) XEON(R) PLATINUM 8592+
+BenchmarkMalloc8  	80454493	        14.95 ns/op
+BenchmarkMalloc16 	49747376	        22.67 ns/op
+PASS
+ok  	runtime	3.382s

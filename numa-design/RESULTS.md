@@ -4831,3 +4831,36 @@ weirdness.
 Disposition: closed as not-reproducible on the final tree after a
 120-run budget; the watch note stands — any future occurrence must be
 captured with full output (no truncation) and filed with logs.
+
+---
+
+# Upstream-prep Task N4 — node-capacity freeze verification: ALL GATES PASS
+
+Date: 2026-08-27. Tree: `68cbbd30f2` (numaMaxHeapNodes 8→4). Raws:
+`bench-data/v4-n4-freeze/`. Arm binaries both stamped
+`go1.28-devel_68cbbd30f2` (C arm `X:numa`), verified via `go version -m`.
+`kernel.numa_balancing=1` verified after. Battery serialized in one
+session: primary sweep → micro → TestNUMA.
+
+| Gate | Bar (pre-registered) | Reading | Verdict |
+|---|---|---|---|
+| N4-G1 primary | p<0.05 AND ≤ −5% | **−10.00% (p=0.000, n=10)** garbage 4096MB @256P, rotating-order sweep | **PASS** |
+| N4-G2 micro | geomean ≤ +4.5% | geomean point **−9.79%**, Malloc8 ~ (p=0.143), Malloc16 ~ (p=0.160) | **PASS** (see note) |
+| N4-G3 battery | TestNUMA green | PASS (+ pagealloc/hint suites, + off-mode test) | **PASS** |
+| N4-G4 census | off build zero-function diff | zero functions changed | **PASS** (recorded at freeze commit) |
+| N4-G5 windows | run=16 / 4 TiB, wrap trims only | 150/160 run=16, rest trims ≥8, disjoint | **PASS** (recorded at freeze commit) |
+
+N4-G2 note (honest): this session's 1P timings show the known bimodal
+noise (±34–101% relative); the bar is met by a wide margin but the
+session cannot resolve the expected +3.5% structural cost. The Task-LF
+dose-response arms (n=24, tight mode) remain the authoritative estimate
+of the N=4 cost: **~+3.5% geomean** on the alloc micro. The point
+estimate here being negative is noise, not a claim.
+
+N4-G1 note: −10.00% at N=4 vs the N=8 tree's −8.77% — consistent with
+the −8…−9% record; the delta between the two readings is within
+session-to-session variation and no N=4-beats-N=8 claim is made without
+an interleaved same-session comparison.
+
+**Standing decision: `numaMaxHeapNodes = 4` is frozen as the shipped
+constant; N=8 is a documented build-time variant.** Gap item 4 closed.
