@@ -1843,6 +1843,9 @@ func startTheWorldWithSema(now int64, w worldStop) int64 {
 				throw("startTheWorld: inconsistent mp->nextp")
 			}
 			mp.nextp.set(p)
+			if goexperiment.Numa {
+				numaStampMWake(mp) // v4 Task A5 wake-latency stamp
+			}
 			notewakeup(&mp.park)
 		} else {
 			// Start M to run P.  Do not start another M below.
@@ -2032,6 +2035,11 @@ func mPark() {
 	}
 	notesleep(&gp.m.park)
 	noteclear(&gp.m.park)
+	if goexperiment.Numa {
+		// Fold this M's measured wake latency (v4 Task A5; zero-stamp
+		// wakes -- rwmutex, faketime -- never fold; see numa_wake.go).
+		numaNoteMWake(gp.m)
+	}
 }
 
 // mexit tears down and exits the current thread.
@@ -3208,6 +3216,9 @@ func startm(pp *p, spinning, lockheld bool) {
 	// The caller incremented nmspinning, so set m.spinning in the new M.
 	nmp.spinning = spinning
 	nmp.nextp.set(pp)
+	if goexperiment.Numa {
+		numaStampMWake(nmp) // v4 Task A5 wake-latency stamp
+	}
 	notewakeup(&nmp.park)
 	// Ownership transfer of pp committed by wakeup. Preemption is now
 	// safe.
@@ -3377,6 +3388,9 @@ func startlockedm(gp *g) {
 	incidlelocked(-1)
 	pp := releasep()
 	mp.nextp.set(pp)
+	if goexperiment.Numa {
+		numaStampMWake(mp) // v4 Task A5 wake-latency stamp
+	}
 	notewakeup(&mp.park)
 	stopm()
 }
@@ -6706,6 +6720,11 @@ func sysmon() {
 		// from a timer to avoid adding system load to applications that spend
 		// most of their time sleeping.
 		now := nanotime()
+		if goexperiment.Numa {
+			// v4 Task A5 wake-signal window evaluation (calibration
+			// phase: GODEBUG=numa=2 diagnostics only; see numa_wake.go).
+			numaWakeSysmonTick(now)
+		}
 		if debug.schedtrace <= 0 && (sched.gcwaiting.Load() || sched.npidle.Load() == gomaxprocs) {
 			lock(&sched.lock)
 			if sched.gcwaiting.Load() || sched.npidle.Load() == gomaxprocs {
