@@ -255,6 +255,32 @@ type pageAlloc struct {
 	// are allocated and not worth searching.
 	searchAddr offAddr
 
+	// NUMA stream windows (GOEXPERIMENT=numa, v4 stage 4 -- design:
+	// numa-design/v4-pagealloc-design.md). Everything here is written
+	// and read only from code reachable behind goexperiment.Numa call
+	// sites (mpagealloc_numa.go and its gated callers), so the off
+	// build carries only the numaMaxHeapNodes==1-sized zero-value
+	// fields and no code.
+	//
+	// numaWindows[n] is the address window of NUMA node n's heap arena
+	// stream ([lo, hi), chunk-aligned, computed once in mallocinit from
+	// the actual hint addresses; lo == hi means "no valid window").
+	//
+	// numaSearchAddr[n] is the windowed analog of searchAddr and obeys
+	// the SAME invariant: it points into inUse or is maxSearchAddr()
+	// (the unarmed/exhausted sentinel); additionally, no free memory in
+	// window n lies below it. It starts at the sentinel and is first
+	// armed by growth or a free landing inside the window.
+	//
+	// numaWindowLatch[n] latches true when homed growth for node n
+	// landed outside node n's window (hint-run exhaustion): from then
+	// on the windowed path is permanently suppressed for node n (the
+	// window no longer represents the node's memory; per-arena node
+	// tags remain the truth).
+	numaWindows     [numaMaxHeapNodes]struct{ lo, hi offAddr }
+	numaSearchAddr  [numaMaxHeapNodes]offAddr
+	numaWindowLatch [numaMaxHeapNodes]bool
+
 	// start and end represent the chunk indices
 	// which pageAlloc knows about. It assumes
 	// chunks in the range [start, end) are
