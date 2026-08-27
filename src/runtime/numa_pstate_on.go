@@ -52,3 +52,7 @@ const numaStealFilter = false
 // second ablation switch for the G2 sched-micro bisection (the steal
 // filter was exonerated: +15% persists with it off).
 const numaScheduleHook = true
+
+// numaHookAblate: 0 = full hook, 1 = immediate return (call cost only),
+// 2 = eligibility reads then return. Diagnostic bisection constant.
+const numaHookAblate = 1

@@ -1202,6 +1202,9 @@ const numaSoftAffinityCheckInterval = 4 * 1e6 // 4ms in nanotime() units
 // dead-code-eliminates out of an experiment-off binary instead of
 // costing a function call that immediately returns.
 func numaNoteSchedule() {
+	if numaHookAblate == 1 {
+		return
+	}
 	mp := getg().m
 	if mp.locks != 0 {
 		// Defensive only -- see the doc comment above; findRunnable is
@@ -1212,6 +1215,9 @@ func numaNoteSchedule() {
 		return
 	}
 	if !numaSoftAffinityEligible() || numaConfined.Load() || numaStoodDown.Load() {
+		return
+	}
+	if numaHookAblate == 2 {
 		return
 	}
 	if numaPlacementActive() {

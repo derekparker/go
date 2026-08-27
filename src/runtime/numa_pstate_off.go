@@ -22,3 +22,5 @@ func (s *pNUMAState) clearHome()                 {}
 const numaStealFilter = false
 
 const numaScheduleHook = false
+
+const numaHookAblate = 0
