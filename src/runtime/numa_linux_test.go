@@ -745,7 +745,6 @@ func TestNUMAPlacementRefillLocality(t *testing.T) {
 	if !runtime.NumaPlacementActiveForTest() {
 		t.Skip("placement not active (single-node, narrowed affinity, streams disabled, ...)")
 	}
-	before := readSpanRefillCounters(t)
 	var wg sync.WaitGroup
 	stop := make(chan struct{})
 	for i := 0; i < runtime.GOMAXPROCS(0); i++ {
@@ -770,6 +769,13 @@ func TestNUMAPlacementRefillLocality(t *testing.T) {
 			}
 		}()
 	}
+	// G2-locality protocol (v4 plan): the gate reading is the
+	// STEADY-STATE counter delta -- warm up first (window arming,
+	// first stream growth, and cache priming concentrate remote
+	// refills in the ramp; the gate's real subjects are steady-state
+	// by construction), then snapshot, measure, snapshot.
+	time.Sleep(2 * time.Second)
+	before := readSpanRefillCounters(t)
 	time.Sleep(2 * time.Second)
 	close(stop)
 	wg.Wait()
@@ -780,9 +786,9 @@ func TestNUMAPlacementRefillLocality(t *testing.T) {
 		t.Skipf("only %d refills observed; workload too small to judge locality", dl+dr)
 	}
 	share := float64(dl) / float64(dl+dr)
-	t.Logf("refills local=%d remote=%d share=%.2f%%", dl, dr, share*100)
+	t.Logf("steady-state refills local=%d remote=%d share=%.2f%%", dl, dr, share*100)
 	if share < 0.90 {
-		t.Errorf("unpinned local refill share %.2f%% < 90%% with placement active", share*100)
+		t.Errorf("unpinned steady-state local refill share %.2f%% < 90%% with placement active", share*100)
 	}
 }
 

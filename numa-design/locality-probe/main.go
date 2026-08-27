@@ -39,7 +39,8 @@ func readCounters() (local, remote uint64, ok bool) {
 
 func main() {
 	procs := flag.Int("procs", runtime.GOMAXPROCS(0), "in-process GOMAXPROCS for the workload")
-	secs := flag.Int("secs", 3, "workload duration in seconds")
+	secs := flag.Int("secs", 3, "measured window in seconds (after warmup)")
+	warmup := flag.Int("warmup", 5, "warmup seconds before the measured counter snapshot (v4 G2-locality protocol: the gate reading is the steady-state delta; the ramp-inclusive share is reported separately as exploratory)")
 	flag.Parse()
 	if os.Getenv("GOMAXPROCS") != "" {
 		fmt.Println("locality FATAL: GOMAXPROCS set in environment; that confines the process (see file comment)")
@@ -47,7 +48,7 @@ func main() {
 	}
 	runtime.GOMAXPROCS(*procs)
 
-	l0, r0, ok := readCounters()
+	lStart, rStart, ok := readCounters()
 	if !ok {
 		fmt.Println("locality SKIP: /numa/span-refills metrics unsupported (experiment off?)")
 		os.Exit(0)
@@ -83,14 +84,19 @@ func main() {
 			}
 		}()
 	}
+	time.Sleep(time.Duration(*warmup) * time.Second)
+	l0, r0, _ := readCounters() // steady-state baseline: ramp excluded
 	time.Sleep(time.Duration(*secs) * time.Second)
 	close(stop)
 	wg.Wait()
 	l1, r1, _ := readCounters()
-	dl, dr := l1-l0, r1-r0
-	share := 0.0
-	if dl+dr > 0 {
-		share = float64(dl) / float64(dl+dr) * 100
+	pct := func(l, r uint64) float64 {
+		if l+r == 0 {
+			return 0
+		}
+		return float64(l) / float64(l+r) * 100
 	}
-	fmt.Printf("locality procs=%d local=%d remote=%d share=%.2f%%\n", *procs, dl, dr, share)
+	dl, dr := l1-l0, r1-r0
+	fmt.Printf("locality procs=%d local=%d remote=%d share=%.2f%% (steady-state, warmup=%ds) ramp-inclusive=%.2f%%\n",
+		*procs, dl, dr, pct(dl, dr), *warmup, pct(l1-lStart, r1-rStart))
 }
