@@ -1251,7 +1251,9 @@ func numaNoteSchedule() {
 					return // bounded retry after a failed apply
 				}
 				mp.numa.armSoftAffinityCheck(now + numaSoftAffinityCheckInterval)
-				numaApplySoftAffinity(mp, int32(home))
+				if numaHookAblate != 3 {
+					numaApplySoftAffinity(mp, int32(home))
+				}
 				return
 			}
 		}
