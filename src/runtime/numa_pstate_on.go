@@ -51,4 +51,4 @@ const numaStealFilter = false
 // numaScheduleHook gates the schedule()-path numaNoteSchedule call --
 // second ablation switch for the G2 sched-micro bisection (the steal
 // filter was exonerated: +15% persists with it off).
-const numaScheduleHook = false
+const numaScheduleHook = true

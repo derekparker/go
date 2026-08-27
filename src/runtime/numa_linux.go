@@ -1230,6 +1230,16 @@ func numaNoteSchedule() {
 				if last, applied := mp.numa.softAffinityNode(); applied && last == home {
 					return // steady state
 				}
+				if !mp.numa.homeStreakAdvance(home) {
+					// Hysteresis (sched-micro gate fix): an M that just
+					// picked up a differently-homed P applies nothing --
+					// only a stable pairing (numaHomeStreakThreshold
+					// consecutive same-home passes) pays the clock read
+					// and the throttled syscall below. Bouncing Ms (the
+					// goroutine-creation churn regime, +15-21% before
+					// this) cost two byte compares per pass here.
+					return
+				}
 				now := nanotime()
 				if !mp.numa.softAffinityCheckDue(now) {
 					return // bounded retry after a failed apply
