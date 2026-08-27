@@ -44,15 +44,26 @@ the hint addresses' longest contiguous run at the layout's actual spacing
 **invalid window** (windowed search permanently misses for that node; growth,
 tagging, and metrics honesty are unaffected — tags are truth, below). The
 disjointness assertion test must run across many simulated prefixes, including
-wrapped ones, not just the default layout. Wrap-trimmed windows mean the
-affected node reaches its out-of-run hints only via grow, whose arenas land
-outside the window — the M1 latch (below) then degrades that node to today's
-behavior deterministically. Accepted, documented residual: on ~25% of launches
-one node's window is smaller (or, rarely, invalid), reducing that node's
-windowed hit rate; the gates' locality bars absorb this because trimmed
-windows still cover ≥half the stream in the common case, and the latch
-prevents any pathological cost. Windows are heapArenaBytes-aligned (hint
-addresses are), hence chunk-aligned: no chunk straddles a window boundary.
+wrapped ones, not just the default layout.
+
+**Hint-chain reorder (review NEW-1, required):** growth consumes a stream's
+hints in ascending-i order (the descending-i hint loop PREPENDS,
+malloc.go:714-716). Under a wrap, the trimmed-off hints are one END of the
+stream's i-range — and when it is the low-i end (≈half of wrapped launches),
+the node's very FIRST homed grow would use an out-of-window hint, firing the
+M1 latch immediately and permanently: zero windowed hits for that node for the
+process lifetime, on ~12% of launches — bimodal flakiness the gate bars cannot
+absorb. So mallocinit, when it trims a stream, also REORDERS that stream's
+hint chain to put the in-window run's hints first (experiment-gated,
+mallocinit-only, single-threaded, no off-build effect). The latch then fires
+only on genuine run exhaustion (≥1 TiB of per-node growth on the randomized
+layout — far beyond any gate workload), and the honest residual is exactly
+"one node's window is ~half-sized on ~25% of launches", which the bars do
+absorb. (This also moots review NEW-5's observation that the latch forfeits
+in-window reuse: post-reorder, latched means the window is truly exhausted.)
+
+Windows are heapArenaBytes-aligned (hint addresses are), hence chunk-aligned:
+no chunk straddles a window boundary.
 
 **Tags are the truth, windows are a heuristic:** memory outside every window
 (hint-fallback growth, trimmed-off hints) is still tagged per-arena
@@ -114,19 +125,27 @@ func (p *pageAlloc) allocNode(npages uintptr, node int32) (addr, scav uintptr, o
   mapped — same justification as alloc:891-895); the chunk is in-window by
   chunk alignment of the bounds.
 - Slow path: `findFrom(npages, maxOffAddr(numaSearchAddr[node], windowLo))`.
-  - `addr == 0` (nothing free anywhere above from) OR
-    `addr + npages*pageSize > windowHi` (everything in [from, windowHi) is
-    allocated): **miss** — no `allocRange`, and set
-    `numaSearchAddr[node] = maxSearchAddr()` (exhausted sentinel; sound
-    because the failed search proved the window empty above `from`, and below
-    `from` was already excluded by the invariant). Next free/grow into the
-    window re-arms it by lowering.
+  - Miss = `addr == 0` OR `addr + npages*pageSize > windowHi`: no
+    `allocRange`. The searchAddr update uses the CANDIDATE, not a blanket
+    sentinel (review NEW-2: a failed search for npages proves no free run of
+    ≥ npages, NOT "window empty" — smaller free runs may remain, and stock
+    alloc poisons its global searchAddr only on npages==1 failure for exactly
+    this reason, mpagealloc.go:909-917): if the candidate ≥ windowHi, or
+    `addr == 0` (find returns maxSearchAddr then, mpagealloc.go:820-822), set
+    `numaSearchAddr[node] = maxSearchAddr()` — sound, nothing free below the
+    candidate anywhere; otherwise raise `numaSearchAddr[node]` to the
+    candidate (valid searchAddr per find's contract, and it prunes the next
+    windowed search). Next free/grow into the window lowers/re-arms either
+    way.
   - Hit: `allocRange`; if candidate ≥ windowHi set the sentinel, else raise
-    `numaSearchAddr[node]` to the candidate (valid searchAddr per find's
-    contract, mpagealloc.go:644-646).
-- Global `p.searchAddr` is never raised by allocNode (windowed searches start
-  above it and prove nothing below — leaving it conservative is slow-only,
-  never wrong; confirmed clean by review probe B).
+    `numaSearchAddr[node]` to the candidate.
+- **The node variants never write the global `p.searchAddr` in either
+  direction** (review NEW-3): never raised (windowed searches start above it
+  and prove nothing below — slow-only, never wrong), and never poisoned on a
+  windowed miss (stock `alloc`'s npages==1 poisoning at mpagealloc.go:916 and
+  `allocToCache`'s at mpagecache.go:147-150 must NOT be mirrored — a windowed
+  miss proves nothing globally). A harness test asserts the global searchAddr
+  is unchanged by a windowed miss.
 
 ## 4. Windowed maintenance on free and grow
 
@@ -240,6 +259,21 @@ m5 (free/grow scan gated on numaHeapHomingActive). Clean areas confirmed:
 global searchAddr never raised is always-safe; pcache fill cannot cross
 windows; 1P gate exercises the routed path; mcache/pcache-hit paths untouched.
 
-## Review verdict — rev 2
+## Review verdict — rev 2 (2026-08-26): APPROVED-WITH-CHANGES
 
-(appended after re-review)
+Every rev-1 finding verified resolved in substance (C1, C2, M1–M5, m1–m5 —
+including DCE census feasibility, sentinel escape-path probing, and the
+plan-amendment consistency check). New findings, folded into the sections
+above: **NEW-1 (Major)** wrap-trimming + ascending-i hint consumption +
+permanent latch would zero one node's windowed locality on ~12% of launches →
+mallocinit reorders the trimmed stream's hint chain (in-window run first);
+**NEW-2 (Major)** sentinel-on-any-miss stated a false invariant for npages>1 →
+candidate-based update (sentinel only when candidate ≥ windowHi or addr==0);
+**NEW-3 (Minor)** node variants never write global searchAddr in either
+direction, with a harness assertion; **NEW-4 (Minor, hygiene)** uncommitted
+src/go.mod clobber in the worktree → restored (no measured artifact affected:
+the clobber post-dated every local build/census and the one in-flight local
+test process had already loaded its module state; all hardware runs used
+numa-dell's clean checkout); **NEW-5 (Observation)** latch-suppresses-search
+concern mooted by NEW-1's reorder. Reviewer: no further review round needed
+with these folded in as specified.

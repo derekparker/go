@@ -417,9 +417,77 @@ Runs only after Tasks 3–6 are green on numa-dell. Gates and bars are locked in
 
 Scope, arms, method, and n are locked in the stage-3 decision block above. This task is instantiated (appended to this plan with concrete steps) only when a gate FAIL after stages 1–2 gives it a target; if all gates pass it collapses to one archived confirmation capture noted in RESULTS.md.
 
-### Task P (stage 4): node-aware page allocation — design round then implementation
+### Task P (stage 4): node-aware page allocation
 
-Same two-phase structure as Task 2 (design doc `numa-design/v4-pagealloc-design.md` per locked decisions P8–P10, adversarial review, then appended implementation tasks gated by G4). Not started until stage 2's decision gates are adjudicated.
+Design round complete: `numa-design/v4-pagealloc-design.md` rev 2, reviewed
+(rev 1 REJECTED → rev 2 APPROVED-WITH-CHANGES, all findings folded; verdicts in
+the doc). The stage-2 interim evidence (RESULTS.md) re-scoped execution: G2
+gates adjudicate on the combined stage-2+4 tree (deviation recorded there).
+Implementation tasks, all code-level detail in the design doc's sections:
+
+#### Task P1: pageAlloc windowed core (no callers)
+
+**Files:** Create `src/runtime/mpagealloc_numa.go` (`findFrom`, `allocNode`,
+`allocToCacheNode`, window-maintenance helpers — design §§2,3,5); modify
+`src/runtime/mpagealloc.go` (struct fields only — design §1); harness exports +
+unit tests (`export_test.go` window-setter, `mpagealloc_test.go`-style tests).
+`find`/`alloc`/`allocToCache` byte-untouched.
+
+- [ ] Failing harness tests first: windowed alloc in-window only; miss
+  allocates nothing and updates per-window searchAddr per NEW-2 (candidate,
+  sentinel only when candidate ≥ hi or addr==0); global searchAddr unchanged
+  by windowed miss (NEW-3); sentinel re-arms via free/grow lowering; latch
+  suppresses; findFrom ≡ find on existing find cases.
+- [ ] Implement; tests green; off census zero diffs (nothing references the
+  new code yet — trivially DCE'd).
+- [ ] Commit: `runtime: add windowed NUMA page allocation core`.
+
+#### Task P2: window computation, hint reorder, latch wiring
+
+**Files:** Modify `src/runtime/malloc.go` (mallocinit: per-stream
+longest-run trimming from actual hint addresses, window init, NEW-1 hint-chain
+reorder — in-window run first); `src/runtime/mheap.go` (homed-grow sets the
+out-of-window latch — design §4); `src/runtime/mpagealloc.go` (free/grow
+per-window searchAddr lowering, gated `numaHeapHomingActive`); pure-function
+run-trimming extracted for tests.
+
+- [ ] Failing tests first: pure-function trimming over many simulated
+  randomized prefixes (wrapped included) asserting disjointness, chunk
+  alignment, in-window-first hint order; linux+experiment test of the real
+  mallocinit windows.
+- [ ] Implement; local TestNUMA + census (off) zero diffs.
+- [ ] Commit: `runtime: compute NUMA stream windows and reorder trimmed hint chains`.
+
+#### Task P3: allocSpan routing
+
+**Files:** Modify `src/runtime/mheap.go` (allocSpan: spanAllocHeap-only,
+syscall-free key (explicit node / P-home), 4-step order —
+windowed → homed-grow-once(latch) → retry-once → unconditional fallback;
+pcache fill via `allocToCacheNode` with plain fallback — design §6).
+
+- [ ] Implement; full local battery (`go test runtime`, `-race` TestNUMA),
+  off census zero diffs, on-build single-node behavior unchanged
+  (numaHeapHomingActive false ⇒ no routing).
+- [ ] Commit: `runtime: route heap span allocation through NUMA stream windows`.
+
+#### Task P4: hardware verification (numa-dell)
+
+- [ ] `make push && make build`; `go version -m` verification.
+- [ ] Full TestNUMA battery — the standing RED
+  `TestNUMAPlacementRefillLocality` must go GREEN (≥90%).
+- [ ] Locality probe sweep (`v4-g2-locality.sh`, 5 widths × 5 launches —
+  multi-launch for the window-trim variance) and the retain-8GiB re-run;
+  large-object locality hook check (≥90% arena-tag matches).
+- [ ] RESULTS.md interim section + raws archived + commit.
+
+#### Task P5 (= former Task 7, merged): combined G2+G4 gate battery
+
+The pre-registered G2 gates (primary/locality/IMC/sched-micros/cost) plus
+G4-RSS (peak-RSS ≤ +10%, experiment vs stock, garbage arms, same session) and
+G4 large-object locality, adjudicated on the combined tree in single-session
+sweeps per the Global Constraints. RESULTS.md verdicts per gate; raws under
+`numa-design/bench-data/v4-g2g4-*/`; ship / fail-and-stop per Global
+Constraints (stage 3 Task L instantiates against any surviving cost FAIL).
 
 ---
 
