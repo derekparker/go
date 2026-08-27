@@ -4589,6 +4589,30 @@ Standing verdict: the 1P alloc-micro gate remains FAIL at ~+4-5% geomean
 (ON build only; off build census-identical; 1P real-workload json +1.35%),
 with a proven path to ~+2% if pursued.
 
+## LF3 design (pre-registered before implementation, user-directed)
+
+Remote-node spanSets move OUT of mcentral into ONE global BSS array indexed
+by spanclass:
+
+    var numaRemoteCentral [numSpanClasses]struct {
+        partial [2][numaMaxHeapNodes - 1]spanSet
+        full    [2][numaMaxHeapNodes - 1]spanSet
+    }
+
+mcentral itself REVERTS TO EXACTLY STOCK SHAPE (`partial [2]spanSet;
+full [2]spanSet`): the off build's mcentral is trivially byte-identical to
+upstream (numaMaxHeapNodes-1 == 0 makes the global zero-size), the hot
+136-entry mheap.central array regains stock footprint — the bytes LF1/LF2
+proved are the cost — and the remote block (~200 KiB, 136 × 4 × 7 sets) is
+cold BSS touched only by the remote-fallback and sweeper paths. The four
+node-indexed accessors redirect `node > 0` to the global; node-0 and
+off-build paths compile to stock field accesses. No pointers, no init-order
+dependencies, no NotInHeap allocation; remote spine locks lockInit'd from
+mcentral.init by spanclass. Chosen over per-mcentral pointer indirection
+(8B/mcentral on-build, an allocation, and an off-build shape change) as the
+boring option. Gates per the pre-registered LF gates: 1P alloc micro vs
+stock targeting ≤ +2%, G2-primary no-regression, census, battery, -race.
+
 ---
 
 # v4 Task A5 — calibration (pre-registered, review H2): rate-only detection frozen
