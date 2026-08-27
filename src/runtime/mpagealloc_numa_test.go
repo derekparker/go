@@ -252,3 +252,43 @@ func TestNUMALongestHintRun(t *testing.T) {
 		}
 	}
 }
+
+func TestPageAllocAllocNodeAfterCacheFlush(t *testing.T) {
+	// Regression (v4 stage 4, hit on numa-dell): pageCache.flush frees
+	// pages WITHOUT pageAlloc.free, so it must lower the windowed
+	// searchAddr too. Without that, the windowed searchAddr goes
+	// stale-high after a flush below it, and the next windowed search
+	// -- whose summaries correctly promise the flushed-free run below
+	// `from` -- throws "bad summary data".
+	b := BaseChunkIdx
+	p, free := newWindowedPageAlloc(t, map[ChunkIdx][]BitRange{
+		b:      {},
+		b + 1:  {},
+		b + 64: {},
+	})
+	defer free()
+	p.NUMAWindowLower(PageBase(b, 0))
+
+	// Fill a cache from the window's low block, then allocate past it
+	// so the windowed searchAddr moves up.
+	c := p.AllocToCacheNode(0)
+	if c.Empty() {
+		t.Fatal("cache fill failed")
+	}
+	if _, _, ok := p.AllocNode(64, 0); !ok {
+		t.Fatal("post-cache alloc failed")
+	}
+	nsaBefore := p.NUMASearchAddr(0)
+	// Flush the cache: its pages (below the windowed searchAddr) go
+	// free without passing through pageAlloc.free.
+	c.Flush(p)
+	if got := p.NUMASearchAddr(0); got >= nsaBefore {
+		t.Fatalf("windowed searchAddr not lowered by cache flush: %#x -> %#x", nsaBefore, got)
+	}
+	// The windowed search must now see the flushed pages instead of
+	// throwing on the summary/searchAddr mismatch.
+	addr, _, ok := p.AllocNode(2, 0)
+	if !ok || addr < PageBase(b, 0) || addr >= PageBase(b+2, 0) {
+		t.Fatalf("AllocNode(2, 0) after flush = %#x ok=%v", addr, ok)
+	}
+}

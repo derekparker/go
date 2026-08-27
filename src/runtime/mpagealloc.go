@@ -282,6 +282,16 @@ type pageAlloc struct {
 	numaSearchAddr  [numaMaxHeapNodes]offAddr
 	numaWindowLatch [numaMaxHeapNodes]bool
 
+	// numaWindowsActive gates the windowed searchAddr maintenance
+	// hooks in grow/free/pageCache.flush/scavenge (<= numaMaxHeapNodes
+	// compares each). Armed once, in numaSchedinit, only when the
+	// windows can ever be consumed (streams enabled AND multi-node
+	// homing active) -- experiment-on single-node hosts never pay for
+	// the hooks (design review m5). The window-consuming entry points
+	// (allocNode/allocToCacheNode) do not read this: an un-maintained
+	// window simply stays at the unarmed sentinel and misses.
+	numaWindowsActive bool
+
 	// start and end represent the chunk indices
 	// which pageAlloc knows about. It assumes
 	// chunks in the range [start, end) are
@@ -425,7 +435,7 @@ func (p *pageAlloc) grow(base, size uintptr) {
 	if b := (offAddr{base}); b.lessThan(p.searchAddr) {
 		p.searchAddr = b
 	}
-	if goexperiment.Numa && numaHeapHomingActive() {
+	if goexperiment.Numa && p.numaWindowsActive {
 		// Windowed mirror (v4 stage 4, design §4): growth into a
 		// stream window arms/lowers that window's searchAddr. Gated on
 		// homing (multi-node) so experiment-on single-node hosts pay
@@ -979,7 +989,7 @@ func (p *pageAlloc) free(base, npages uintptr) {
 	if b := (offAddr{base}); b.lessThan(p.searchAddr) {
 		p.searchAddr = b
 	}
-	if goexperiment.Numa && numaHeapHomingActive() {
+	if goexperiment.Numa && p.numaWindowsActive {
 		// Windowed mirror of the lowering above (v4 stage 4, design
 		// §4): a free into a stream window re-arms that window's
 		// searchAddr. Gated on homing (multi-node) so experiment-on

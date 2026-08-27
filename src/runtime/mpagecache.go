@@ -5,6 +5,7 @@
 package runtime
 
 import (
+	"internal/goexperiment"
 	"internal/runtime/sys"
 	"unsafe"
 )
@@ -102,6 +103,17 @@ func (c *pageCache) flush(p *pageAlloc) {
 	// we update the searchAddr just like free does.
 	if b := (offAddr{c.base}); b.lessThan(p.searchAddr) {
 		p.searchAddr = b
+	}
+	if goexperiment.Numa && p.numaWindowsActive {
+		// Windowed mirror (v4 stage 4): this flush frees pages WITHOUT
+		// going through pageAlloc.free, so the per-window searchAddr
+		// must be lowered here too or it goes stale-high -- free
+		// memory below it violates the searchAddr invariant findFrom
+		// inherits from find, and a later windowed search whose
+		// summaries promise that lower run throws "bad summary data"
+		// (hit on real hardware: P destruction flushing page caches
+		// below an armed window searchAddr).
+		p.numaWindowLower(c.base)
 	}
 	p.update(c.base, pageCachePages, false, false)
 	*c = pageCache{}

@@ -21,6 +21,9 @@ func (p *PageAlloc) SetNUMAWindow(node int32, lo, hi uintptr) {
 	pp.numaWindows[node].lo = offAddr{lo}
 	pp.numaWindows[node].hi = offAddr{hi}
 	pp.numaSearchAddr[node] = maxSearchAddr()
+	// Arm the maintenance hooks (grow/free/flush/scavenge lowering) the
+	// way numaSchedinit does for the real heap.
+	pp.numaWindowsActive = true
 }
 
 // NUMAWindowLower simulates the free/grow windowed searchAddr lowering
