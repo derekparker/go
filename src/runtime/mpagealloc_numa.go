@@ -148,12 +148,28 @@ func (p *pageAlloc) allocNode(npages uintptr, node int32) (addr, scav uintptr, o
 		}
 		var candidate offAddr
 		addr, candidate = p.findFrom(npages, from)
-		if addr == 0 || (offAddr{addr + npages*pageSize - 1}).lessThan(hi) == false {
-			// Miss: nothing allocated. addr == 0 makes candidate
-			// maxSearchAddr() (findFrom's exhausted return), so the
-			// NEW-2 rule below sets the sentinel; an out-of-window
-			// result raises to the candidate or the sentinel as the
-			// candidate dictates.
+		if addr == 0 {
+			// No run of >= npages exists ANYWHERE at or above from.
+			// For npages == 1 that means genuinely nothing free:
+			// exhausted sentinel (stock alloc's own npages==1-only
+			// poisoning, windowed). For npages > 1 smaller in-window
+			// runs may survive, and findFrom's failure return DISCARDS
+			// firstFree (candidate is the maxSearchAddr convention, not
+			// a report) -- we learn nothing about the window, so leave
+			// the searchAddr unchanged. Treating this candidate as real
+			// falsely exhausted the window over a surviving 1-page run;
+			// caught by the churn property test after two hardware
+			// crash signatures pointed here.
+			if npages == 1 {
+				p.numaSearchAddr[node] = maxSearchAddr()
+			}
+			return 0, 0, false
+		}
+		if (offAddr{addr + npages*pageSize - 1}).lessThan(hi) == false {
+			// Found, but out-of-window: miss, nothing allocated. This
+			// candidate IS a real firstFree report ("no free memory in
+			// [from, candidate)"), so the NEW-2 rule applies: raise to
+			// it, or set the sentinel when it lies past the window.
 			p.numaUpdateSearchAddr(node, candidate, hi)
 			return 0, 0, false
 		}

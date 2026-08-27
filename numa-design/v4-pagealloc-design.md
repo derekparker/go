@@ -125,18 +125,24 @@ func (p *pageAlloc) allocNode(npages uintptr, node int32) (addr, scav uintptr, o
   mapped — same justification as alloc:891-895); the chunk is in-window by
   chunk alignment of the bounds.
 - Slow path: `findFrom(npages, maxOffAddr(numaSearchAddr[node], windowLo))`.
-  - Miss = `addr == 0` OR `addr + npages*pageSize > windowHi`: no
-    `allocRange`. The searchAddr update uses the CANDIDATE, not a blanket
-    sentinel (review NEW-2: a failed search for npages proves no free run of
-    ≥ npages, NOT "window empty" — smaller free runs may remain, and stock
-    alloc poisons its global searchAddr only on npages==1 failure for exactly
-    this reason, mpagealloc.go:909-917): if the candidate ≥ windowHi, or
-    `addr == 0` (find returns maxSearchAddr then, mpagealloc.go:820-822), set
-    `numaSearchAddr[node] = maxSearchAddr()` — sound, nothing free below the
-    candidate anywhere; otherwise raise `numaSearchAddr[node]` to the
-    candidate (valid searchAddr per find's contract, and it prunes the next
-    windowed search). Next free/grow into the window lowers/re-arms either
-    way.
+  - Miss, `addr == 0` (no run of ≥ npages ANYWHERE at or above from):
+    sentinel **only when npages == 1** (genuinely nothing free) — exactly
+    stock alloc's own npages==1-only poisoning (mpagealloc.go:909-917).
+    For npages > 1, **leave the searchAddr unchanged**: findFrom's failure
+    return DISCARDS firstFree (its maxSearchAddr "candidate" is a return
+    convention, not a report) and smaller in-window runs may survive.
+    *(Post-rev-2 correction: the rev-2 text — written per review NEW-2 and
+    approved — set the sentinel on every addr == 0 miss, treating that
+    candidate as real. The churn property test caught it: a surviving
+    in-window 1-page run was shadowed by a 6-page miss's false "exhausted",
+    which is exactly the stale-high violation NEW-2 exists to prevent; the
+    remaining hardware crash signatures traced here.)*
+  - Miss, found but out-of-window (`addr + npages*pageSize > windowHi`):
+    this candidate IS a real firstFree report ("no free memory in
+    [from, candidate)"), so the NEW-2 rule applies: raise
+    `numaSearchAddr[node]` to it, or set the sentinel when it lies at or
+    past windowHi. No `allocRange` on either miss; the next free/grow into
+    the window lowers/re-arms.
   - Hit: `allocRange`; if candidate ≥ windowHi set the sentinel, else raise
     `numaSearchAddr[node]` to the candidate.
 - **The node variants never write the global `p.searchAddr` in either

@@ -7,6 +7,8 @@
 package runtime_test
 
 import (
+	"fmt"
+
 	. "runtime"
 	"testing"
 )
@@ -324,5 +326,167 @@ func TestPageAllocArmWindowsSeedsFromInUse(t *testing.T) {
 	addr, _, ok := p.AllocNode(2, 0)
 	if !ok || addr != PageBase(b, 0) {
 		t.Fatalf("AllocNode(2, 0) = %#x ok=%v, want %#x", addr, ok, PageBase(b, 0))
+	}
+}
+
+// TestPageAllocWindowInvariantChurn is a property test hunting for any
+// operation that leaves a window's searchAddr stale-high (free memory
+// in-window below it) -- the invariant whose violation makes findFrom
+// throw "bad summary data" (two distinct hardware crashes so far).
+// It mixes windowed and GLOBAL operations, because the global paths
+// (plain alloc/allocToCache and cache flushes) mutate the same heap the
+// windows describe.
+func TestPageAllocWindowInvariantChurn(t *testing.T) {
+	b := BaseChunkIdx
+	nChunks := ChunkIdx(4)
+	chunks := map[ChunkIdx][]BitRange{}
+	for c := ChunkIdx(0); c < nChunks; c++ {
+		chunks[b+c] = []BitRange{}
+	}
+	p := NewPageAlloc(chunks, nil)
+	defer FreePageAlloc(p)
+	lo, hi := PageBase(b, 0), PageBase(b+2, 0)
+	p.SetNUMAWindow(0, lo, hi)
+	p.SetNUMAWindow(1, PageBase(b+2, 0), PageBase(b+4, 0))
+	p.ArmNUMAWindows()
+
+	// checkInvariant scans window 0's chunks for a free page below its
+	// searchAddr.
+	checkInvariant := func(op string, step int) {
+		t.Helper()
+		nsa := p.NUMASearchAddr(0)
+		if nsa == MaxSearchAddrForTest() {
+			return
+		}
+		for c := ChunkIdx(0); c < 2; c++ {
+			pd := p.PallocData(b + c)
+			if pd == nil {
+				continue
+			}
+			bits := pd.PallocBits()
+			for pi := uint(0); pi < uint(PallocChunkPages); pi++ {
+				addr := PageBase(b+c, pi)
+				if addr >= nsa {
+					return
+				}
+				if bits.PopcntRange(pi, 1) == 0 {
+					t.Fatalf("step %d (%s): free page %#x below window searchAddr %#x", step, op, addr, nsa)
+				}
+			}
+		}
+	}
+
+	var hist []string
+	rng := uint64(12345)
+	next := func(n uint64) uint64 { rng = rng*6364136223846793005 + 1442695040888963407; return (rng >> 33) % n }
+	type allocRec struct{ base, npages uintptr }
+	var live []allocRec
+	var caches []PageCache
+	for _, seed := range []uint64{12345, 999, 31337} {
+		rng = seed
+		for step := 0; step < 8000; step++ {
+			var op string
+			switch next(8) {
+			case 0, 1:
+				n := uintptr(1 + next(8))
+				a, _, ok := p.AllocNode(n, 0)
+				op = fmt.Sprintf("AllocNode(%d)=%#x,%v", n, a, ok)
+				if ok {
+					live = append(live, allocRec{a, n})
+				}
+			case 2:
+				op = "GlobalAlloc"
+				n := uintptr(1 + next(8))
+				if a, _ := p.Alloc(n); a != 0 {
+					live = append(live, allocRec{a, n})
+				}
+			case 3:
+				op = "AllocToCacheNode"
+				if c := p.AllocToCacheNode(0); !c.Empty() {
+					caches = append(caches, c)
+				}
+			case 4:
+				op = "GlobalAllocToCache"
+				if c := p.AllocToCache(); !c.Empty() {
+					caches = append(caches, c)
+				}
+			case 5:
+				op = "CacheAllocSome"
+				if len(caches) > 0 {
+					i := next(uint64(len(caches)))
+					if a, _ := caches[i].Alloc(1); a != 0 {
+						live = append(live, allocRec{a, 1})
+					}
+				}
+			case 6:
+				op = "CacheFlush"
+				if len(caches) > 0 {
+					i := next(uint64(len(caches)))
+					caches[i].Flush(p)
+					caches[i] = caches[len(caches)-1]
+					caches = caches[:len(caches)-1]
+				}
+			case 7:
+				if len(live) > 0 {
+					i := next(uint64(len(live)))
+					op = fmt.Sprintf("Free(%#x, %d) nsaBefore=%#x", live[i].base, live[i].npages, p.NUMASearchAddr(0))
+					p.Free(live[i].base, live[i].npages)
+					live[i] = live[len(live)-1]
+					live = live[:len(live)-1]
+				} else {
+					op = "Free(noop)"
+				}
+			}
+			hist = append(hist, fmt.Sprintf("step %d: %s -> nsa=%#x", step, op, p.NUMASearchAddr(0)))
+			if len(hist) > 25 {
+				hist = hist[1:]
+			}
+			func() {
+				defer func() {
+					if t.Failed() {
+						for _, h := range hist {
+							t.Log(h)
+						}
+						t.FailNow()
+					}
+				}()
+				checkInvariant(op, step)
+			}()
+		}
+	}
+}
+
+func TestPageAllocAllocNodeMiniRepro(t *testing.T) {
+	// Minimal deterministic replica of the churn failure at step 946:
+	// window 0 has exactly one free page (chunk 0, page 502), window 1
+	// is fully free. AllocNode(6, 0) must miss -- and must NOT set the
+	// exhausted sentinel, because the 1-page run is still free below.
+	b := BaseChunkIdx
+	p := NewPageAlloc(map[ChunkIdx][]BitRange{
+		b:     {{0, 502}, {503, PallocChunkPages - 503}},
+		b + 1: {{0, PallocChunkPages}},
+		b + 2: {},
+		b + 3: {},
+	}, nil)
+	defer FreePageAlloc(p)
+	p.SetNUMAWindow(0, PageBase(b, 0), PageBase(b+2, 0))
+	p.SetNUMAWindow(1, PageBase(b+2, 0), PageBase(b+4, 0))
+	p.ArmNUMAWindows()
+	if got, want := p.NUMASearchAddr(0), PageBase(b, 0); got != want {
+		t.Fatalf("armed nsa = %#x want %#x", got, want)
+	}
+	// Move nsa up to the free page the way the churn did (free-lower).
+	p.NUMAWindowLower(PageBase(b, 502))
+	// Arming seeded at window lo already (lower of the two) -- force
+	// the exact churn state: nsa exactly at the free page.
+	addrF, candF := p.FindFrom(6, PageBase(b, 502))
+	t.Logf("findFrom(6, %#x) = addr %#x candidate %#x (hi=%#x)", PageBase(b, 502), addrF, candF, PageBase(b+2, 0))
+	a, _, ok := p.AllocNode(6, 0)
+	t.Logf("AllocNode(6,0) = %#x, %v; nsa now %#x (sentinel=%#x)", a, ok, p.NUMASearchAddr(0), MaxSearchAddrForTest())
+	if ok {
+		t.Fatalf("AllocNode(6,0) unexpectedly hit at %#x", a)
+	}
+	if p.NUMASearchAddr(0) == MaxSearchAddrForTest() {
+		t.Fatal("miss set the exhausted sentinel with a free page still in-window")
 	}
 }
