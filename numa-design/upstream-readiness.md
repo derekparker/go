@@ -67,9 +67,12 @@ case runtime maintainers ask for and rarely get.
 
 ## Gap list before filing (ordered; the proposal is credible only with these)
 
-1. **Resolve the window-run inference anomaly** (some launches compute
-   512 GiB windows instead of 2 TiB — harmless for every measured gate but
-   "we don't know why" is not a sentence a runtime proposal survives).
+1. **Resolve the window-run inference anomaly** — ✅ RESOLVED 2026-08-27:
+   a baseline stock-Go bug (`randHeapBasePrefixMask` misaligned with the
+   randomized prefix position leaked 2 random bits into the prefix byte,
+   collapsing distinct hints to duplicates on ~75% of launches). Fixed with
+   regression test `TestArenaHintChainsSane`; now a standalone CL 0 that
+   leads the series. See RESULTS.md "Upstream gap item 1".
 2. **Second (and ideally third) hardware platform.** Every number is from
    one 2-node Sapphire Rapids box. Minimum credible: one arm64 multi-node
    and/or one 4-node x86; re-run the pathology harness + locality sweep
@@ -77,9 +80,10 @@ case runtime maintainers ask for and rarely get.
 3. **Full `all.bash` + trybot-equivalent sweep** on the final tree (the
    branch has run targeted batteries; upstream needs the whole suite, both
    build modes).
-4. **Decide the node-capacity constant** (N=4 recommended: covers 1–4-node
-   deployments at ~+3.5% micro / +1.35% real-workload cost; document N=8 as
-   a possible variant).
+4. **Decide the node-capacity constant** — ✅ DECIDED 2026-08-27 (user
+   approved N=4): frozen at `numaMaxHeapNodes = 4` with pre-registered
+   verification gates N4-G1..G5 (v4 plan); N=8 documented as a build-time
+   variant.
 5. **Series hygiene pass**: squash red/green and fix-wave pairs, rewrite
    comments that cite internal review tags ("review M2", "Task LF3") into
    self-contained rationale, and split into a reviewable CL series — the
@@ -87,9 +91,9 @@ case runtime maintainers ask for and rarely get.
    as ~7 CLs); v4 placement/windows/A5 is a second tranche that can trail.
 6. **Chase the two unreproduced local test flakes** (or at minimum convert
    them into tracked issues with the captured context).
-7. Proposal mechanics: a distilled design doc (the numa-design/* corpus is
-   the source, ~10× too long as-is), the GOEXPERIMENT staging plan, and the
-   explicit non-goals (no API, no default-on, Linux-only initially).
+7. Proposal mechanics — ✅ DRAFTED 2026-08-27: distilled design doc at
+   `proposal-draft.md` (staging plan and non-goals included); CL series
+   breakdown at `cl-series-plan.md`.
 
 ## Recommended proposal shape
 
