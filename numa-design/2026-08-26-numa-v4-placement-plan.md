@@ -460,6 +460,31 @@ as Tasks 2/P. Design space to adjudicate in the design doc:
   fire there), single sessions, plus the standing hard gates (census, 1P,
   -race, TestNUMA battery).
 
+### Task LF (added 2026-08-27, user-directed): reduce the ON-build structural alloc cost
+
+Target: Task L's verdict — the ~+4.2% geomean 1P alloc-micro cost is a
+compile-time structural property of the experiment-ON build's shared
+allocator paths (per-node mcentral restructure the prime suspect), present
+since WS-B. Protocol, pre-registered:
+
+- **LF1 — direction probe:** experiment-ON build with `numaMaxHeapNodes`
+  forced to 1 (collapses the per-node spanSet arrays and per-node loops to
+  stock shape while keeping the experiment on). Rotating 3-arm sweep vs A0
+  (off) and A1 (full ON), n=12, Malloc8/16. If the cost recovers, the fix
+  direction is footprint/layout; if not, the suspect list reopens
+  (allocSpan/grow/free branch shape) and LF2's design must re-attribute
+  before refactoring.
+- **LF2 — refactor per LF1**, candidates in preference order: (a) mcentral
+  layout that keeps the node-0 (primary) partial/full sets in stock
+  position/shape with remote-node sets moved out of the hot cachelines;
+  (b) cacheSpan hot-path specialization — stock-shaped fast path, outlined
+  per-node search; (c) a smaller numaMaxHeapNodes. Whatever ships must keep
+  routing correctness (existing refill tests + hardware battery).
+- **LF gates:** 1P alloc micro vs stock — target ≤ +2% (the standing hard
+  gate), measured n≥12 rotating in the tight mode; no regression on the
+  G2-primary sweep (fresh single session); census zero diffs off; full
+  TestNUMA battery on numa-dell; -race.
+
 ### Task L-orig (stage 3, conditional, superseded scope): lock-callchain attribution
 
 Scope, arms, method, and n are locked in the stage-3 decision block above. This task is instantiated (appended to this plan with concrete steps) only when a gate FAIL after stages 1–2 gives it a target; if all gates pass it collapses to one archived confirmation capture noted in RESULTS.md.
