@@ -81,10 +81,11 @@ case runtime maintainers ask for and rarely get.
    ALL TESTS PASSED in both build modes on the final tree (`68cbbd30f2`,
    536 package results each, zero FAILs). See RESULTS.md "Upstream gap
    item 3".
-4. **Decide the node-capacity constant** — ✅ DECIDED 2026-08-27 (user
-   approved N=4): frozen at `numaMaxHeapNodes = 4` with pre-registered
-   verification gates N4-G1..G5 (v4 plan); N=8 documented as a build-time
-   variant.
+4. **Decide the node-capacity constant** — ✅ DECIDED AND VERIFIED
+   2026-08-27 (user approved N=4): frozen at `numaMaxHeapNodes = 4`; all
+   five pre-registered gates N4-G1..G5 PASS (primary −10.00% p=0.000 n=10;
+   battery green; census clean; windows 4 TiB). N=8 documented as a
+   build-time variant. See RESULTS.md "Task N4".
 5. **Series hygiene pass**: squash red/green and fix-wave pairs, rewrite
    comments that cite internal review tags ("review M2", "Task LF3") into
    self-contained rationale, and split into a reviewable CL series — the

@@ -219,7 +219,9 @@ interleaved rotating-order sweeps, raws archived). Remaining before filing:
 1. ~~Window-run inference anomaly~~ — resolved: baseline prefix-mask bug,
    fixed with regression test (see staging plan).
 2. Second hardware platform (arm64 multi-node and/or 4-node x86) — the
-   harness makes this mechanical; not yet run.
-3. Full `all.bash` in both build modes on the final tree — in progress.
-4. ~~Node-capacity constant~~ — frozen at N=4 with pre-registered
-   verification gates (N4-G1..G5).
+   harness makes this mechanical; not yet run. **The only remaining
+   validation gap.**
+3. ~~Full `all.bash`~~ — ALL TESTS PASSED in both build modes on the
+   final tree.
+4. ~~Node-capacity constant~~ — frozen at N=4; all five verification
+   gates pass (primary −10.00%, p=0.000, n=10, preserved at N=4).
