@@ -4731,3 +4731,10 @@ cost, WS-B-era, Task LF direction proven at ~+1.9% if pursued).
   +1.35%); N=8 supports big boxes at ~+5.5%; a per-variant constant is
   possible but adds build-matrix complexity. Gate remains FAIL as
   pre-registered at the shipped N=8, fully attributed and quantified.
+
+## Task LF close-out verification (LF3-inclusive tree)
+
+G2-primary no-regression (pre-registered LF gate), fresh single session
+n=10: **−8.77% (p=0.002)** — the placement win fully intact with LF3 in
+tree (raws `bench-data/v4-taskLF/v4-lf3-primary-*`). Full TestNUMA battery
+green on numa-dell. numa_balancing=1 verified.
