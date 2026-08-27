@@ -40,3 +40,10 @@ func (s *pNUMAState) setHome(node int8) { s.homeNode = node + 1 }
 // placement-inactive branch, so a stale assignment can never outlive
 // the predicate that authorized it (the pairing rule, design §2).
 func (s *pNUMAState) clearHome() { s.homeNode = 0 }
+
+// numaStealFilter gates stealWork's same-node-first pass 0 (v4 stage 2
+// design §6). Temporarily a build-time switch for the G2 ablation: the
+// sched-micro gate measured CreateGoroutines +19% with the filter on,
+// and the filter's contribution to the locality wins is unproven -- the
+// ablation re-runs the primary gate with it off to decide keep/drop.
+const numaStealFilter = false

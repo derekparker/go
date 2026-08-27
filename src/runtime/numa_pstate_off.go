@@ -18,3 +18,5 @@ type pNUMAState struct{}
 func (s *pNUMAState) home() (node int8, ok bool) { return 0, false }
 func (s *pNUMAState) setHome(node int8)          {}
 func (s *pNUMAState) clearHome()                 {}
+
+const numaStealFilter = false

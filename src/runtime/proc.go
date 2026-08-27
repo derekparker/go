@@ -3950,7 +3950,7 @@ func stealWork(now int64) (gp *g, inheritTime bool, rnow, pollUntil int64, newWo
 			if pp == p2 {
 				continue
 			}
-			if goexperiment.Numa && i == 0 && stealHome >= 0 {
+			if goexperiment.Numa && i == 0 && stealHome >= 0 && numaStealFilter {
 				if vHome, ok := p2.numa.home(); ok && vHome != stealHome {
 					continue // pass 0: same-node victims only
 				}
