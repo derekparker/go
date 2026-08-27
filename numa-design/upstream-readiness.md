@@ -86,11 +86,11 @@ case runtime maintainers ask for and rarely get.
    five pre-registered gates N4-G1..G5 PASS (primary −10.00% p=0.000 n=10;
    battery green; census clean; windows 4 TiB). N=8 documented as a
    build-time variant. See RESULTS.md "Task N4".
-5. **Series hygiene pass**: squash red/green and fix-wave pairs, rewrite
-   comments that cite internal review tags ("review M2", "Task LF3") into
-   self-contained rationale, and split into a reviewable CL series — the
-   v3 final review already prescribed the first tranche (Layer 0/1 + WS-A
-   as ~7 CLs); v4 placement/windows/A5 is a second tranche that can trail.
+5. **Series hygiene pass** — ✅ COMMENT HALF DONE 2026-08-27: all 214
+   internal-tag comment sites rewritten self-contained (`64cca37634`,
+   census-proven codegen-neutral; one deliberate GODEBUG string rename).
+   Remaining: the mechanical series cut per `cl-series-plan.md` (CL 0 +
+   two tranches), deferred until filing is green-lit.
 6. **Chase the two unreproduced local test flakes** — ✅ CLOSED 2026-08-27:
    0 failures in a 120-run dedicated stress chase on the final tree (60 per
    build mode, full output capture); both originals predate the now-fixed
