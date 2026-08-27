@@ -25,10 +25,10 @@ type mcentral struct {
 	spanclass spanClass
 
 	// partial and full contain two mspan sets each, per NUMA heap
-	// arena stream (design §12.3/§12.4, task 9): one of swept in-use
+	// arena stream: one of swept in-use
 	// spans, and one of unswept in-use spans, exactly as before
 	// per-node routing existed -- now also indexed by the node a
-	// span's home arena was grown for (heapArena.node, task 8), so
+	// span's home arena was grown for (heapArena.node), so
 	// that a refill can search its own node's spans before any other
 	// node's (see cacheSpan). These two roles still trade on each GC
 	// cycle. The unswept set is drained either by allocation or by
@@ -48,10 +48,10 @@ type mcentral struct {
 	// sweeper and mcentral that do consume from the unswept list may
 	// encounter swept spans, and these should be ignored.
 	//
-	// Layout (Task LF3): these fields hold ONLY the primary (node 0)
+	// Layout: these fields hold ONLY the primary (node 0)
 	// sets, in exactly the stock shape -- remote nodes' sets live in
 	// the global numaRemoteCentral array (below), indexed by
-	// spanclass. Task L's ablation ladder measured the earlier
+	// spanclass. An ablation study measured the earlier
 	// [2][numaMaxHeapNodes] in-struct layout as the dominant source of
 	// a ~+4% experiment-ON 1P alloc-micro cost that survives disabling
 	// every runtime NUMA mechanism: the enlarged 136-entry
@@ -66,8 +66,8 @@ type mcentral struct {
 }
 
 // numaRemoteCentral holds the REMOTE nodes' (1..numaMaxHeapNodes-1)
-// span sets for every size class -- deliberately outside mcentral (Task
-// LF3, see the field comment above): one cold BSS block touched only by
+// span sets for every size class -- deliberately outside mcentral (see
+// the partial/full field comment above): one cold BSS block touched only by
 // the remote-fallback search and the sweeper's per-node loops, keeping
 // the hot central array at stock footprint. Zero-size with the
 // experiment off (numaMaxHeapNodes == 1).
@@ -78,9 +78,9 @@ var numaRemoteCentral [numSpanClasses]struct {
 
 // Initialize a single central free list.
 //
-// Lock-rank note (I5): every per-node spanSet spine lock must be
+// Lock-rank note: every per-node spanSet spine lock must be
 // lockInit'd here -- 2 partial + 2 full sets x numaMaxHeapNodes, not
-// just the four locks the pre-task-9 shape had -- or a
+// just the four locks the single-set shape had -- or a
 // staticlockranking build throws on the first uninitialized lock it
 // sees. With the experiment off numaMaxHeapNodes == 1 and this is
 // exactly the original four lockInit calls.
@@ -137,11 +137,11 @@ func (c *mcentral) fullSwept(sweepgen uint32, node int32) *spanSet {
 
 // numaSpanRefillLocal and numaSpanRefillRemote back the
 // /numa/span-refills/local:spans and /numa/span-refills/remote:spans
-// runtime/metrics counters (design §12.4's in-vivo locality proxy;
-// review M1 controller ruling: named with the dimension in the path
-// and the unit in the unit slot, not /numa/span-refills:{local,remote}
-// as the plan text originally had it -- metric names freeze once
-// shipped, so the upstream-correct shape is used from the start).
+// runtime/metrics counters, a cheap continuous locality signal between
+// perf-counter runs. Named with the dimension in the path
+// and the unit in the unit slot (not /numa/span-refills:{local,remote})
+// because metric names freeze once
+// shipped, so the correct shape must be used from the start.
 // Incremented only in cacheSpan, at refill frequency -- never on a
 // malloc fast path. Declared unconditionally (metrics.go registers
 // their names on every build, like every other runtime/metrics
@@ -154,8 +154,8 @@ var (
 
 // numaRefillNode returns the NUMA node mcentral.cacheSpan should route
 // this span refill to, and whether that is a genuine per-node reading
-// (design §12.4's routing ingredient) -- forwards directly to
-// numaGrowNode (task 8), which already has exactly the contract
+// -- forwards directly to
+// numaGrowNode, which already has exactly the contract
 // routing needs: node is always a valid index into the per-node
 // spanSet arrays above, even when genuine is false (streams disabled,
 // a failed getcpu, or node >= numaMaxHeapNodes -- see numaGrowNode's
@@ -166,40 +166,40 @@ var (
 // declines to home -- see mcentral.grow).
 //
 // Called ONCE per mcentral.cacheSpan call, i.e. once per refill --
-// never from getMCache or a malloc fast path (v2/v3 forbidden list).
+// never from getMCache or a malloc fast path (getcpu is banned there).
 //
-// Controller ruling on plan line 103 ("no syscalls under sched.lock or
-// with mp.locks != 0"): that rule is scoped to Task 10's scheduler
+// On the rule "no syscalls under sched.lock or
+// with mp.locks != 0": that rule is scoped to the scheduler
 // hooks (schedule()/acquirep), where a syscall risks a lock-ordering
 // or latency hazard against sched.lock and friends. mallocgc's
 // alloc-path callers of refill (and therefore of this function) hold
 // mp.locks != 0 via acquirem for the whole fast path -- but this
-// getcpu call runs under exactly the same shape of contract Task 8's
+// getcpu call runs under exactly the same shape of contract
 // numaGrowNode already established for mheap.grow (a getcpu call made
 // while h.lock is about to be or already is held, at grow frequency):
 // no scheduler-affecting lock is held, and the call site is
-// deliberately infrequent (refill, not malloc, frequency). Accepted;
-// this is not the hazard plan line 103 was written to prevent.
+// deliberately infrequent (refill, not malloc, frequency). So this
+// is not the hazard that rule exists to prevent.
 func numaRefillNode() (node int32, genuine bool) {
 	return numaGrowNode()
 }
 
 // Allocate a span to use in an mcache.
 //
-// Routes the refill by NUMA node (design §12.4): the current node is
+// Routes the refill by NUMA node: the current node is
 // read ONCE per call via numaRefillNode (getcpu, at refill frequency
-// only -- never from getMCache or a malloc fast path, v2/v3 forbidden
-// list). The local node's sets are searched first, exactly the way
+// only -- never from getMCache or a malloc fast
+// path). The local node's sets are searched first, exactly the way
 // this function's single set was always searched before per-node
 // routing existed (see cacheSpanFromNode); only if the local node has
 // nothing usable are the remaining nodes tried, in index order (up to
-// numaGrowLoopBound, review I3); only if no node has anything does
+// numaGrowLoopBound); only if no node has anything does
 // this fall through to mheap growth, homed to the local node when the
 // reading is genuine (see grow).
 //
-// Review I1 controller ruling: whether a refill counts as "local" or
-// "remote" (/numa/span-refills/{local,remote}:spans, design §12.4's
-// in-vivo locality proxy) is decided by inspecting the ACTUAL span this
+// Whether a refill counts as "local" or
+// "remote" (/numa/span-refills/{local,remote}:spans, the in-vivo
+// locality proxy) is decided by inspecting the ACTUAL span this
 // function is about to return, not by which code path produced it.
 // An earlier version assumed cacheSpanFromNode(node, ...) succeeding
 // meant "found on the local node" and c.grow succeeding meant
@@ -211,7 +211,7 @@ func numaRefillNode() (node int32, genuine bool) {
 // -- mheap.grow (the only place that actually homes memory to a node)
 // only runs on allocSpan's base==0 fallthrough. Believing "just grew"
 // meant "definitely local" systematically overcounted local refills,
-// biasing this counter (and Task 11's own gate proxy, which reads it).
+// biasing this counter (and everything that reads it as a locality signal).
 func (c *mcentral) cacheSpan() *mspan {
 	// Deduct credit for this span allocation and sweep if necessary.
 	spanBytes := uintptr(gc.SizeClassToNPages[c.spanclass.sizeclass()]) * pageSize
@@ -226,15 +226,15 @@ func (c *mcentral) cacheSpan() *mspan {
 
 	node, genuine := numaRefillNode()
 
-	// Review NEW-2: probe the local node's partial-swept set BEFORE
+	// Probe the local node's partial-swept set BEFORE
 	// ever registering as a sweeper, matching upstream's own
 	// pre-routing behavior (the original single-set cacheSpan always
 	// popped partialSwept first and only called sweep.active.begin()
-	// on a miss). The I2 fix below (sharing one sweepLocker across the
-	// whole search instead of one per node) initially hoisted begin()
+	// on a miss). Sharing one sweepLocker across the
+	// whole search instead of one per node initially hoisted begin()
 	// to always run first, even when this free, no-sweep-cost probe
 	// alone would have sufficed -- regressing the hot path relative to
-	// upstream. This keeps I2's win (still at most one begin/end pair
+	// upstream. This keeps the shared-locker win (still at most one begin/end pair
 	// per refill) without paying for it on the common no-sweep-needed
 	// case.
 	sg := mheap_.sweepgen
@@ -248,9 +248,9 @@ func (c *mcentral) cacheSpan() *mspan {
 		// benefit of having a full free span to allocate from. By
 		// setting this to 100, we limit the space overhead to 1%.
 		//
-		// This budget is shared across every node searched below (I5-style
+		// This budget is shared across every node searched below (the
 		// off-build collapse aside, this is the same global bound the
-		// pre-task-9 single-set search always had -- routing spreads the
+		// original single-set search always had -- routing spreads the
 		// same amount of sweep work across nodes rather than multiplying
 		// it per node).
 		//
@@ -262,7 +262,7 @@ func (c *mcentral) cacheSpan() *mspan {
 		// allocation if the budget runs low.
 		spanBudget := 100
 
-		// Review I2: begin the sweeper's process-global sweepLocker
+		// Begin the sweeper's process-global sweepLocker
 		// ONCE for the rest of this refill and share it across every
 		// node cacheSpanFromNode tries below (including a re-check of
 		// the local node's own unswept sets), rather than once per
@@ -272,7 +272,7 @@ func (c *mcentral) cacheSpan() *mspan {
 		// from many Ps).
 		sl := sweep.active.begin()
 
-		// Review NEW-2 micro-nit: the local node's partial-swept set was
+		// The local node's partial-swept set was
 		// already probed (empty) just above, under the same sg -- skip
 		// cacheSpanFromNode's own equivalent probe for node specifically,
 		// rather than paying for an immediate, guaranteed-empty repeat of
@@ -287,7 +287,7 @@ func (c *mcentral) cacheSpan() *mspan {
 				if other == node {
 					continue
 				}
-				// Review M2: this loop is not gated on remaining budget.
+				// This loop is deliberately not gated on remaining budget.
 				// Every node's first probe (partialSwept.pop, inside
 				// cacheSpanFromNode) costs no sweep budget at all --
 				// stopping the whole fallback early because budget ran
@@ -315,7 +315,7 @@ func (c *mcentral) cacheSpan() *mspan {
 
 			// We failed to get a span from the mcentral so get one from
 			// mheap, homed to the node this refill is routing for (ties
-			// task 8's per-node growth streams to this routing decision,
+			// the per-node growth streams to this routing decision,
 			// and reuses the numaRefillNode reading above instead of a
 			// second getcpu call at grow time).
 			s = c.grow(node, genuine)
@@ -325,14 +325,14 @@ func (c *mcentral) cacheSpan() *mspan {
 		}
 	}
 
-	// Review I1 controller ruling (see this function's doc comment):
+	// See this function's doc comment:
 	// local is computed uniformly, right here at the actual success
 	// exit, from the span that's actually about to be returned -- one
 	// arena-metadata lookup (not getcpu), honest for every path that
 	// reaches here (local pop, remote pop, or grow).
 	//
-	// Final review F5 (documented, deliberately not excluded from the
-	// count): when genuine is false (numaRefillNode's doc comment:
+	// Known and deliberate, not excluded from the
+	// count: when genuine is false (numaRefillNode's doc comment:
 	// streams disabled, a failed getcpu, or node >= numaMaxHeapNodes),
 	// node is numaGrowNode's sentinel 0, not a real reading of where
 	// this call is actually running -- and node 0 also happens to be
@@ -345,7 +345,7 @@ func (c *mcentral) cacheSpan() *mspan {
 	// forced to 0, so numaSpanRefillLocal would read ~100% regardless
 	// of where anything actually ran -- not a measurement of real
 	// locality on those builds. Left counted anyway (rather than gated
-	// on genuine) because TestNUMASpanRefillMetrics' primary red-test
+	// on genuine) because TestNUMASpanRefillMetrics' primary
 	// property (testSpanRefillCountersIncrement) asserts these counters
 	// move on any refill churn, streams enabled or not, as the basic
 	// "the counters are wired up" signal; gating counting on genuine
@@ -390,15 +390,15 @@ func (c *mcentral) cacheSpan() *mspan {
 
 // cacheSpanFromNode searches node's partial/full spanSets for a span
 // with free objects, sweeping unswept spans as needed via sl (owned
-// and begun/ended once by the caller, cacheSpan -- review I2, not
+// and begun/ended once by the caller, cacheSpan -- not
 // begun/ended per node here), spending at most *budget span-sweep
 // attempts (decremented as it goes -- shared across every node
 // cacheSpan tries, see there). Returns nil if node has nothing usable
 // within the remaining budget.
 //
 // sg is the sweepgen every call cacheSpan makes across one refill
-// shares (threaded through rather than re-read here, review NEW-2
-// micro-nit) -- see below. skipSwept, when true, skips this
+// shares (threaded through rather than re-read
+// here) -- see below. skipSwept, when true, skips this
 // function's own partialSwept probe entirely: cacheSpan's local-node
 // fast path (see there) already made that exact check, under the
 // same sg, immediately before calling here, so repeating it would
@@ -407,14 +407,14 @@ func (c *mcentral) cacheSpan() *mspan {
 // call passes false, since those nodes' partialSwept sets have not
 // been probed yet.
 //
-// This is exactly the pre-task-9 (single, unindexed) cacheSpan search
+// This is exactly the original (single, unindexed) cacheSpan search
 // body, parameterized by which node's sets to search and given a
 // shared sweepLocker instead of acquiring its own; see cacheSpan for
 // the local-then-remote-then-grow routing order this is composed
 // into.
 func (c *mcentral) cacheSpanFromNode(node int32, budget *int, sl sweepLocker, sg uint32, skipSwept bool) *mspan {
-	// Try partial swept spans first. This costs no sweep budget --
-	// review M2 -- so it's always tried (unless skipSwept), even if
+	// Try partial swept spans first. This costs no sweep budget,
+	// so it's always tried (unless skipSwept), even if
 	// the shared budget is already exhausted from an earlier node.
 	if !skipSwept {
 		if s := c.partialSwept(sg, node).pop(); s != nil {
@@ -473,9 +473,9 @@ func (c *mcentral) cacheSpanFromNode(node int32, budget *int, sl sweepLocker, sg
 // s must have a span class corresponding to this
 // mcentral and it must not be empty.
 //
-// Returns s to its home node's spanSet (design §12.4) -- NOT the
+// Returns s to its home node's spanSet -- NOT the
 // freeing thread's current node. A span's home node is fixed at grow
-// time (heapArena.node, design §12.3) and never changes, so returning
+// time (heapArena.node) and never changes, so returning
 // it to its own node keeps every per-node set node-pure: a future
 // refill on that node always finds spans that are actually local to
 // it. Routing by the freeing thread's node instead would gradually
@@ -534,12 +534,12 @@ func (c *mcentral) uncacheSpan(s *mspan) {
 }
 
 // grow allocates a new empty span from the heap and initializes it for
-// c's size class, homed to node when genuine is true (design §12.4:
-// ties task 8's per-node growth streams to this refill's routing
+// c's size class, homed to node when genuine is true (this
+// ties the per-node growth streams to this refill's routing
 // decision, reusing the numaRefillNode reading cacheSpan already made
 // rather than a second getcpu call at grow time).
 //
-// genuine mirrors numaGrowNode's own homed bool (task 8, review I1):
+// genuine mirrors numaGrowNode's own homed bool:
 // false collapses the grow-homing argument to mheap's "don't home"
 // sentinel, exactly as numaGrowNodeArg would from a fresh reading --
 // without re-reading the node.

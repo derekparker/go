@@ -955,7 +955,8 @@ func schedinit() {
 	if goexperiment.Numa {
 		// Fill-one-socket-first needs the startup GOMAXPROCS value; no
 		// other runtime thread exists yet, so affinity/mempolicy set
-		// here is inherited by every future M. Layer 1 BIND-all already
+		// here is inherited by every future M. The BIND-all task policy
+		// (numaSetProcessBindAll) already
 		// ran in numaSchedinit above and stays the fallback.
 		numaConfineIfSmall(procs)
 		// P-home placement decides AFTER confinement (mutual
@@ -963,7 +964,7 @@ func schedinit() {
 		// placement) and assigns homes right here rather than waiting
 		// for the next procresize -- the bootstrap procresize above ran
 		// before this decision, and the first STW can be a whole heap
-		// ramp-up away (v4 placement design, review M1).
+		// ramp-up away.
 		numaPlacementInit()
 		numaAssignPHomes(procs)
 	}
@@ -1819,9 +1820,9 @@ func startTheWorldWithSema(now int64, w worldStop) int64 {
 	unlock(&sched.lock)
 
 	// NUMA stand-down: detection only here. mp.locks != 0 (acquirem
-	// above) and the design's Forbidden list bans syscalls under
-	// sched.lock or with mp.locks != 0 (same rule as Task 10's
-	// schedule() hook), so numaStandDownIfNeeded only flips atomic
+	// above), and syscalls are banned under
+	// sched.lock or with mp.locks != 0 (the same rule
+	// numaNoteSchedule follows), so numaStandDownIfNeeded only flips atomic
 	// state -- no syscalls. If it reports a fresh trigger, the
 	// syscall-bearing widening (eager allm walk + this M's own
 	// convergence) is deferred to numaStandDownWiden below, run only
@@ -1844,7 +1845,7 @@ func startTheWorldWithSema(now int64, w worldStop) int64 {
 			}
 			mp.nextp.set(p)
 			if goexperiment.Numa {
-				numaCountMWake() // v4 Task A5 wake-rate count
+				numaCountMWake() // wake-rate count for enforcement stand-down
 			}
 			notewakeup(&mp.park)
 		} else {
@@ -2036,7 +2037,7 @@ func mPark() {
 	notesleep(&gp.m.park)
 	noteclear(&gp.m.park)
 	if goexperiment.Numa {
-		// v4 Task A5: while the enforcement stand-down latch is set,
+		// While the enforcement stand-down latch is set,
 		// each parking M widens its own kernel mask and clears its own
 		// soft-affinity cache (see numaEnforceParkBackstop).
 		numaEnforceParkBackstop(gp.m)
@@ -2979,7 +2980,7 @@ func newm(fn func(), pp *p, id int64) {
 }
 
 func newm1(mp *m) {
-	// Node-mask soft affinity (design §12.4, task 10 review C1/NEW-1):
+	// Node-mask soft affinity:
 	// both branches below create a brand new OS thread that inherits
 	// the CALLING M's (getg().m, not mp -- the new, not-yet-started M
 	// this function's own parameter names) current CPU affinity mask --
@@ -2988,9 +2989,9 @@ func newm1(mp *m) {
 	// creation primitives with the same inherit-caller's-affinity
 	// semantics, so this must run before EITHER branch, not just before
 	// newosproc: an earlier version of this fix lived inside newosproc
-	// itself and never widened the cgo path at all, leaving C1's
+	// itself and never widened the cgo path at all, leaving the
 	// self-reinforcing single-node collapse fully intact on any cgo
-	// build (review NEW-1). See numaWidenBeforeClone's doc comment
+	// build. See numaWidenBeforeClone's doc comment
 	// (numa_linux.go) for the full mechanism.
 	if goexperiment.Numa {
 		numaWidenBeforeClone(getg().m)
@@ -3218,7 +3219,7 @@ func startm(pp *p, spinning, lockheld bool) {
 	nmp.spinning = spinning
 	nmp.nextp.set(pp)
 	if goexperiment.Numa {
-		numaCountMWake() // v4 Task A5 wake-rate count
+		numaCountMWake() // wake-rate count for enforcement stand-down
 	}
 	notewakeup(&nmp.park)
 	// Ownership transfer of pp committed by wakeup. Preemption is now
@@ -3390,7 +3391,7 @@ func startlockedm(gp *g) {
 	pp := releasep()
 	mp.nextp.set(pp)
 	if goexperiment.Numa {
-		numaCountMWake() // v4 Task A5 wake-rate count
+		numaCountMWake() // wake-rate count for enforcement stand-down
 	}
 	notewakeup(&mp.park)
 	stopm()
@@ -4332,12 +4333,12 @@ top:
 		goto top
 	}
 
-	// Node-mask soft affinity (design §12.4, task 10, ingredient c):
+	// Node-mask soft affinity:
 	// this is the one point in the scheduler where the M is about to
 	// run user code with mp.locks == 0 and no locks held -- unlike
 	// acquirep, whose call paths (procresize under sched.lock, allocm
 	// under allocmLock+acquirem) make a syscall here a lock-ordering
-	// hazard (design's I3 note). Gated on goexperiment.Numa, a
+	// hazard. Gated on goexperiment.Numa, a
 	// compile-time constant, so the call dead-code-eliminates out of an
 	// experiment-off binary entirely; numaNoteSchedule itself gates
 	// every other precondition (multi-node, not confined, not stood
@@ -5316,7 +5317,7 @@ func syscall_runtime_BeforeFork() {
 	sigsave(&gp.m.sigmask)
 	sigblock(false)
 
-	// Node-mask soft affinity (design §12.4) narrows this M's own CPU
+	// Node-mask soft affinity narrows this M's own CPU
 	// affinity as a scheduling hint, not an operator placement choice --
 	// but sched_setaffinity's mask is inherited across fork(2)/clone(2),
 	// so without this, a child process forked from this M (about to
@@ -5413,7 +5414,7 @@ func syscall_runtime_BeforeExec() {
 	// Prevent thread creation during exec.
 	execLock.lock()
 
-	// Node-mask soft affinity (design §12.4) narrows this M's own CPU
+	// Node-mask soft affinity narrows this M's own CPU
 	// affinity as a scheduling hint, not an operator placement choice --
 	// but sched_setaffinity's mask survives execve(2) (unlike fork/clone,
 	// execve does not create a new thread; it replaces this thread's own
@@ -6275,7 +6276,7 @@ func procresize(nprocs int32) *p {
 		// proportional to node CPU counts, so a GOMAXPROCS change moves
 		// them). sched.lock is held and the world is stopped here --
 		// the only write context pNUMAState allows. Clears all homes
-		// when placement is inactive (v4 placement design §3).
+		// when placement is inactive.
 		numaAssignPHomes(nprocs)
 	}
 
@@ -6722,8 +6723,8 @@ func sysmon() {
 		// most of their time sleeping.
 		now := nanotime()
 		if goexperiment.Numa {
-			// v4 Task A5 wake-signal window evaluation (calibration
-			// phase: GODEBUG=numa=2 diagnostics only; see numa_wake.go).
+			// Wake-rate window evaluation for the adaptive
+			// enforcement stand-down (see numa_wake.go).
 			numaWakeSysmonTick(now)
 		}
 		if debug.schedtrace <= 0 && (sched.gcwaiting.Load() || sched.npidle.Load() == gomaxprocs) {

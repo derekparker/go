@@ -404,8 +404,8 @@ var (
 	heapRandSeedBitsRemaining int
 )
 
-// numaHeapStreamsEnabled is the single source of truth (review C1/C2)
-// for whether per-node heap arena streams (design §12.3) are usable at
+// numaHeapStreamsEnabled is the single source of truth for whether
+// per-node heap arena streams are usable at
 // all on this build/process: computed once in mallocinit, alongside
 // (and from the same inputs as) the address-layout switch that decides
 // hint placement, then read by numaGrowNode at grow time.
@@ -628,13 +628,13 @@ func mallocinit() {
 		}
 
 		// One source of truth for whether per-node heap arena streams
-		// are usable (review C1/C2): computed here, from the exact same
+		// are usable: computed here, from the exact same
 		// inputs (raceenabled, vmaSize) the hint-placement switch below
 		// uses, and read later by numaGrowNode at grow time. See
 		// numaHeapStreamsEnabled's doc comment for why a mismatch
 		// between this and the hint loop is fatal, not just suboptimal.
 		//
-		// Final review F5: this depends only on goexperiment.Numa (a
+		// Note this depends only on goexperiment.Numa (a
 		// compile-time constant), raceenabled, and vmaSize -- NOT on
 		// numaTopology.NumNodes. So an experiment-on single-node host
 		// still gets numaHeapStreamsEnabled == true here and the hint
@@ -700,17 +700,17 @@ func mallocinit() {
 				continue
 			}
 			// Heap hint: distribute the (!raceenabled) 0..0x3f range
-			// across per-node arena streams (design §12.3), so growth
+			// across per-node arena streams, so growth
 			// for different nodes lands in disjoint, >=1TiB-apart
 			// address windows (h.arenaHints/h.curArena are indexed by
 			// node -- see mheap.grow). numaHeapStreamsEnabled is false
-			// (I5's tight-VA fallback) for race mode and riscv64's
+			// (the tight-VA fallback) for race mode and riscv64's
 			// 39-bit VMA layout -- both already have far less address
 			// space to work with than the default 1<<40-per-hint layout
 			// assumes, and partitioning it further across streams would
 			// only fragment it -- keeping every heap hint on the single
 			// shared stream 0 instead. This also covers the
-			// experiment-off and numaMaxHeapNodes==1 collapse (I5):
+			// experiment-off, numaMaxHeapNodes==1 collapse:
 			// node is always the literal constant 0 there, so
 			// mheap_.arenaHints[node] indexes the same single slot this
 			// field was before per-node streams existed.
@@ -724,24 +724,23 @@ func mallocinit() {
 		}
 
 		if goexperiment.Numa && numaHeapStreamsEnabled {
-			// v4 stage 4: derive each stream's address window from the
+			// Derive each stream's address window from the
 			// hint addresses just generated (never from an assumed
 			// layout -- randomizeHeapBase is baseline-ON, its spacing
 			// differs, and its random prefix wraps mod 256), and
 			// reorder any wrap-trimmed stream's hint chain so the
 			// in-window hints are consumed first. See
-			// numaInitStreamWindows (mpagealloc_numa.go) and
-			// numa-design/v4-pagealloc-design.md.
+			// numaInitStreamWindows (mpagealloc_numa.go).
 			numaInitStreamWindows()
 		}
 	} else {
-		// 32-bit: tight VA, the ultimate I5 tight-VA-fallback case.
+		// 32-bit: tight VA, the ultimate tight-VA-fallback case.
 		// numaHeapStreamsEnabled is already false here (its zero
 		// value, since mallocinit runs before anything could set it
 		// true) -- this assignment is redundant in effect, and exists
 		// only to make that a stated fact about this branch rather
 		// than an unstated dependency on initialization order surviving
-		// future edits (review NEW-4). Single fixed reservation below,
+		// future edits. Single fixed reservation below,
 		// no hint chain to partition across nodes at all; heap growth
 		// here always uses stream 0 (see mheap.grow).
 		numaHeapStreamsEnabled = false
@@ -808,7 +807,7 @@ func mallocinit() {
 				break
 			}
 		}
-		// 32-bit: tight VA (I5's tight-VA fallback), single shared
+		// 32-bit: tight VA (the tight-VA fallback), single shared
 		// stream -- node 0 always, same as the experiment-off collapse.
 		hint := (*arenaHint)(mheap_.arenaHintAlloc.alloc())
 		hint.addr = p
@@ -842,9 +841,9 @@ func mallocinit() {
 // arenaList is the list the arena should be added to.
 //
 // heap reports whether hintList is one of the regular heap's per-node
-// arena hint streams (h.arenaHints[node], design §12.3) as opposed to a
+// arena hint streams (h.arenaHints[node]) as opposed to a
 // user arena hint chain (h.userArena.arenaHints). This replaces the old
-// hintList == &h.arenaHints pointer-identity check (I6): once arenaHints
+// hintList == &h.arenaHints pointer-identity check: once arenaHints
 // became a per-node array, &h.arenaHints[node] is never equal to
 // &h.arenaHints in the old shape's sense for any node, so the caller now
 // states which case it is directly. heap enables the 32-bit-only h.arena
@@ -861,7 +860,7 @@ func mallocinit() {
 // case, which already reused the heap's own hint chain before arenaHints
 // was ever an array).
 //
-// With the experiment off, numaMaxHeapNodes == 1 (I5) and idx below is
+// With the experiment off, numaMaxHeapNodes == 1 and idx below is
 // always the literal constant 0 (node itself is never read), matching
 // this function's shape before node existed.
 //

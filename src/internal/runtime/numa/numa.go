@@ -5,10 +5,9 @@
 // Package numa discovers the NUMA topology of the machine the process is
 // running on: the set of memory nodes and which node each CPU belongs to.
 //
-// This package is Layer 0 of the NUMA support plan: it only discovers
-// topology. It does not change allocator or scheduler behavior, and it is
-// safe to import and call unconditionally; callers gate use of the result
-// on GOEXPERIMENT=numa.
+// This package only discovers topology. It does not change allocator or
+// scheduler behavior, and it is safe to import and call unconditionally;
+// callers gate use of the result on GOEXPERIMENT=numa.
 package numa
 
 const (
@@ -40,11 +39,11 @@ type Topology struct {
 	// NumAllowedNodes is the number of nodes this process may allocate
 	// memory from; Nodes[0:NumAllowedNodes] are the allowed nodes.
 	//
-	// At Layer 0, every online node is allowed, including nodes with
+	// In this package, every online node is allowed, including nodes with
 	// memory but no CPUs (e.g. CXL/HBM): excluding CPU-less nodes here
 	// would silently shrink the usable-memory mask.
 	//
-	// Final review F5: this field itself is never narrowed below
+	// This field itself is never narrowed below
 	// NumNodes -- ReadTopology always sets both to the same value (see
 	// below), and nothing later mutates NumAllowedNodes either, so
 	// NumAllowedNodes == NumNodes holds by construction for the whole

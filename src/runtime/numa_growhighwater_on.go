@@ -9,21 +9,21 @@ package runtime
 import "internal/runtime/atomic"
 
 // numaGrowHighWaterNode is the highest per-node heap arena stream
-// index mheap.grow has ever touched (review I3). Updated via
+// index mheap.grow has ever touched. Updated via
 // numaGrowHighWaterNodeUpdate, from within mheap.grow itself, using
 // the same monotonic-max CAS-retry pattern sweepClass.update
 // (mgcsweep.go) already establishes for a process-global "highest
 // index touched so far" counter.
 //
-// Deliberately NO init() here (re-review NEW-1): an earlier version
+// Deliberately NO init() here: an earlier version
 // called numaGrowHighWaterNode.Store(-1) from a package init() to mark
 // "nothing touched yet" as a sentinel distinct from "node 0 touched".
 // That init() runs from runtime.main, via doInit -- LONG after
 // schedinit/mallocinit/procresize have already grown the heap and
 // therefore already advanced this counter via real mheap.grow calls.
 // The Store(-1) silently clobbered that already-accumulated mark. On
-// real 2-node hardware this produced exactly the failure mode I3 was
-// supposed to prevent: an early node-1 grow correctly advanced the
+// real 2-node hardware this produced exactly the failure mode the
+// bound exists to prevent: an early node-1 grow correctly advanced the
 // mark to 1, a later node-0 grow (after init() clobbered it back to
 // -1) left it at 0, and code bounding a search by this value would
 // skip node 1's now-populated sets entirely -- reproduced as
@@ -45,7 +45,7 @@ import "internal/runtime/atomic"
 // This is a pure optimization hint, never a correctness bound in its
 // own right: c.partial/full[*][node] for any node > the high-water
 // mark is always empty by construction, since a span can only land in
-// node N's set if its home arena was grown for node N (design §12.3),
+// node N's set if its home arena was grown for node N,
 // and mheap.grow is the only place that ever grows a given stream.
 // cacheSpan's remote-fallback loop uses numaGrowLoopBound to skip
 // streams that have therefore never been touched, rather than always
@@ -55,7 +55,7 @@ import "internal/runtime/atomic"
 // (mgcsweep.go) for why staying full-range there is a conservative
 // choice, not a soundness requirement, now that this clobber is fixed.
 //
-// Build-tagged (I5), like numaMaxHeapNodes itself: an off-build
+// Build-tagged, like numaMaxHeapNodes itself: an off-build
 // package-level var would add BSS/data to every Go binary regardless
 // of the experiment, even though every call site is already
 // goexperiment.Numa-guarded -- the guard alone doesn't remove the
@@ -69,7 +69,7 @@ var numaGrowHighWaterNode atomic.Int32
 // atomic type and the CAS-retry rather than a plain compare-then-store.
 //
 // Ordering this update runs BEFORE mheap.grow's own sysAlloc call is
-// what makes numaGrowLoopBound's bound sound (re-review NEW-1): a span
+// what makes numaGrowLoopBound's bound sound: a span
 // can only ever land in node N's spanSets if some heapArena was tagged
 // node N via numaArenaSetNode, which only happens from within
 // mheap.grow's sysAlloc call for stream N -- so by the time any such
@@ -87,7 +87,7 @@ func numaGrowHighWaterNodeUpdate(idx int32) {
 }
 
 // numaGrowLoopBound returns the inclusive upper bound cacheSpan's
-// remote-fallback loop should use for node indices (review I3):
+// remote-fallback loop should use for node indices:
 // numaGrowHighWaterNode's current value, which starts at 0 (no init()
 // needed -- see that variable's doc comment) and only ever increases.
 // See numa_growhighwater_off.go for the off-build value (always 0).

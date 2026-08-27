@@ -100,7 +100,7 @@ func futexwakeup(addr *uint32, cnt uint32) {
 }
 
 func getCPUCount() int32 {
-	// Node-mask soft affinity (design §12.4) can have the calling M's
+	// Node-mask soft affinity can have the calling M's
 	// kernel CPU affinity transiently narrowed to a single NUMA node's
 	// CPUs as a scheduling hint (numaNoteSchedule/numaApplySoftAffinity)
 	// -- indistinguishable, from sched_getaffinity's point of view, from
@@ -109,8 +109,8 @@ func getCPUCount() int32 {
 	// whenever this function happens to run on a soft-narrowed M, most
 	// notably via runtime.SetDefaultGOMAXPROCS's explicit
 	// customGOMAXPROCS=false recompute -- the same class of feedback
-	// loop locked decision 6 (numa-design/2026-08-20-numa-v3-locality-plan.md)
-	// already closed off for fill-one-socket confinement's own narrowed
+	// loop already closed
+	// off for fill-one-socket confinement's own narrowed
 	// mask, by only ever engaging confinement under sched.customGOMAXPROCS
 	// (which is never auto-updated). Soft affinity has no such guard --
 	// it narrows regardless of customGOMAXPROCS -- so this function needs
@@ -208,7 +208,7 @@ func newosproc(mp *m) {
 		print("newosproc stk=", stk, " m=", mp, " g=", mp.g0, " clone=", abi.FuncPCABI0(clone), " id=", mp.id, " ostk=", &mp, "\n")
 	}
 
-	// Node-mask soft affinity (design §12.4, task 10 review C1/NEW-1):
+	// Node-mask soft affinity:
 	// the widen-before-clone call that used to live here has moved up to
 	// newm1 (proc.go), its only caller -- newm1 also has a cgo path
 	// (asmcgocall(_cgo_thread_start, ...), which creates the OS thread

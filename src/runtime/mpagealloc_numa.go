@@ -2,18 +2,19 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-// NUMA-windowed page allocation (GOEXPERIMENT=numa, v4 stage 4; design:
-// numa-design/v4-pagealloc-design.md).
+// NUMA-windowed page allocation (GOEXPERIMENT=numa): constrain page
+// allocation to the address window of a NUMA node's heap arena stream,
+// so pages for a node come from memory homed to that node.
 //
 // This file has no build tag: every entry point is referenced only from
 // call sites behind the compile-time goexperiment.Numa constant (plus
-// the test harness, which is excluded from the census baseline), so the
+// the test harness), so the
 // linker's dead-code elimination strips all of it from an experiment-off
-// binary -- the off census must show zero function diffs, which is the
-// reason findFrom below DUPLICATES pageAlloc.find instead of find being
-// refactored into a wrapper: find, alloc, and allocToCache must stay
-// byte-identical (design review M5). findFrom's behavioral equivalence
-// with find is locked by a harness test, not by inspection.
+// binary -- an experiment-off binary must contain no NUMA code, which is
+// the reason findFrom below DUPLICATES pageAlloc.find instead of find
+// being refactored into a wrapper: find, alloc, and allocToCache must
+// stay byte-identical to stock. findFrom's behavioral equivalence
+// with find is locked by a test, not by inspection.
 
 package runtime
 
@@ -36,7 +37,7 @@ func (p *pageAlloc) numaWindowSpan(node int32) (lo, hi offAddr, ok bool) {
 
 // numaWindowOf returns the node whose stream window contains addr, or
 // -1. At most numaMaxHeapNodes compares; used by the free/grow
-// searchAddr-lowering hooks (design §4), whose callers gate on
+// searchAddr-lowering hooks, whose callers gate on
 // numaHeapHomingActive so experiment-on single-node hosts never pay it.
 func (p *pageAlloc) numaWindowOf(addr uintptr) int32 {
 	a := offAddr{addr}
@@ -65,15 +66,14 @@ func (p *pageAlloc) numaWindowLower(base uintptr) {
 }
 
 // numaUpdateSearchAddr applies the miss/hit searchAddr rule for window
-// n given findFrom's candidate (design §3, review NEW-2): a failed
+// n given findFrom's candidate: a failed
 // search for npages proves only that no free run of >= npages exists --
 // NOT that the window is empty -- so the exhausted sentinel is set only
 // when the candidate itself proves nothing free remains below windowHi
 // (candidate >= hi, or addr == 0 in the caller, where findFrom returned
 // maxSearchAddr()). Otherwise the searchAddr rises to the candidate,
 // which is a valid searchAddr by findFrom's contract and prunes the
-// next windowed search. Never touches the global p.searchAddr (review
-// NEW-3).
+// next windowed search. Never touches the global p.searchAddr.
 func (p *pageAlloc) numaUpdateSearchAddr(node int32, candidate, hi offAddr) {
 	if !candidate.lessThan(hi) {
 		p.numaSearchAddr[node] = maxSearchAddr()
@@ -86,16 +86,16 @@ func (p *pageAlloc) numaUpdateSearchAddr(node int32, candidate, hi offAddr) {
 
 // allocNode is pageAlloc.alloc constrained to node's stream window: it
 // allocates npages only from [windowLo, windowHi), performing at most
-// ONE windowed search per call (design P10). On any miss -- invalid or
+// ONE windowed search per call, a hard cost bound. On any miss -- invalid or
 // latched or unarmed window, or no in-window run of npages -- it
 // returns ok == false WITHOUT allocating, and the caller falls back
-// (homed grow, then unrestricted alloc; mheap.allocSpan, design §6).
+// (homed grow, then unrestricted alloc; see mheap.allocSpan).
 //
 // The global p.searchAddr is never written here, in either direction:
 // windowed searches start at or above it and prove nothing about lower
 // addresses (never raise), and a windowed miss proves nothing globally
 // (never poison -- stock alloc's npages==1 poisoning must not be
-// mirrored; review NEW-3).
+// mirrored).
 //
 // p.mheapLock must be held.
 //
@@ -168,7 +168,8 @@ func (p *pageAlloc) allocNode(npages uintptr, node int32) (addr, scav uintptr, o
 		if (offAddr{addr + npages*pageSize - 1}).lessThan(hi) == false {
 			// Found, but out-of-window: miss, nothing allocated. This
 			// candidate IS a real firstFree report ("no free memory in
-			// [from, candidate)"), so the NEW-2 rule applies: raise to
+			// [from, candidate)"), so numaUpdateSearchAddr's rule
+			// applies: raise to
 			// it, or set the sentinel when it lies past the window.
 			p.numaUpdateSearchAddr(node, candidate, hi)
 			return 0, 0, false
@@ -186,7 +187,7 @@ Found:
 // means "fall back to the plain allocToCache" and nothing was
 // allocated. The global p.searchAddr is never written (in particular,
 // allocToCache's find-failure poisoning at its slow path must not be
-// mirrored -- review NEW-3).
+// mirrored).
 //
 // p.mheapLock must be held.
 //
@@ -256,7 +257,7 @@ func (p *pageAlloc) allocToCacheNode(node int32) pageCache {
 // findFrom is pageAlloc.find with the search's pruning start taken from
 // the explicit `from` parameter instead of p.searchAddr. It is a
 // DELIBERATE near-duplicate of find (see this file's header comment):
-// find must stay byte-identical for the experiment-off census, so it is
+// find must stay byte-identical to stock in off builds, so it is
 // not refactored into a wrapper over this. Any change to find must be
 // mirrored here; the harness equivalence test (findFrom(n, p.searchAddr)
 // == find(n) over the find test cases) enforces the pairing.
@@ -373,8 +374,8 @@ nextLevel:
 
 // numaLongestHintRun finds, over a stream's hint addresses in chain
 // (ascending-i) order, the longest run of consecutive addresses with a
-// constant positive spacing -- the stream's contiguous address window
-// (design C1). The spacing is inferred as the most common positive
+// constant positive spacing -- the stream's contiguous address
+// window. The spacing is inferred as the most common positive
 // delta (ties to the smaller), which is layout-independent: every hint
 // layout uses a constant per-i spacing, broken at most once per stream
 // by the randomized-prefix mod-256 wrap, whose delta is a one-off.
@@ -427,7 +428,7 @@ func numaLongestHintRun(addrs []uintptr) (start, n int, spacing uintptr) {
 // numaInitStreamWindows computes every stream's address window from the
 // hint chains mallocinit just built, arms the windowed searchAddrs at
 // the unarmed sentinel, and -- when a stream's hints are NOT one
-// contiguous run (the randomized-prefix wrap, design review NEW-1) --
+// contiguous run (the randomized-prefix wrap) --
 // reorders that stream's hint chain so the in-window run's hints come
 // FIRST: growth consumes hints in chain order, so without the reorder
 // the node's very first grow could use an out-of-window hint and fire
@@ -438,7 +439,7 @@ func numaLongestHintRun(addrs []uintptr) (start, n int, spacing uintptr) {
 // Called once from mallocinit, single-threaded, only when
 // numaHeapStreamsEnabled (behind the compile-time goexperiment.Numa
 // guard at the call site -- this function must not exist in the off
-// binary's census).
+// binary at all).
 func numaInitStreamWindows() {
 	for node := int32(0); node < numaMaxHeapNodes; node++ {
 		// Sized to mallocinit's exact partition: the 0x40 heap hints
@@ -508,8 +509,8 @@ func numaInitStreamWindows() {
 // grow/free lowering happened to land ABOVE them, the windowed
 // searchAddr would be stale-high from birth -- free memory below it,
 // violating the invariant findFrom inherits from find and throwing
-// "bad summary data" on the next windowed search (hit on numa-dell:
-// soft-affinity testprogs crashed within 0.3s of startup).
+// "bad summary data" on the next windowed search (observed on a 2-node
+// machine: test programs crashed within 0.3s of startup).
 //
 // Called once from numaSchedinit while m0 is the only runtime thread;
 // reads p.inUse (sorted ascending) without the heap lock under that

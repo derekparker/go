@@ -38,5 +38,6 @@ func (s *pNUMAState) setHome(node int8) { s.homeNode = node + 1 }
 
 // clearHome resets this P to "no home assigned" -- numaAssignPHomes's
 // placement-inactive branch, so a stale assignment can never outlive
-// the predicate that authorized it (the pairing rule, design §2).
+// the predicate that authorized it (assignment may only be consumed
+// while numaPlacementActive holds).
 func (s *pNUMAState) clearHome() { s.homeNode = 0 }

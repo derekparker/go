@@ -459,14 +459,12 @@ func initMetrics() {
 					in.sysStats.gcMiscSys + in.sysStats.otherSys
 			},
 		},
-		// M1 controller ruling: named /numa/span-refills/{local,remote}:spans
+		// Named /numa/span-refills/{local,remote}:spans
 		// -- dimension (local vs. remote) in the path, unit (spans) in
-		// the unit slot -- rather than the plan text's
-		// /numa/span-refills:{local,remote}, which put the dimension
-		// in the unit slot. Metric names freeze once shipped, so this
-		// upstream-correct shape is used from the start; the
-		// deviation from the plan text is recorded here and in the
-		// task 9 report.
+		// the unit slot -- rather than
+		// /numa/span-refills:{local,remote}, which would put the dimension
+		// in the unit slot. Metric names freeze once shipped, so the
+		// correct shape is used from the start.
 		"/numa/span-refills/local:spans": {
 			compute: func(_ *statAggregate, out *metricValue) {
 				out.kind = metricKindUint64

@@ -14,7 +14,7 @@ package runtime
 // numaBindArena's own precedent in stubs_nonlinux.go).
 func numaGrowHighWaterNodeUpdate(idx int32) {}
 
-// numaGrowLoopBound is always 0 off-build (I5): numaMaxHeapNodes == 1
+// numaGrowLoopBound is always 0 off-build: numaMaxHeapNodes == 1
 // there, so there is exactly one stream/node index (0), and no
 // high-water-mark tracking is needed or exists.
 func numaGrowLoopBound() int32 { return 0 }

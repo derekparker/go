@@ -16,7 +16,7 @@ import (
 // only where it is true; elsewhere numaShouldConfine already fails via
 // numaGetCPUNode, and this constant keeps the stand-down path honest.
 //
-// True on every linux GOARCH (final review F3): SYS_SCHED_SETAFFINITY is
+// True on every linux GOARCH: SYS_SCHED_SETAFFINITY is
 // defined for all 13 linux GOARCHes in internal/runtime/syscall/linux's
 // per-arch defs_linux_*.go files, verified against each arch's
 // src/syscall/zsysnum_linux_*.go. Originally amd64/arm64-only while the

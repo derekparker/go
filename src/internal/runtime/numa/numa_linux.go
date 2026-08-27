@@ -18,10 +18,10 @@ const nodeDir = "/sys/devices/system/node/"
 // it is not retained after ReadTopology returns. ReadTopology performs no
 // heap allocation.
 //
-// Layer 0 policy: every online node is allowed, including nodes with
-// memory but no CPUs (e.g. CXL/HBM). Narrowing this to the process's actual
-// memory policy is deferred to a later layer, which will use
-// get_mempolicy(MPOL_F_MEMS_ALLOWED) instead of parsing cpusets.
+// Every online node is allowed here, including nodes with memory but no
+// CPUs (e.g. CXL/HBM). Narrowing to the process's actual memory policy
+// happens in the runtime package instead (numaSetProcessBindAll), which
+// uses get_mempolicy(MPOL_F_MEMS_ALLOWED) rather than parsing cpusets.
 //
 // ReadTopology does not populate t.Distance: nothing consumes inter-node
 // distance yet. Use ParseDistance directly on a nodeN/distance file if a
@@ -82,7 +82,7 @@ func ReadTopology(t *Topology, scratch []byte) error {
 	}
 
 	t.NumNodes = int32(numNodes)
-	// Layer 0: every online node is allowed.
+	// Every online node is allowed; see the doc comment above.
 	t.NumAllowedNodes = int32(numNodes)
 
 	return nil

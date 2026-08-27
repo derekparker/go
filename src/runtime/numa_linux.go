@@ -12,13 +12,13 @@ import (
 	"unsafe"
 )
 
-// Layer 1 mempolicy constants. See numaSetProcessBindAll and numaBindArena.
+// Mempolicy constants. See numaSetProcessBindAll and numaBindArena.
 //
 // The allowed-nodes narrowing lives entirely here, in
 // numaSetProcessBindAll, not in numaTopology/internal/runtime/numa: that
 // package's Topology.NumAllowedNodes is never narrowed below NumNodes --
-// the two are equal by construction for any Topology it produces (final
-// review F5; see Topology.NumAllowedNodes's own doc comment). Instead,
+// the two are equal by construction for any Topology it produces
+// (see Topology.NumAllowedNodes's own doc comment). Instead,
 // numaSetProcessBindAll reads the process's real memory policy via
 // get_mempolicy(MPOL_F_MEMS_ALLOWED) directly and publishes the result
 // as numaAllowedNodemask, a value entirely separate from numaTopology.
@@ -89,7 +89,7 @@ func numaNodemaskPopcount(m *numaNodemask) int {
 // set_mempolicy in numaSetProcessBindAll always covers the full 64-id
 // range via the (up to) 2-word numaNodemask buffer, but this single-word
 // atomic cannot. A 32-bit host with more than 32 NUMA nodes is not a
-// configuration Layer 1 targets; such a host still gets correct
+// configuration the BIND-all policy targets; such a host still gets correct
 // task-policy behavior, just without the (redundant, in that case) arena
 // VMA policy for node ids >= 32.
 //
@@ -108,9 +108,7 @@ var numaAllowedNodemask atomic.Uintptr
 // numaTopology.NumNodes == 0 correctly represents as "unknown" rather than
 // silently claiming a single node.
 //
-// Layer 0: read-only after schedinit. Final review F4: stale comment
-// corrected -- this was true only through the earliest Layer-0-only
-// milestone; numaTopology is now the source topology reference for
+// Read-only after schedinit. numaTopology is the source topology reference for
 // fill-one-socket confinement (numaShouldConfine/numaConfine), node-mask
 // soft affinity (numaNoteSchedule), per-node heap arena stream homing
 // (numaGrowNode/numaHeapHomingActive), and Topology.NumAllowedNodes
@@ -139,8 +137,8 @@ func numaSchedinit() {
 	numaSetProcessBindAll()
 	numaDetectStartupAffinity()
 	if numaHeapStreamsEnabled && numaHeapHomingActive() {
-		// Arm the windowed searchAddrs and their maintenance hooks (v4
-		// stage 4; see pageAlloc.numaArmWindows for why each window's
+		// Arm the windowed searchAddrs and their maintenance hooks
+		// (see pageAlloc.numaArmWindows for why each window's
 		// searchAddr must be seeded from the CURRENT inUse set rather
 		// than left for the first post-arm lowering -- pre-arm heap
 		// growth already holds free pages). This is the earliest point
@@ -161,8 +159,8 @@ func numaSchedinit() {
 // NumAllowedNodes are set to 1, and every CPU maps to node 0 (NodeOfCPU
 // returns 0), matching Topology's zero-value CPUToNode entries and the
 // !linux stub's policy in internal/runtime/numa. This is a conservative
-// fallback: layers built on top of Layer 0 must treat "1 node" as "no
-// NUMA-aware behavior available", never crash.
+// fallback: everything built on top of topology discovery must treat
+// "1 node" as "no NUMA-aware behavior available", never crash.
 func numaInitTopology() {
 	if err := numa.ReadTopology(&numaTopology, numaScratch[:]); err != nil {
 		if debug.numa > 0 {
@@ -199,8 +197,8 @@ func numaCurrentNode() int32 {
 // from, and publishes the resulting mask in numaAllowedNodemask for
 // numaBindArena to consume.
 //
-// It is called once from numaSchedinit, after numaInitTopology. Layer 1
-// only: BIND-all, never MPOL_PREFERRED, and no STW toggle.
+// It is called once from numaSchedinit, after numaInitTopology.
+// BIND-all only, never MPOL_PREFERRED, and no STW toggle.
 //
 // Global constraint: on a single-node host (or when topology discovery
 // only ever found one node), runtime behavior must be identical to stock
@@ -240,8 +238,7 @@ func numaCurrentNode() int32 {
 // moments, not a live view. A container that repartitions its cpuset
 // mid-run is not observed until the next stand-down trigger (or process
 // restart); see numaBindArena's doc comment for why re-checking more
-// often is not worth it, and bind-all-policy.md's "Dynamic cpuset
-// staleness" section for the full accepted-staleness model.
+// often is not worth it. This staleness is accepted by design.
 func numaSetProcessBindAll() {
 	if numaTopology.NumNodes < 2 {
 		return
@@ -313,13 +310,13 @@ var (
 	numaSavedAffinityLen int32
 )
 
-// numaConfineIfSmall applies fill-one-socket-first confinement (design
-// §12.2) when the decision conditions hold. Called from schedinit after
-// procresize, before any other runtime thread exists. Layer 1
-// (numaSetProcessBindAll) has ALREADY run by this point and stays in
+// numaConfineIfSmall applies fill-one-socket-first
+// confinement when the decision conditions hold. Called from schedinit after
+// procresize, before any other runtime thread exists. The BIND-all task
+// policy (numaSetProcessBindAll) has ALREADY run by this point and stays in
 // force: confinement only narrows CPU affinity and replaces the task
 // mempolicy; numaAllowedNodemask remains published and numaBindArena
-// keeps stamping heap chunks with uniform BIND-all (locked decision 5).
+// keeps stamping heap chunks with uniform BIND-all.
 // Experiment off: caller never invokes it (goexperiment.Numa-guarded
 // call site).
 func numaConfineIfSmall(procs int32) {
@@ -333,8 +330,8 @@ func numaConfineIfSmall(procs int32) {
 // numaOnlineCPUCount returns the total number of CPUs numaTopology found
 // across every discovered node. Shared by numaShouldConfine (compared
 // against the startup affinity mask's popcount to detect a narrowed
-// mask, locked decision 6's "operator placement wins" check) and
-// numaDetectStartupAffinity (Task 10's independent, unconditional
+// mask, the "operator placement wins" check) and
+// numaDetectStartupAffinity (an independent, unconditional
 // version of the same check, for node-mask soft affinity).
 func numaOnlineCPUCount() int32 {
 	online := int32(0)
@@ -379,8 +376,7 @@ func numaAffinityPopcount(mask []byte) int32 {
 // only call site (numaSchedinit), so with the experiment off this array
 // is simply never populated (still statically allocated, same as
 // numaScratch above, which accepts the same kind of always-present-but-
-// only-used-on cost). Comparable in kind to Task 8's disclosed per-node
-// array costs.
+// only-used-on cost).
 var numaNodeCPUMaskCache [64][numaCPUMaskBytes]byte
 var numaNodeCPUMaskCachedPopcount [64]int32
 
@@ -388,8 +384,8 @@ var numaNodeCPUMaskCachedPopcount [64]int32
 // node numaTopology discovered. Called once from numaSchedinit, after
 // numaInitTopology. A single 8192-CPU scan per discovered node (not per
 // getcpu-triggered node change) -- this is what turns the per-node mask
-// from an 8192-iteration scan on every soft-affinity node change (the
-// review's M3 finding) into an O(1) cache lookup.
+// from an 8192-iteration scan on every soft-affinity node change
+// into an O(1) cache lookup.
 func numaBuildNodeCPUMaskCache() {
 	for i := int32(0); i < numaTopology.NumNodes; i++ {
 		id := numaTopology.Nodes[i].ID
@@ -412,7 +408,7 @@ func numaBuildNodeCPUMaskCache() {
 // CPU was found (a topology with no CPUs for this node -- e.g. a
 // CPU-less memory-only node -- cannot be narrowed to). Shared by
 // numaConfine (process-wide fill-one-socket confinement, once, from
-// schedinit) and numaNoteSchedule (per-M soft affinity, design §12.4).
+// schedinit) and numaNoteSchedule (per-M soft affinity).
 func numaNodeAffinityMask(node int32, mask *[numaCPUMaskBytes]byte) bool {
 	if node < 0 || node >= 64 || numaNodeCPUMaskCachedPopcount[node] == 0 {
 		return false
@@ -421,10 +417,10 @@ func numaNodeAffinityMask(node int32, mask *[numaCPUMaskBytes]byte) bool {
 	return true
 }
 
-// numaShouldConfine reports whether fill-one-socket-first should engage
-// (design §12.2): multi-node machine, representable topology, Layer 1
+// numaShouldConfine reports whether fill-one-socket-first should
+// engage: multi-node machine, representable topology, the BIND-all policy
 // actually engaged (published nodemask), an EXPLICITLY chosen GOMAXPROCS
-// (locked decision 6 — without sched.customGOMAXPROCS, sysmon's ~1/sec
+// (without sched.customGOMAXPROCS, sysmon's ~1/sec
 // defaultGOMAXPROCS recompute reads the narrowed mask and freezes procs
 // at the node size, a real feedback loop), no pre-existing narrowed CPU
 // affinity (operator placement always wins), a usable getcpu, and
@@ -436,14 +432,12 @@ func numaNodeAffinityMask(node int32, mask *[numaCPUMaskBytes]byte) bool {
 // are startup snapshots (see numaSetProcessBindAll's doc comment): a
 // cpuset narrowed after this point is not detected here or anywhere else
 // until a stand-down trigger re-reads it (numaStandDownWiden). Accepted,
-// documented staleness -- see bind-all-policy.md's "Dynamic cpuset
-// staleness" section.
+// documented staleness (see numaSetProcessBindAll's doc comment).
 func numaShouldConfine(procs int32) (int32, bool) {
-	// Final review F5: these first three conditions used to bail out
-	// silently (a single bundled `if`, no numaConfineDeclined call) --
-	// the only decline paths in this function that did not print under
-	// GODEBUG=numa=1, contrary to this function's own doc comment above.
-	// Split out and reported individually so a diagnostic run can tell
+	// The first three conditions are split out and reported
+	// individually (rather than one bundled `if`) so every decline path
+	// in this function prints under GODEBUG=numa=1, as this function's
+	// doc comment promises, and a diagnostic run can tell
 	// "not multi-node" apart from "topology discovery gave up partway"
 	// apart from "this arch has no sched_setaffinity".
 	if numaTopology.NumNodes < 2 {
@@ -459,8 +453,9 @@ func numaShouldConfine(procs int32) (int32, bool) {
 		return 0, false
 	}
 	if numaAllowedNodemask.Load() == 0 {
-		// Layer 1 declined or failed; do not build confinement on top.
-		numaConfineDeclined("layer1 inactive")
+		// The BIND-all policy declined or failed; do not build
+		// confinement on top.
+		numaConfineDeclined("bind-all mempolicy inactive")
 		return 0, false
 	}
 	// Read without sched.lock: numaShouldConfine runs from schedinit, before
@@ -471,7 +466,7 @@ func numaShouldConfine(procs int32) (int32, bool) {
 	// takes sched.lock because they run concurrently with other Ms.
 	if !sched.customGOMAXPROCS {
 		// Default GOMAXPROCS auto-updates from the affinity mask we are
-		// about to narrow (locked decision 6): only confine a process
+		// about to narrow: only confine a process
 		// whose P count was chosen explicitly.
 		numaConfineDeclined("GOMAXPROCS not explicitly set")
 		return 0, false
@@ -490,8 +485,8 @@ func numaShouldConfine(procs int32) (int32, bool) {
 		numaConfineDeclined("affinity narrower than online CPUs")
 		return 0, false
 	}
-	node := numaCurrentNode() // boot CPU's node (locked decision 2)
-	// Final review F5: node < 0 (the getcpu syscall itself failed) and
+	node := numaCurrentNode() // confine to the boot CPU's node
+	// node < 0 (the getcpu syscall itself failed) and
 	// node >= 64 (getcpu succeeded but returned an id past what the
 	// 64-node nodemask/cache arrays this package uses can represent) are
 	// different failure modes -- report them separately so a diagnostic
@@ -534,16 +529,14 @@ func numaNodeCPUCount(node int32) int32 {
 }
 
 // numaConfine confines the process to node: CPU affinity to that node's
-// CPUs plus a task MPOL_PREFERRED policy for its memory (locked
-// decision 1: PREFERRED, never single-node BIND — the OOM footgun).
+// CPUs plus a task MPOL_PREFERRED policy for its memory
+// (PREFERRED, never single-node BIND — the OOM footgun).
 // The PREFERRED set_mempolicy REPLACES the Layer-1 BIND-all task policy
 // for this thread and, by clone inheritance, every later M. Runs while
 // m0 is the only runtime thread.
 //
-// Heap-VMA exemption does not depend on this task policy (final review
-// F4: corrected -- an earlier version of this comment said every chunk
-// keeps uniform BIND-all unconditionally, which stopped being true once
-// per-node heap arena stream homing landed, task 8): numaAllowedNodemask
+// Heap-VMA exemption does not depend on this task
+// policy: numaAllowedNodemask
 // stays published either way, so mheap.grow's chunks keep getting an
 // explicit VMA policy regardless of confinement, but which policy
 // depends on numaHeapHomingActive (numa_linux.go) — with homing active
@@ -552,8 +545,8 @@ func numaNodeCPUCount(node int32) int32 {
 // (single-node, streams disabled, or topology not yet discovered),
 // numaBindArena's uniform BIND-all applies exactly as originally
 // described. Either way, the VMA-own policy is what holds against
-// threads the task policy never reached (pre-runtime cgo threads;
-// locked decision 1), and both a uniform BIND-all mask and per-node
+// threads the task policy never reached (pre-runtime cgo
+// threads), and both a uniform BIND-all mask and per-node
 // PREFERRED masks confined to mheap.grow's own disjoint per-node address
 // partitioning VMA-merge cleanly, so neither case sees a Layer-2-style
 // map blowup.
@@ -589,7 +582,7 @@ func numaConfine(node int32) bool {
 // should stand down: either (a) the new GOMAXPROCS exceeds the confined
 // node's CPU count, or (b) customGOMAXPROCS is false, i.e. the process
 // just transitioned (or returned) to default-GOMAXPROCS mode while
-// confined (locked decisions 3-4, plus the SetDefaultGOMAXPROCS fix
+// confined (see the SetDefaultGOMAXPROCS discussion
 // below). Called from startTheWorldWithSema immediately after
 // sched.lock is released, with procs and customGOMAXPROCS both captured
 // under that same sched.lock critical section as the procs computation
@@ -605,15 +598,15 @@ func numaConfine(node int32) bool {
 // mask forever -- the process would stay confined and never stand down.
 // Standing down unconditionally on any customGOMAXPROCS==false transition
 // closes that loop: it is exactly the signal that GOMAXPROCS control just
-// left "the operator explicitly chose a value" (locked decision 6, the
+// left "the operator explicitly chose a value" (the
 // same precondition numaShouldConfine required to confine in the first
 // place) and returned to automatic mode, where confinement's premise no
 // longer holds regardless of what the recomputed value happens to be.
 //
 // This function is deliberately syscall-free: the caller runs with
-// mp.locks != 0 (acquirem, to pin the P across the resize) and the design's
-// Forbidden list bans syscalls under sched.lock or with mp.locks != 0 (same
-// rule as Task 10's schedule() hook). It only flips the one-way
+// mp.locks != 0 (acquirem, to pin the P across the resize), and
+// syscalls are banned under sched.lock or with mp.locks != 0 (the same
+// rule numaNoteSchedule follows). It only flips the one-way
 // numaStoodDown latch and reports whether it just did so; the actual
 // syscall-bearing work -- the eager allm affinity walk and this thread's
 // own convergence -- is done by numaStandDownWiden, which the caller
@@ -632,7 +625,7 @@ func numaStandDownIfNeeded(procs int32, customGOMAXPROCS bool) bool {
 	if procs <= numaConfinedNodeCPUs && customGOMAXPROCS {
 		return false
 	}
-	// Store numaStoodDown BEFORE numaConfined (Task 10 review I1):
+	// Store numaStoodDown BEFORE numaConfined:
 	// numaNoteSchedule's reader checks numaConfined.Load() first, then
 	// numaStoodDown.Load(), via a short-circuit ||. With the stores in
 	// the other order, a reader could observe numaConfined already
@@ -664,8 +657,8 @@ func numaStandDownIfNeeded(procs int32, customGOMAXPROCS bool) bool {
 // numaStandDownIfNeeded's detection site, which runs with mp.locks != 0
 // and must not make syscalls (see that function's doc comment).
 // numaWidenAllThreads is the eager, best-effort, affinity-only allm
-// walk shared by WS-A's confinement stand-down (numaStandDownWiden) and
-// A5's enforcement stand-down (numaEnforceStandDown): it restores every
+// walk shared by the confinement stand-down (numaStandDownWiden) and
+// the enforcement stand-down (numaEnforceStandDown): it restores every
 // reachable thread's kernel CPU mask to the saved startup-wide mask.
 // It deliberately touches NOTHING else -- no mempolicy, no per-M caches
 // (cross-M cache writes are races; owners converge themselves). See the
@@ -720,9 +713,9 @@ func numaStandDownWiden() {
 	// numaAllowedNodemask -- this is the one point after startup where a
 	// cpuset narrowed while running (a container's cpuset.mems/cpuset.cpus
 	// edited mid-process) is picked up; see numaSetProcessBindAll's doc
-	// comment and bind-all-policy.md's "Dynamic cpuset staleness" section
+	// comment
 	// for why it is not re-read anywhere more often than this. Its own
-	// failure (e.g. a cpuset narrowed to one node since Layer 1 ran) is
+	// failure (e.g. a cpuset narrowed to one node since startup) is
 	// silently absorbed here: numaAllowedNodemask simply keeps its prior
 	// value, and numaFixThreadPlacement below -- not this call -- is what
 	// actually converges (and correctly retries at the next park on
@@ -763,7 +756,7 @@ func numaFixThreadPlacement() {
 	// w0 is unconditionally non-zero here: reaching numaStoodDown==true
 	// requires having been numaConfined, which requires numaShouldConfine
 	// to have observed numaAllowedNodemask.Load() != 0 at confine time
-	// (its "layer1 inactive" decline check) -- and nothing in this file
+	// (its "bind-all mempolicy inactive" decline check) -- and nothing in this file
 	// ever stores zero back into numaAllowedNodemask once published, so
 	// it cannot have reverted to zero since. The check remains as a
 	// belt-and-suspenders guard (an unbounded, silent retry-forever if
@@ -780,7 +773,7 @@ func numaFixThreadPlacement() {
 		uintptr(_MPOL_BIND), uintptr(unsafe.Pointer(&mask[0])), numaMaxNode, 0, 0, 0); errno != 0 {
 		return // retry at next park
 	}
-	// Latch only after every syscall succeeded (I4): latching first
+	// Latch only after every syscall succeeded: latching first
 	// would permanently strand a thread that raced a transient failure.
 	mp.numa.setPlacementDone()
 }
@@ -793,15 +786,14 @@ func numaFixThreadPlacement() {
 //
 // A per-chunk MPOL_PREFERRED refinement (keyed off the growing M's
 // current node via getcpu(2)) previously ran here as a second mbind call
-// after this one -- Layer 2. It is gone: its IMC locality gate failed
-// (remote-DRAM share unchanged, +0.10%/-0.07% vs a required >=10% drop)
-// and a single-session three-arm sweep proved it behaviorally inert
-// (C-full vs C-L1, p=0.838) once fill-one-socket-first confinement was in
-// place. It was also the sole cause of the ~34x per-chunk VMA
-// fragmentation seen at Layer 2: adjacent chunks preferring different
+// after this one. It was removed: measurement showed it did not move
+// memory locality (remote-DRAM share unchanged, +0.10%/-0.07% vs a
+// required >=10% drop) and it was behaviorally inert
+// (p=0.838) once fill-one-socket-first confinement was in
+// place. It was also the sole cause of a ~34x per-chunk VMA
+// fragmentation blowup: adjacent chunks preferring different
 // nodes could not VMA-merge, where this function's single uniform BIND-all
-// mask merges cleanly. See task-6-report.md and RESULTS.md's "Layer 2
-// removal" section for the removal evidence.
+// mask merges cleanly.
 //
 // numaBindArena is called from mheap.grow, with h.lock held, immediately
 // after each sysMap of newly-backed heap memory (mmap with MAP_FIXED
@@ -823,7 +815,9 @@ func numaFixThreadPlacement() {
 // just a belt-and-suspenders duplicate of the arena mbind.
 //
 // numaBindArena does not catch up already-mapped ranges once the mask
-// becomes available: see task-6-report.md for that scope decision.
+// becomes available: those early ranges stay covered by the task-wide
+// policy alone (see above), and a catch-up walk was judged not worth
+// its complexity.
 //
 // numaAllowedNodemask is read here, never refreshed: this function does
 // not call numaSetProcessBindAll (or otherwise re-query cpuset.mems)
@@ -837,8 +831,7 @@ func numaFixThreadPlacement() {
 // same cost. So a cpuset narrowed after this process's mask was last
 // read is stale here until the next stand-down trigger (numaStandDownWiden,
 // which does call numaSetProcessBindAll) or a process restart -- accepted
-// by design, not a bug. See bind-all-policy.md's "Dynamic cpuset
-// staleness" section.
+// by design, not a bug.
 //
 // mbind errors are ignored: this is deliberate (see design), not a
 // silently-swallowed bug.
@@ -859,19 +852,19 @@ func numaBindArena(addr unsafe.Pointer, size uintptr) {
 	linux.Syscall6(linux.SYS_MBIND, uintptr(addr), size, uintptr(_MPOL_BIND), uintptr(unsafe.Pointer(&mask[0])), numaMaxNode, 0)
 }
 
-// Per-node heap arena stream homing (design §12.3, task 8). numaBindArena
-// above stays exactly as it is -- Layer 1's uniform BIND-all, unconditionally
-// balancer-exempt against every thread (decision 5). The functions below add
+// Per-node heap arena stream homing. numaBindArena
+// above stays exactly as it is -- the uniform BIND-all, unconditionally
+// balancer-exempt against every thread. The functions below add
 // per-node memory homing on top of it, active only when per-node arena
 // streams are real (numaHeapHomingActive) and always mbind'ing a range that
 // mheap.grow's address partitioning (h.arenaHints[node]/h.curArena[node])
 // already keeps disjoint from every other node's range -- so, unlike the
-// removed Layer 2, adjacent chunks always share the same node's policy and
+// removed per-chunk refinement, adjacent chunks always share the same node's policy and
 // merge cleanly (see numaBindArenaHome's doc comment).
 
 // numaGrowNode returns the NUMA node mheap.grow should grow into (stream),
 // and whether that is a genuine per-node reading safe to home memory to
-// (homed) -- review I1.
+// (homed).
 //
 // stream is always a valid heap arena stream index ([0, numaMaxHeapNodes)),
 // even when homed is false: stream 0's address space always exists and is
@@ -881,18 +874,18 @@ func numaBindArena(addr unsafe.Pointer, size uintptr) {
 // would otherwise be mistaken for a genuine node-0 reading:
 //
 //   - streams are disabled entirely (numaHeapStreamsEnabled -- experiment
-//     off, race build, tight-VA riscv64, or 32-bit; review C1/C2);
+//     off, race build, tight-VA riscv64, or 32-bit);
 //   - the running node could not be determined (a failed getcpu) -- a
 //     syscall failure says nothing about which node is actually running,
 //     least of all that it's node 0;
-//   - the running node is >= numaMaxHeapNodes (I5: "not node % N sharing" --
+//   - the running node is >= numaMaxHeapNodes ("not node % N sharing" --
 //     a host with more real nodes than streams does not get false locality
 //     for the nodes it has no stream for, and must not be homed to node 0
 //     on their behalf either -- sparse/high node ids exist even on hosts
 //     with few total nodes, e.g. CXL memory nodes).
 //
 // Called from allocSpan (via numaGrowNodeArg), at heap-growth frequency
-// only (mheap.grow itself never calls getcpu -- the v2/v3 forbidden list's
+// only (mheap.grow itself never calls getcpu -- the
 // "no getcpu on a malloc fast path, refill/grow/scheduler-pass frequency
 // only" rule). With streams disabled this returns before any syscall.
 func numaGrowNode() (stream int32, homed bool) {
@@ -903,15 +896,14 @@ func numaGrowNode() (stream int32, homed bool) {
 		// The goexperiment.Numa guard is compile-time: without it the
 		// placement branch reads mutable vars the off build cannot fold
 		// away, growing this function past the inlining threshold and
-		// changing the off binary's function census (caught by the
-		// census gate during v4 Task 4).
+		// changing the off binary's generated code.
 		//
-		// Placement path (v4 stage 2): key routing and growth homing by
+		// Placement path: key routing and growth homing by
 		// the current P's assigned home -- no syscall, and it is the
 		// node enforcement (numaNoteSchedule) converges this M to:
 		// memory goes where the consumer is KEPT, not where it happened
 		// to be observed. The home < numaMaxHeapNodes check is
-		// defensive (design review C1): placement eligibility already
+		// defensive: placement eligibility already
 		// declines when any CPU-bearing node id >= numaMaxHeapNodes,
 		// but this function's contract -- node is always a valid index
 		// into the per-node spanSet/arenaHints/curArena arrays -- is
@@ -935,10 +927,10 @@ func numaGrowNode() (stream int32, homed bool) {
 
 // numaHeapHomingActive reports whether mheap.grow should home newly mapped
 // chunks to a specific NUMA node (numaBindArenaHome, MPOL_PREFERRED) instead
-// of Layer 1's uniform BIND-all (numaBindArena). True only when per-node
+// of the uniform BIND-all (numaBindArena). True only when per-node
 // arena streams are real and safe to home into:
 //
-//   - the experiment is on and numaMaxHeapNodes > 1 (I5 -- both a compile-time
+//   - the experiment is on and numaMaxHeapNodes > 1 (both a compile-time
 //     constant check, so this whole function folds to "return false" with the
 //     experiment off, same as numaMaxHeapNodes's own collapse);
 //   - the machine actually has more than one node;
@@ -959,8 +951,8 @@ func numaHeapHomingActive() bool {
 // numaBindGrowth is mheap.grow's single call site for arena VMA policy: it
 // dispatches to numaBindArenaHome (per-node PREFERRED) only when node is a
 // genuine per-node reading (node >= 0 -- see numaGrowNode/numaGrowNodeArg
-// for the sentinel, review I1) AND per-node homing is active AND node is
-// actually one of this process's allowed NUMA nodes (review I2: node's bit
+// for the sentinel) AND per-node homing is active AND node is
+// actually one of this process's allowed NUMA nodes (node's bit
 // must be set in numaAllowedNodemask, the same mask numaBindArena's
 // BIND-all already restricts itself to -- a cpuset can exclude a node that
 // still fits in numaMaxHeapNodes's index range, e.g. a container pinned to
@@ -988,7 +980,7 @@ func numaBindGrowth(addr unsafe.Pointer, size uintptr, node int32) {
 // numaBindArenaHome sets MPOL_PREFERRED(node), as the VMA policy for the
 // heap arena range [addr, addr+size), homing that range's physical memory to
 // node while still allowing it to spill gracefully if node fills (never
-// MPOL_BIND to a single node -- the OOM footgun bind-all-policy.md forbids
+// MPOL_BIND to a single node -- an OOM footgun the design forbids
 // for the whole process; here it is a graceful-spill VMA policy over one
 // preferred node, not a hard process-wide bind).
 //
@@ -996,7 +988,7 @@ func numaBindGrowth(addr unsafe.Pointer, size uintptr, node int32) {
 // numaAllowedNodemask -- every node this process is actually allowed to use,
 // per its cpuset), MPOL_PREFERRED(node) drops that restriction at the VMA
 // level: if node fills, the kernel spills to *any* node, not just the
-// process's allowed set. numaBindGrowth's caller (review I2) is what keeps
+// process's allowed set. numaBindGrowth's own check is what keeps
 // this safe -- node is only ever passed here after confirming node's own
 // bit is set in numaAllowedNodemask, so preferring it is never itself a
 // cpuset violation -- but the range's *spill* target is not cpuset-bounded
@@ -1007,12 +999,12 @@ func numaBindGrowth(addr unsafe.Pointer, size uintptr, node int32) {
 // so this is not an escape from the cpuset, just a weaker *preference*
 // restriction than BIND-all carried.
 //
-// Unlike the removed Layer 2 (which keyed a per-chunk PREFERRED off
+// Unlike the removed per-chunk refinement (which keyed a per-chunk PREFERRED off
 // whichever thread happened to be growing the heap's single shared address
 // stream at that moment, so adjacent chunks could end up preferring
-// different nodes and could never VMA-merge -- see task-6-report.md), every
+// different nodes and could never VMA-merge), every
 // chunk mbind'd here belongs to h.curArena[node]'s own address-partitioned
-// stream (>=1 TiB apart from every other node's stream, design §12.3): all
+// stream (>=1 TiB apart from every other node's stream): all
 // growth into one node's stream always gets that same node's PREFERRED
 // policy, so adjacent chunks within a stream merge cleanly, the same way
 // numaBindArena's uniform BIND-all does today.
@@ -1030,8 +1022,8 @@ func numaBindArenaHome(addr unsafe.Pointer, size uintptr, node int32) {
 	linux.Syscall6(linux.SYS_MBIND, uintptr(addr), size, uintptr(_MPOL_PREFERRED), uintptr(unsafe.Pointer(&mask[0])), numaMaxNode, 0)
 }
 
-// Node-mask soft affinity from the scheduler (design §12.4, task 10,
-// ingredient c). Ingredients a (numaBindArenaHome/numaGrowNode above) and
+// Node-mask soft affinity from the scheduler, the third locality
+// ingredient. Ingredients a (numaBindArenaHome/numaGrowNode above) and
 // b (mcentral per-node spanSets, numa_refill_test.go) home memory by
 // node; this ingredient keeps the M that touches that memory running on
 // (a CPU of) the same node, so the kernel's own NUMA balancer -- exempted
@@ -1045,12 +1037,12 @@ func numaBindArenaHome(addr unsafe.Pointer, size uintptr, node int32) {
 // during numaSchedinit.
 //
 // This is deliberately independent of numaShouldConfine's own narrowed-
-// affinity check (numa_linux.go, locked decision 6): that check only
+// affinity check: that check only
 // runs when sched.customGOMAXPROCS is set, because fill-one-socket
 // confinement itself requires an explicitly chosen GOMAXPROCS. Node-mask
 // soft affinity carries no such precondition -- it applies to any
 // multi-node process, confined or not, with any GOMAXPROCS -- so its own
-// "operator placement wins" stand-down rule (design §12.4) needs an
+// "operator placement wins" stand-down rule needs an
 // answer that does not depend on customGOMAXPROCS. Both checks reuse the
 // same detection mechanism (numaAffinityPopcount vs numaOnlineCPUCount);
 // only the trigger conditions differ.
@@ -1079,7 +1071,7 @@ var numaStartupAffinity [numaCPUMaskBytes]byte
 // numaNoteSchedule's eligibility gate (numaSoftAffinityEligible)
 // regardless of this value.
 //
-// NOTE (M6, copied from numaShouldConfine's own equivalent note):
+// NOTE (numaShouldConfine's equivalent check shares this caveat):
 // offline CPUs can make sysfs-online and the affinity popcount disagree
 // -- a host with offline CPUs may have numaOnlineCPUCount() count a CPU
 // this process's affinity mask never included, so the popcount
@@ -1109,8 +1101,8 @@ func numaDetectStartupAffinity() {
 // (numaNoteSchedule) may ever engage for this process at all: the
 // experiment is on, this arch implements numaSetThreadAffinity, the
 // machine is multi-node, and this process started with full affinity
-// (numaStartupFullAffinity -- operator placement always wins, same rule
-// Layer 1/confinement follow). Every input is either a compile-time
+// (numaStartupFullAffinity -- operator placement always wins, the same
+// rule the BIND-all policy and confinement follow). Every input is either a compile-time
 // constant or a plain package var written once, single-threaded, during
 // numaSchedinit -- so this whole function is a handful of loads, cheap
 // enough for numaNoteSchedule's common (steady-state) schedule() path.
@@ -1121,19 +1113,19 @@ func numaSoftAffinityEligible() bool {
 // numaSoftAffinityCheckInterval bounds how often numaNoteSchedule pays
 // its getcpu(2) syscall, per M, via a nanotime()-gated throttle.
 //
-// The plan's Forbidden list allows getcpu at "scheduler-pass frequency"
-// (the same class as Task 8/9's grow/refill-frequency calls), and an
-// early version of this function took that literally -- one getcpu call
-// on every schedule() pass. A real-2-node-hardware run of the existing
+// An early version of this function made one getcpu call
+// on every schedule() pass (the same frequency class as the
+// grow/refill-frequency calls). A run of the existing
 // BenchmarkPingPongHog (runtime, a tight goroutine ping-pong that calls
-// schedule() on every hand-off) showed that costs +56.02% (p=0.000,
-// n=10) on numa-dell: schedule() is called far more often than acquirep
+// schedule() on every hand-off) on real 2-node hardware showed that
+// costs +56.02% (p=0.000,
+// n=10): schedule() is called far more often than acquirep
 // ever is (every blocking channel op, every GC assist yield, ...), so
 // "same order as acquirep" and "every schedule() call" are not actually
-// the same frequency, and a raw (non-vDSO; Task 14 is the profile-gated
-// vDSO/rseq follow-up) getcpu syscall's few-hundred-ns cost, paid that
+// the same frequency, and a raw (non-vDSO)
+// getcpu syscall's few-hundred-ns cost, paid that
 // often, is a real regression -- not the "cheap compare, no syscall"
-// steady state the design requires.
+// steady state required here.
 //
 // nanotime() is the fix: vDSO-backed on amd64/arm64 linux (not a
 // syscall trap), so reading it every schedule() pass to decide whether
@@ -1146,14 +1138,13 @@ func numaSoftAffinityEligible() bool {
 // enough that even a schedule()-call rate in the millions/sec keeps the
 // syscall rate in the hundreds/sec.
 //
-// M9: if Task 11's gates want a different tradeoff (faster convergence
+// If a different tradeoff is ever needed (faster convergence
 // vs even less overhead), the natural next step is a GODEBUG=numasoft=N
-// knob rather than re-tuning this literal -- not done here since no
-// gate has asked for it yet.
+// knob rather than re-tuning this literal.
 const numaSoftAffinityCheckInterval = 4 * 1e6 // 4ms in nanotime() units
 
-// numaNoteSchedule applies node-mask soft affinity to the current M
-// (design §12.4, ingredient c): at most once every
+// numaNoteSchedule applies node-mask soft affinity to the current
+// M: at most once every
 // numaSoftAffinityCheckInterval per M (see that constant's doc comment
 // for why), reads the M's current NUMA node via getcpu (numaCurrentNode)
 // and, ONLY if it differs from the node this M's affinity was last
@@ -1170,7 +1161,7 @@ const numaSoftAffinityCheckInterval = 4 * 1e6 // 4ms in nanotime() units
 // below rather than relied upon. Must never be called from acquirep:
 // procresize asserts sched.lock held on its call path and allocm holds
 // allocmLock plus acquirem on its, so a syscall there would be a
-// lock-ordering/latency hazard (design's I3 note) -- schedule() is where
+// lock-ordering/latency hazard -- schedule() is where
 // the M is about to run user code with no locks held, which is exactly
 // why the hook lives here instead.
 //
@@ -1197,10 +1188,10 @@ const numaSoftAffinityCheckInterval = 4 * 1e6 // 4ms in nanotime() units
 // an oversight: sched_setaffinity narrows a CPU *set* (the whole node),
 // never a single CPU, so the kernel keeps full scheduling freedom within
 // that node and can still migrate the OS thread under real pressure;
-// work-stealing across Ps is untouched (Forbidden list: "no steal
-// changes"); and any NEW M the larger GOMAXPROCS brings in finds its own
-// node independently via its own first numaNoteSchedule pass (and, as of
-// the C1 fix below, starts from a genuinely wide inherited mask, not a
+// work-stealing across Ps is untouched (soft affinity deliberately
+// changes no stealing); and any NEW M the larger GOMAXPROCS brings in finds its own
+// node independently via its own first numaNoteSchedule pass (and, given
+// numaWidenBeforeClone, starts from a genuinely wide inherited mask, not a
 // leaked narrow one). The net effect of a GOMAXPROCS raise is simply
 // "more Ms, each independently node-sticky", which is the intended
 // steady state -- not "the process reverts to full spread", which is
@@ -1223,19 +1214,19 @@ func numaNoteSchedule() {
 		return
 	}
 	if !numaSoftAffinityEligible() || numaConfined.Load() || numaStoodDown.Load() || numaEnforceStoodDown.Load() {
-		// The last term is A5's enforcement stand-down: applies halt
+		// The last term is the adaptive enforcement stand-down: applies halt
 		// (both key paths) while the wake-storm latch is set; the
 		// placement memory side is untouched. Same rarely-written
 		// global cluster as the other gates.
 		return
 	}
 	if numaPlacementActive() {
-		// Placement path (v4 stage 2): the node key is the current P's
+		// Placement path: the node key is the current P's
 		// assigned home, not a getcpu observation -- deterministic, and
 		// it is the node routing/homing (numaGrowNode) already sends
 		// this M's memory to. Steady state (home already applied) is
 		// two byte loads and a compare: no getcpu, no nanotime. The
-		// nextCheck throttle guards only the APPLY (design review M2):
+		// nextCheck throttle guards only the APPLY:
 		// numaApplySoftAffinity records lastNode only on success, so an
 		// unthrottled retry loop against a failing sched_setaffinity
 		// (e.g. a cpuset narrowed mid-run, the accepted-staleness
@@ -1244,7 +1235,7 @@ func numaNoteSchedule() {
 			if home, ok := pp.numa.home(); ok {
 				epoch := numaEnforceEpoch.Load()
 				if last, applied := mp.numa.softAffinityNode(); applied && last == home && mp.numa.appliedEpoch() == epoch {
-					// Steady state. The epoch term (design review H1)
+					// Steady state. The epoch term
 					// makes a post-re-arm cache stale: the eager
 					// stand-down walk widened this M's KERNEL mask but
 					// could not touch this cache, so without the epoch
@@ -1265,7 +1256,7 @@ func numaNoteSchedule() {
 		// This P has no home. Should not happen while placement is
 		// active (schedinit and every procresize assign before Ps
 		// run); fall through to the getcpu path rather than silently
-		// losing soft affinity (design review M1).
+		// losing soft affinity.
 	}
 	now := nanotime()
 	if !mp.numa.softAffinityCheckDue(now) {
@@ -1287,7 +1278,7 @@ func numaNoteSchedule() {
 }
 
 // numaApplySoftAffinity is numaNoteSchedule's slow path: it only runs on
-// an actual node change (M2, review): computing/copying the per-node
+// an actual node change: computing/copying the per-node
 // mask needs a [numaCPUMaskBytes]byte (1024-byte) local, and keeping
 // that out of numaNoteSchedule's own frame keeps the throttled fast path
 // (the overwhelmingly common call) a tiny frame -- go:noinline so the
@@ -1330,12 +1321,11 @@ func numaApplySoftAffinity(mp *m, node int32) bool {
 //     mask via its own numaDetectStartupAffinity/numaShouldConfine
 //     checks and concludes "operator placement wins", silently declining
 //     both confinement and its own soft affinity for its entire
-//     lifetime -- design §12.4's stand-down rule, tripped by an internal
-//     artifact instead of a real operator (found in this task's own
-//     verification: broke 3 existing Workstream A tests when go test's
-//     own soft-narrowed Ms spawned testprog subprocesses).
-//   - via newm1's own new-M paths (review C1, the critical finding, and
-//     NEW-1, the cgo-build gap in the first fix): every new M this
+//     lifetime -- the "operator placement wins" stand-down rule, tripped
+//     by an internal artifact instead of a real operator (observed
+//     directly: go test's
+//     own soft-narrowed Ms spawned testprog subprocesses that declined).
+//   - via newm1's own new-M paths: every new M this
 //     runtime itself creates inherits whichever node the CREATING M
 //     happened to be soft-narrowed to. Since numaNoteSchedule has no
 //     widening path of its own (it only ever narrows), and getcpu on an
@@ -1345,7 +1335,7 @@ func numaApplySoftAffinity(mp *m, node int32) bool {
 //     a self-reinforcing cascade that collapses the entire process onto
 //     whichever node the first M to narrow (typically m0, at its very
 //     first schedule() pass, before any other M exists) happened to be
-//     on. On numa-dell at GOMAXPROCS=256 this manifested as every M
+//     on. On a 2-node machine at GOMAXPROCS=256 this manifested as every M
 //     pinned to one node's 128 CPUs -- 2x oversubscription, the other
 //     node fully idle -- silently defeating the entire feature while
 //     still passing every prior correctness test (which only checked
@@ -1362,7 +1352,7 @@ func numaApplySoftAffinity(mp *m, node int32) bool {
 // been soft-affinity-narrowed in the first place (numaSoftAffinityEligible
 // requires numaStartupFullAffinity, which is only ever true when
 // numaStartupAffinity's popcount already equals numaOnlineCPUCount()).
-// Also clears this M's cached softAffinityNode (and, per review M4, its
+// Also clears this M's cached softAffinityNode (and its
 // nextCheck deadline -- see clearSoftAffinityNode): without that, the
 // next numaNoteSchedule pass would see the same node as before (or, for
 // the deadline, not check again for up to numaSoftAffinityCheckInterval)
@@ -1375,9 +1365,9 @@ func numaApplySoftAffinity(mp *m, node int32) bool {
 // actually widens (mp was soft-narrowed), it also increments
 // numaWidenCount -- a diagnostic-only counter (numaWidenCountForTest,
 // export_numa_test.go) that gives automated tests a race-safe way to
-// observe that this path fired at all, closing the coverage gap I2's
-// -race skip leaves for the newm1/newosproc/cgo site specifically
-// (review adjudication (b)).
+// observe that this path fired at all, closing the coverage gap that
+// TestNUMASoftAffinity's -race skip leaves for the newm1/newosproc/cgo
+// site specifically.
 //
 // Called from three sites: syscall_runtime_BeforeFork (proc.go, the
 // os/exec ForkExec path), syscall_runtime_BeforeExec (proc.go, the
@@ -1387,7 +1377,7 @@ func numaApplySoftAffinity(mp *m, node int32) bool {
 // the calling thread's affinity mask, and syscall.Exec reaches execve
 // without ever going through ForkExec/BeforeFork at all), and newm1
 // (proc.go, the runtime's own new-M path -- both its cgo and non-cgo
-// branches, per NEW-1 above). The first two run immediately before the
+// branches, see above). The first two run immediately before the
 // actual fork/clone/execve syscall each guards; newm1's runs before the
 // clone/pthread_create call within it. The BeforeFork call site runs
 // under the "no more allocation or calls of non-assembly functions"
@@ -1398,8 +1388,7 @@ func numaApplySoftAffinity(mp *m, node int32) bool {
 // restrictive property, so the same function is safe to call from all
 // three.
 //
-// I5 ruling (review, reworded per NEW-2 to the reviewer's stronger
-// ground): at the BeforeFork and newm1 call sites, this function's
+// Lock/signal-state note: at the BeforeFork and newm1 call sites, this function's
 // sched_setaffinity syscall runs at essentially the identical
 // lock/signal state as the clone/fork/pthread_create call it
 // immediately precedes within the same function -- mp.locks != 0
@@ -1417,13 +1406,14 @@ func numaApplySoftAffinity(mp *m, node int32) bool {
 // sanctioned at that exact point. The BeforeExec call site differs --
 // mp.locks is not necessarily nonzero there, but execLock is held
 // write-locked across the whole BeforeExec-to-AfterExec window instead.
-// Not a Forbidden-list violation at any of the three sites: that list's
+// Not a violation at any of the three sites: the
 // "no syscalls under sched.lock or with
 // mp.locks != 0" rule targets scheduler-hook syscalls that could
 // contend with concurrent scheduling state (numaNoteSchedule's own
-// schedule()-hook rule) -- the same reasoning Task 9's own recorded
-// ruling used to scope that Forbidden-list line to scheduler hooks
-// specifically, not every mp.locks!=0 context in the runtime.
+// schedule()-hook rule) -- the same reasoning that scopes
+// that rule to scheduler hooks
+// specifically, not every mp.locks!=0 context in the runtime
+// (see numaRefillNode's doc comment in mcentral.go).
 //
 //go:nosplit
 func numaWidenBeforeClone(mp *m) {
@@ -1437,18 +1427,18 @@ func numaWidenBeforeClone(mp *m) {
 }
 
 // numaWidenCount counts every time numaWidenBeforeClone actually widened
-// a narrowed M (review adjudication (b)): diagnostic-only, read by
+// a narrowed M: diagnostic-only, read by
 // NumaWidenCountForTest (export_numa_test.go) so automated tests have a
 // race-safe way to confirm the newm1/newosproc/cgo widen path fired at
 // all during M-creation churn, without depending on the distinct-node
-// spread TestNUMASoftAffinity's I2 check asserts (which is skipped under
+// spread TestNUMASoftAffinity asserts (which is skipped under
 // -race -- see that test's doc comment) or on any particular kernel
 // scheduling outcome. Not read by any non-test runtime code.
 var numaWidenCount atomic.Uint64
 
-// ---- P/goroutine node placement (v4 stage 2) ----
+// ---- P/goroutine node placement ----
 //
-// Design: numa-design/v4-placement-design.md. Each P gets a home node
+// Each P gets a home node
 // (numaAssignPHomes, proportional contiguous partition); the M running
 // a P converges to that P's node (numaNoteSchedule's placement path);
 // refill routing and heap-growth homing key off the same assignment
@@ -1498,7 +1488,7 @@ func numaPlacementInit() {
 		numaPlacementDeclined("heap streams disabled")
 		return
 	}
-	// Review C1: the per-node spanSet/arenaHints/curArena arrays are
+	// The per-node spanSet/arenaHints/curArena arrays are
 	// sized numaMaxHeapNodes, and the placement key feeds them via
 	// numaGrowNode. A CPU-bearing node with an id past that bound
 	// (sparse/CXL ids, >8-node boxes) would home Ps to an index the
@@ -1531,7 +1521,7 @@ func numaPlacementInit() {
 // CPU-bearing nodes described by cpus (index = node id; 0 = no CPUs on
 // that node), writing them to quotas (same indexing; len(cpus) ==
 // len(quotas) <= numaMaxHeapNodes). Pure function: largest-remainder
-// proportional split (int64 products -- review m3), remainder
+// proportional split (int64 products), remainder
 // distributed one P per node in decreasing-remainder order with ties to
 // the lower node id, then the >=1 rule: every CPU-bearing node gets at
 // least one P while some node still has more than one to give.
@@ -1594,8 +1584,8 @@ func numaPlacementQuotas(nprocs int32, cpus, quotas []int32) {
 }
 
 // numaAssignPHomes (re)assigns contiguous home-node ranges to
-// allp[:nprocs]. Called from schedinit (right after numaPlacementInit;
-// review M1 -- the bootstrap procresize runs BEFORE the placement
+// allp[:nprocs]. Called from schedinit (right after numaPlacementInit --
+// the bootstrap procresize runs BEFORE the placement
 // decision, so waiting for "the next procresize" would leave every home
 // unassigned until the first STW, exactly the ramp-up phase in which
 // the heap gets laid out and homed) and from procresize under
@@ -1646,29 +1636,28 @@ func numaAssignPHomes(nprocs int32) {
 	}
 }
 
-// ---- adaptive enforcement stand-down (v4 Task A5) ----
+// ---- adaptive enforcement stand-down ----
 //
-// Design: numa-design/v4-a5-adaptive-enforcement-design.md (reviewed);
-// calibration verdict in RESULTS.md ("rate-only detection frozen"):
-// detection is the elapsed-normalized M-wake rate alone -- the latency
-// arm measurably cannot discriminate the regimes -- with the trip
-// threshold sitting ~12x above the primary regime's measured maximum
-// and ~7x below the storm regime's measured minimum.
+// Detection is the elapsed-normalized M-wake rate alone -- calibration
+// showed wake latency
+// measurably cannot discriminate the regimes -- with the trip
+// threshold sitting ~12x above ordinary workloads' measured maximum
+// wake rate and ~7x below a wake storm's measured minimum.
 
 // numaEnforceStoodDown is the enforcement stand-down latch: while set,
 // numaNoteSchedule applies no thread affinity (the placement MEMORY
 // side -- P homes, refill keying, stream windows -- stays fully
 // active), and parking Ms widen themselves via the mPark backstop.
 // Written only by sysmon (numaEnforceEval) and read from the schedule()
-// path; distinct from WS-A's numaStoodDown (confinement) latch.
+// path; distinct from the numaStoodDown (confinement) latch.
 var numaEnforceStoodDown atomic.Bool
 
 // numaEnforceEpoch is bumped at each enforcement stand-down. An M's
 // soft-affinity cache records the epoch at apply time, and
 // numaNoteSchedule's steady state requires an epoch match -- without
 // this, Ms widened by the eager walk would keep stale "already
-// narrowed" caches after a re-arm and never re-apply (design review
-// H1: the walk cannot write other Ms' caches without a data race).
+// narrowed" caches after a re-arm and never re-apply (the
+// walk cannot write other Ms' caches without a data race).
 var numaEnforceEpoch atomic.Uint32
 
 // Trip/re-arm state, touched only by sysmon (single writer by
@@ -1684,14 +1673,15 @@ const (
 	// numaWakeRateTrip is the elapsed-normalized M-wake rate (wakes per
 	// second) at or above which a window counts toward tripping, and
 	// numaEnforceTripStreak is how many CONSECUTIVE such windows trip.
-	// FROZEN FROM FULL-TRACE CALIBRATION (RESULTS.md, corrected entry
-	// at abc2bb8443): instantaneous rate alone cannot separate the
-	// regimes -- the primary garbage workload's GC wake herds BURST to
-	// 13.9k-36k/s, above the storm regimes' sustained 7.8k-12.3k/s --
-	// but sustainment does: garbage's over-threshold runs die within 4
+	// Frozen from full-trace calibration on 2-node
+	// hardware: instantaneous rate alone cannot separate the
+	// regimes -- a GC-heavy workload's wake herds BURST to
+	// 13.9k-36k/s, above a sustained storm's 7.8k-12.3k/s --
+	// but sustainment does: the GC-heavy workload's over-threshold runs
+	// die within 4
 	// consecutive 100ms windows across a full unperturbed trace, while
 	// a storm exceeds the threshold in every window indefinitely. The
-	// streak of 8 (~800ms sustained) is 2x garbage's worst observed
+	// streak of 8 (~800ms sustained) is 2x that workload's worst observed
 	// run; the threshold sits 3.8x below the storms' minimum.
 	numaWakeRateTrip      = 2048
 	numaEnforceTripStreak = 8
@@ -1706,8 +1696,8 @@ const (
 
 // numaEnforceEval is sysmon's per-window decision (called from
 // numaWakeSysmonTick with the window's elapsed-normalized wake rate and
-// duration). Trips only while enforcement is live and meaningful
-// (design review M5b): a confined or stood-down process's enforcement
+// duration). Trips only while enforcement is live and
+// meaningful: a confined or stood-down process's enforcement
 // is already inert, and burning the lifetime cap on no-op stand-downs
 // would permanently latch a mechanism that was never the cause.
 // GODEBUG=numaenforce pins: 1 = always on (detector inert),
@@ -1762,8 +1752,8 @@ func numaEnforceEval(ratePerSec int64, elapsed int64) {
 
 // numaEnforceStandDown trips the latch: bump the epoch (so every M's
 // apply cache goes stale for the eventual re-arm), latch, count, and
-// eagerly widen every reachable thread's kernel mask (affinity-only --
-// design review M5a: no mempolicy, no BindAll refresh, no bindAllDone).
+// eagerly widen every reachable thread's kernel mask (affinity-only:
+// no mempolicy, no BindAll refresh, no bindAllDone).
 func numaEnforceStandDown() {
 	numaEnforceEpoch.Add(1)
 	numaEnforceStoodDown.Store(true)
@@ -1782,9 +1772,9 @@ func numaEnforceStandDown() {
 // numaEnforceParkBackstop is each M's own convergence at park (called
 // behind goexperiment.Numa from mPark): while the latch is set, an M
 // whose kernel mask is still soft-narrowed widens itself and clears its
-// own cache (own-M writes -- safe; design review H1's second half).
+// own cache (own-M writes -- safe, unlike cross-M cache writes).
 // An M that never parks keeps its narrow mask -- the same accepted
-// residual as WS-A's stand-down, and such an M is by definition not in
+// residual as the confinement stand-down, and such an M is by definition not in
 // the wake-storm population.
 func numaEnforceParkBackstop(mp *m) {
 	if !numaEnforceStoodDown.Load() {

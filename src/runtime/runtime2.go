@@ -725,7 +725,7 @@ type m struct {
 	locksHeld    [10]heldLockInfo
 
 	// numa is this M's NUMA per-M state: stand-down convergence (see
-	// numaFixThreadPlacement in numa_linux.go) and, since task 10,
+	// numaFixThreadPlacement in numa_linux.go) and
 	// node-mask soft affinity's own last-narrowed-node and next-getcpu-
 	// check-deadline caches (see numaNoteSchedule/numaWidenBeforeClone,
 	// same file). Placed immediately
@@ -735,8 +735,8 @@ type m struct {
 	// LAST triggers the compiler's trailing-zero-size padding rule
 	// (extra padding so &m.numa can never alias the next heap object)
 	// and grows sizeof(m) even with the experiment off -- an earlier
-	// version of this field learned that the hard way (see the C2
-	// history in git blame / task-3-report.md). With self kept last and
+	// version of this field learned that the hard
+	// way (see git blame). With self kept last and
 	// mNUMAState empty (struct{}) when goexperiment.numa is off, every
 	// field's offset -- including self's -- and sizeof(m) itself are
 	// byte-identical to a build with no numa field at all. See

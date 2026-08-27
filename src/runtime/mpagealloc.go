@@ -256,8 +256,8 @@ type pageAlloc struct {
 	// are allocated and not worth searching.
 	searchAddr offAddr
 
-	// NUMA stream windows (GOEXPERIMENT=numa, v4 stage 4 -- design:
-	// numa-design/v4-pagealloc-design.md). Everything here is written
+	// NUMA stream windows (GOEXPERIMENT=numa; see
+	// mpagealloc_numa.go). Everything here is written
 	// and read only from code reachable behind goexperiment.Numa call
 	// sites (mpagealloc_numa.go and its gated callers), so the off
 	// build carries only the numaMaxHeapNodes==1-sized zero-value
@@ -287,7 +287,7 @@ type pageAlloc struct {
 	// compares each). Armed once, in numaSchedinit, only when the
 	// windows can ever be consumed (streams enabled AND multi-node
 	// homing active) -- experiment-on single-node hosts never pay for
-	// the hooks (design review m5). The window-consuming entry points
+	// the hooks. The window-consuming entry points
 	// (allocNode/allocToCacheNode) do not read this: an un-maintained
 	// window simply stays at the unarmed sentinel and misses.
 	numaWindowsActive bool
@@ -436,7 +436,7 @@ func (p *pageAlloc) grow(base, size uintptr) {
 		p.searchAddr = b
 	}
 	if goexperiment.Numa && p.numaWindowsActive {
-		// Windowed mirror (v4 stage 4, design §4): growth into a
+		// Windowed mirror: growth into a
 		// stream window arms/lowers that window's searchAddr. Gated on
 		// homing (multi-node) so experiment-on single-node hosts pay
 		// nothing; compile-time guard keeps the off build
@@ -990,8 +990,8 @@ func (p *pageAlloc) free(base, npages uintptr) {
 		p.searchAddr = b
 	}
 	if goexperiment.Numa && p.numaWindowsActive {
-		// Windowed mirror of the lowering above (v4 stage 4, design
-		// §4): a free into a stream window re-arms that window's
+		// Windowed mirror of the lowering
+		// above: a free into a stream window re-arms that window's
 		// searchAddr. Gated on homing (multi-node) so experiment-on
 		// single-node hosts pay nothing; compile-time guard keeps the
 		// off build byte-identical.

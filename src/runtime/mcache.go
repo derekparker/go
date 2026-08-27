@@ -255,9 +255,10 @@ func (c *mcache) allocLarge(size uintptr, noscan bool) *mspan {
 
 	spc := makeSpanClass(0, noscan)
 	// Large objects bypass mcentral's per-node refill routing entirely
-	// (design §12.4 scopes routing to mcentral.cacheSpan); pass
+	// (routing is deliberately scoped to mcentral.cacheSpan); pass
 	// numaAllocNodeAuto so allocSpan keeps determining the grow-homing
-	// node itself, at grow frequency, exactly as before task 9.
+	// node itself, at grow frequency, exactly as before per-node
+	// routing existed.
 	s := mheap_.alloc(npages, spc, numaAllocNodeAuto)
 	if s == nil {
 		throw("out of memory")
@@ -277,7 +278,7 @@ func (c *mcache) allocLarge(size uintptr, noscan bool) *mspan {
 
 	// Put the large span in the mcentral swept list so that it's
 	// visible to the background sweeper. Route it to its own home
-	// node's set (design §12.4), same as uncacheSpan.
+	// node's set, same as uncacheSpan.
 	mheap_.central[spc].mcentral.fullSwept(mheap_.sweepgen, numaArenaNode(s.base())).push(s)
 
 	// Adjust s.limit down to the object-containing part of the span.

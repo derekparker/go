@@ -4,19 +4,19 @@
 
 package runtime
 
-// M wake-rate detection for adaptive enforcement stand-down (v4 Task
-// A5; design: numa-design/v4-a5-adaptive-enforcement-design.md, with
-// the calibration verdict in RESULTS.md): the ONLY signal is the
-// elapsed-normalized M wake rate -- calibration measured the primary
-// regime at 49-84 wakes/s against the losing storm regimes at
+// M wake-rate detection for the adaptive enforcement
+// stand-down: the ONLY signal is the
+// elapsed-normalized M wake rate -- calibration on 2-node hardware
+// measured ordinary workloads
+// at 49-84 wakes/s against pathological wake storms at
 // 7.8k-12.3k/s (~100x separation, no overlap), while wake LATENCY
-// measurably cannot discriminate (the primary regime's rare wakes are
+// measurably cannot discriminate (an ordinary workload's rare wakes are
 // the slow STW-herd ones). Rate-only detection also means the waker
 // side is one counter increment and the park path carries nothing.
 //
 // No build tag: every function here is referenced only from call sites
 // behind the compile-time goexperiment.Numa constant, so the off binary
-// carries none of it (zero-function-diff census).
+// carries none of it.
 
 import (
 	"internal/runtime/atomic"
@@ -36,7 +36,7 @@ var (
 	numaWakeLastCount uint64
 )
 
-// numaWakeWindow is the minimum evaluation window (design: 100ms).
+// numaWakeWindow is the minimum evaluation window (100ms).
 const numaWakeWindow = 100 * 1e6
 
 // numaCountMWake is the waker-side count, called (behind
@@ -47,7 +47,7 @@ func numaCountMWake() {
 
 // numaWakeSysmonTick evaluates the wake-rate window from sysmon: at
 // most once per numaWakeWindow it computes the elapsed-normalized rate
-// (design review M4: sysmon's cadence is adaptive and unbounded above,
+// (sysmon's cadence is adaptive and unbounded above,
 // so a raw per-window count would inflate across idle stretches) and
 // hands it to numaEnforceEval (the trip/re-arm state machine,
 // numa_linux.go; no-op stub elsewhere). GODEBUG=numa=2 prints the

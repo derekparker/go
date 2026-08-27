@@ -797,7 +797,7 @@ func (p *pageAlloc) scavengeOne(ci chunkIdx, searchIdx uint, max uintptr) uintpt
 				p.searchAddr = b
 			}
 			if goexperiment.Numa && p.numaWindowsActive {
-				// Windowed mirror (v4 stage 4): like pageCache.flush,
+				// Windowed mirror: like pageCache.flush,
 				// this free-back bypasses pageAlloc.free, so the
 				// per-window searchAddr must be lowered here too (see
 				// the flush hook in mpagecache.go for the stale-high

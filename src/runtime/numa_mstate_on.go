@@ -13,12 +13,12 @@ package runtime
 //     socket-first confinement (see numaFixThreadPlacement in
 //     numa_linux.go);
 //   - which NUMA node (if any) numaNoteSchedule last narrowed this M's
-//     CPU affinity to (design §12.4 soft affinity, numa_linux.go).
+//     CPU affinity to (node-mask soft affinity, numa_linux.go).
 type mNUMAState struct {
 	bindAllDone bool // this thread's placement converged after stand-down
 
 	// enforceEpoch is the numaEnforceEpoch value current when this M
-	// last successfully applied placement affinity (v4 Task A5): a
+	// last successfully applied placement affinity: a
 	// stand-down bumps the global, making every cache stale so Ms
 	// re-apply after a re-arm. Own-M writes only.
 	enforceEpoch uint32
@@ -70,7 +70,7 @@ func (s *mNUMAState) softAffinityNode() (node int8, ok bool) {
 func (s *mNUMAState) setSoftAffinityNode(node int8) { s.lastNode = node + 1 }
 
 // clearSoftAffinityNode resets lastNode to "never narrowed" and
-// nextCheck to "always due" (M4, review) -- see numaWidenBeforeClone,
+// nextCheck to "always due" -- see numaWidenBeforeClone,
 // numa_linux.go: after widening this M's real kernel affinity back to
 // full ahead of a fork/clone, both caches must be cleared, or the next
 // numaNoteSchedule pass would either see no node change (lastNode stale)
@@ -104,6 +104,6 @@ func (s *mNUMAState) armSoftAffinityCheck(deadline int64) {
 }
 
 // appliedEpoch / setAppliedEpoch cache the enforcement epoch at apply
-// time (v4 Task A5; see enforceEpoch's field comment).
+// time (see enforceEpoch's field comment).
 func (s *mNUMAState) appliedEpoch() uint32     { return s.enforceEpoch }
 func (s *mNUMAState) setAppliedEpoch(e uint32) { s.enforceEpoch = e }

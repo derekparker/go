@@ -94,15 +94,14 @@ func (s sweepClass) split() (spc spanClass, full bool) {
 // central sweep buffers. It returns ownership of the span to the caller.
 // Returns nil if no such span exists.
 //
-// The background sweeper doesn't route by node the way cacheSpan does
-// (design §12.4) -- it just needs to drain every unswept span
+// The background sweeper doesn't route by node the way cacheSpan
+// does -- it just needs to drain every unswept span
 // eventually, so it tries every node's set for a given span class
 // before moving on.
 //
-// This deliberately does NOT use numaGrowLoopBound (review I3) the way
-// cacheSpan's remote-fallback loop does, but re-review NEW-1 corrected
-// the reasoning recorded here for an earlier version of this comment:
-// the bound WOULD now be sound here too. numaGrowHighWaterNode is
+// This deliberately does NOT use numaGrowLoopBound the way
+// cacheSpan's remote-fallback loop does, even though
+// the bound WOULD be sound here too: numaGrowHighWaterNode is
 // monotonic and updated inside mheap.grow strictly before any
 // heapArena (and therefore any span, and therefore any spanSet
 // population -- swept-role push or the sweepgen rotation that later
@@ -121,7 +120,7 @@ func (s sweepClass) split() (spc spanClass, full bool) {
 // otherwise) rather than a recoverable miss, and it isn't on any
 // malloc/refill-frequency path, so the walk this avoids is cheap
 // relative to the margin of safety kept by not depending on the bound
-// here too. With the experiment off, numaMaxHeapNodes == 1 (I5) and
+// here too. With the experiment off, numaMaxHeapNodes == 1 and
 // this inner loop always runs exactly once regardless.
 func (h *mheap) nextSpanForSweep() *mspan {
 	sg := h.sweepgen
@@ -774,9 +773,9 @@ func (sl *sweepLocked) sweep(preserve bool) bool {
 			// There still exist pointers into the span or the span hasn't been
 			// freed yet. It's not ready to be reused. Put it back on the
 			// full swept list for the next cycle, routed to its home
-			// node (design §12.4; user arena chunks are node 0's
-			// "grower unknown" case per the task 8 review -- advisory
-			// placement only).
+			// node. (User arena chunks are always tagged node 0 --
+			// no per-node reading exists for them -- so their routing
+			// is advisory placement only.)
 			mheap_.central[spc].mcentral.fullSwept(sweepgen, numaArenaNode(s.base())).push(s)
 			return false
 		}
@@ -829,7 +828,7 @@ func (sl *sweepLocked) sweep(preserve bool) bool {
 				return true
 			}
 			// Return span back to the right mcentral list, routed to
-			// its home node (design §12.4).
+			// its home node.
 			node := numaArenaNode(s.base())
 			if nalloc == s.nelems {
 				mheap_.central[spc].mcentral.fullSwept(sweepgen, node).push(s)
@@ -879,7 +878,7 @@ func (sl *sweepLocked) sweep(preserve bool) bool {
 		}
 
 		// Add a large span directly onto the full+swept list, routed
-		// to its home node (design §12.4).
+		// to its home node.
 		mheap_.central[spc].mcentral.fullSwept(sweepgen, numaArenaNode(s.base())).push(s)
 	}
 	return false

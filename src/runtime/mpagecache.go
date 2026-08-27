@@ -105,7 +105,7 @@ func (c *pageCache) flush(p *pageAlloc) {
 		p.searchAddr = b
 	}
 	if goexperiment.Numa && p.numaWindowsActive {
-		// Windowed mirror (v4 stage 4): this flush frees pages WITHOUT
+		// Windowed mirror: this flush frees pages WITHOUT
 		// going through pageAlloc.free, so the per-window searchAddr
 		// must be lowered here too or it goes stale-high -- free
 		// memory below it violates the searchAddr invariant findFrom
