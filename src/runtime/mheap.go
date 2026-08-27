@@ -1369,6 +1369,28 @@ func (h *mheap) allocSpan(npages uintptr, typ spanAllocType, spanclass spanClass
 	// size, we already manage to do this by default.
 	needPhysPageAlign := physPageAlignedStacks && typ == spanAllocStack && pageSize < physPageSize
 
+	// NUMA stream-window routing (v4 stage 4, design §6): heap spans
+	// only, and only under a syscall-free node key -- the caller's
+	// explicit refill node (mcentral's path; getcpu already paid at
+	// refill frequency there), or the current P's placement home (two
+	// byte loads). numaAllocNodeAuto callers without placement stay
+	// exactly as lazy as today (resolveGrowNode at grow frequency);
+	// no getcpu ever runs at allocSpan frequency (design review M3).
+	// routeNode < 0 means "no routing": every branch below collapses
+	// to stock behavior.
+	routeNode := int32(-1)
+	if goexperiment.Numa && typ == spanAllocHeap && numaHeapStreamsEnabled && numaHeapHomingActive() {
+		if node >= 0 && node < numaMaxHeapNodes {
+			routeNode = node
+		} else if node == numaAllocNodeAuto && numaPlacementActive() {
+			if pp := gp.m.p.ptr(); pp != nil {
+				if home, ok := pp.numa.home(); ok && int32(home) < numaMaxHeapNodes {
+					routeNode = int32(home)
+				}
+			}
+		}
+	}
+
 	// If the allocation is small enough, try the page cache!
 	// The page cache does not support aligned allocations, so we cannot use
 	// it if we need to provide a physical page aligned stack allocation.
@@ -1379,7 +1401,15 @@ func (h *mheap) allocSpan(npages uintptr, typ spanAllocType, spanclass spanClass
 		// If the cache is empty, refill it.
 		if c.empty() {
 			lock(&h.lock)
-			*c = h.pages.allocToCache()
+			if goexperiment.Numa && routeNode >= 0 {
+				// Windowed fill first; an empty result means the
+				// window had nothing and the plain fill below takes
+				// over under the same lock acquisition (design §5).
+				*c = h.pages.allocToCacheNode(routeNode)
+			}
+			if c.empty() {
+				*c = h.pages.allocToCache()
+			}
 			unlock(&h.lock)
 		}
 
@@ -1428,6 +1458,30 @@ func (h *mheap) allocSpan(npages uintptr, typ spanAllocType, spanclass spanClass
 		scav = h.pages.allocRange(base, npages)
 	}
 
+	if base == 0 && goexperiment.Numa && routeNode >= 0 {
+		// Routed direct path (design §6, review M1 -- strictly
+		// bounded): one windowed alloc; on miss, one homed grow (which
+		// latches the node's window off if growth lands outside it);
+		// one windowed retry; then unconditional fall-through to the
+		// stock unrestricted sequence below regardless of why these
+		// missed. Homed-grow-BEFORE-unrestricted-reuse is the point:
+		// the stock order (reuse-anywhere first) is exactly the
+		// cross-node consumption the v4 stage-2 evidence indicts; the
+		// footprint this trades is bounded by gate G4-RSS. If the grow
+		// here succeeds but the retry misses (out-of-window growth),
+		// the unrestricted alloc below is satisfied by that growth
+		// without growing again, so the stock branch's `growth`
+		// assignment stays effectively unreachable and the scavenge
+		// accounting at HaveSpan sees this growth.
+		var ok bool
+		base, scav, ok = h.pages.allocNode(npages, routeNode)
+		if !ok {
+			if g, grewOK := h.grow(npages, routeNode); grewOK {
+				growth += g
+				base, scav, _ = h.pages.allocNode(npages, routeNode)
+			}
+		}
+	}
 	if base == 0 {
 		// Try to acquire a base address.
 		base, scav = h.pages.alloc(npages)
