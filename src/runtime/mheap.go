@@ -1402,10 +1402,26 @@ func (h *mheap) allocSpan(npages uintptr, typ spanAllocType, spanclass spanClass
 		if c.empty() {
 			lock(&h.lock)
 			if goexperiment.Numa && routeNode >= 0 {
-				// Windowed fill first; an empty result means the
-				// window had nothing and the plain fill below takes
-				// over under the same lock acquisition (design §5).
+				// Windowed fill first (design §5). On a miss, grow
+				// homed ONCE and retry, mirroring the direct path's
+				// M1-bounded shape -- without this, the plain fill
+				// below grabs the lowest free addresses (typically
+				// another node's stream window), and every small span
+				// carved from this 64-page cache is remote-labeled for
+				// its lifetime and recycles into the wrong node's
+				// spanSets: one transient miss becomes a persistent
+				// pollution regime (observed as bimodal ~72%-vs-94%
+				// locality across launches on numa-dell). Skipped when
+				// the node's window is latched off -- growth cannot
+				// land in-window then, and growing 4 MiB per cache
+				// fill would be pure waste.
 				*c = h.pages.allocToCacheNode(routeNode)
+				if c.empty() && !h.pages.numaWindowLatch[routeNode] {
+					if g, ok := h.grow(1, routeNode); ok {
+						growth += g
+						*c = h.pages.allocToCacheNode(routeNode)
+					}
+				}
 			}
 			if c.empty() {
 				*c = h.pages.allocToCache()
