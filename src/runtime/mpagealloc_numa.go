@@ -473,3 +473,41 @@ func numaInitStreamWindows() {
 		}
 	}
 }
+
+// numaArmWindows activates windowed searchAddr maintenance and
+// initializes each valid window's searchAddr from the CURRENT inUse
+// set: the lowest in-window mapped address, or the unarmed sentinel if
+// the window has no mapped memory yet. The from-inUse initialization is
+// the invariant's base case and it is load-bearing: heap grown BEFORE
+// this point (the mallocinit-era first chunks -- windows are computed
+// in mallocinit but the topology needed to arm them is only known
+// here) can already hold free pages, and if the first post-arm
+// grow/free lowering happened to land ABOVE them, the windowed
+// searchAddr would be stale-high from birth -- free memory below it,
+// violating the invariant findFrom inherits from find and throwing
+// "bad summary data" on the next windowed search (hit on numa-dell:
+// soft-affinity testprogs crashed within 0.3s of startup).
+//
+// Called once from numaSchedinit while m0 is the only runtime thread;
+// reads p.inUse (sorted ascending) without the heap lock under that
+// single-threaded invariant.
+func (p *pageAlloc) numaArmWindows() {
+	for n := int32(0); n < numaMaxHeapNodes; n++ {
+		w := p.numaWindows[n]
+		if !w.lo.lessThan(w.hi) {
+			continue
+		}
+		p.numaSearchAddr[n] = maxSearchAddr()
+		for _, r := range p.inUse.ranges {
+			if w.lo.lessThan(r.limit) && r.base.lessThan(w.hi) {
+				b := r.base
+				if b.lessThan(w.lo) {
+					b = w.lo // clamp: still inside this mapped range
+				}
+				p.numaSearchAddr[n] = b
+				break // ranges are sorted ascending: first overlap is lowest
+			}
+		}
+	}
+	p.numaWindowsActive = true
+}

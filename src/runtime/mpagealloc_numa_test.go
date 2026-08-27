@@ -292,3 +292,37 @@ func TestPageAllocAllocNodeAfterCacheFlush(t *testing.T) {
 		t.Fatalf("AllocNode(2, 0) after flush = %#x ok=%v", addr, ok)
 	}
 }
+
+func TestPageAllocArmWindowsSeedsFromInUse(t *testing.T) {
+	// Regression (v4 stage 4, second numa-dell crash): windows are
+	// computed (mallocinit) before they can be armed (numaSchedinit,
+	// topology known), and the heap grown in between already holds
+	// free pages. Arming must seed each window's searchAddr from the
+	// lowest in-window inUse address -- seeding via "whatever
+	// grow/free lowers it first" leaves pre-arm free pages BELOW the
+	// searchAddr, and the next windowed search throws "bad summary
+	// data".
+	b := BaseChunkIdx
+	p := NewPageAlloc(map[ChunkIdx][]BitRange{
+		// Chunk b: free pages low (0-99 free), allocated above.
+		b:      {{100, PallocChunkPages - 100}},
+		b + 1:  {{0, PallocChunkPages}},
+		b + 64: {},
+	}, nil)
+	defer FreePageAlloc(p)
+	p.SetNUMAWindow(0, PageBase(b, 0), PageBase(b+2, 0))
+	p.SetNUMAWindow(1, PageBase(b+64, 0), PageBase(b+66, 0))
+	p.ArmNUMAWindows()
+
+	// Window 0's searchAddr must start at the window's lowest mapped
+	// address, below the free run -- NOT at some later-lowered base.
+	if got, want := p.NUMASearchAddr(0), PageBase(b, 0); got != want {
+		t.Fatalf("armed searchAddr = %#x, want %#x (lowest in-window inUse)", got, want)
+	}
+	// And the windowed search must find the low free pages without
+	// throwing.
+	addr, _, ok := p.AllocNode(2, 0)
+	if !ok || addr != PageBase(b, 0) {
+		t.Fatalf("AllocNode(2, 0) = %#x ok=%v, want %#x", addr, ok, PageBase(b, 0))
+	}
+}

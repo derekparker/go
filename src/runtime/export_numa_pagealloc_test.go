@@ -127,3 +127,9 @@ func NumaFirstArenaHintForTest(node int32) uintptr {
 // PallocChunkBytesForTest exports the palloc chunk size for alignment
 // assertions.
 func PallocChunkBytesForTest() uintptr { return pallocChunkBytes }
+
+// ArmNUMAWindows runs the real arming path (numaArmWindows) on a test
+// PageAlloc: windowed searchAddrs seeded from the current inUse set.
+func (p *PageAlloc) ArmNUMAWindows() {
+	(*pageAlloc)(p).numaArmWindows()
+}
