@@ -4787,3 +4787,22 @@ branch; the zero-diff discipline otherwise holds).
 regression test that should lead the CL series (it is not
 NUMA-specific), and the proposal's window-inference section can now
 state the layout invariant without caveats.
+
+---
+
+# Upstream gap item 3 — full all.bash, both build modes: PASS
+
+Date: 2026-08-27. Tree: `68cbbd30f2` (prefix-mask fix + N=4 freeze).
+Dev box (linux/amd64), `GOROOT_BOOTSTRAP=~/sdk/gotip`, GOWORK=off.
+
+- `./all.bash` (experiment off): **ALL TESTS PASSED**, exit 0,
+  536 package results, zero FAILs.
+- `GOEXPERIMENT=numa ./all.bash`: **ALL TESTS PASSED**, exit 0,
+  536 package results, zero FAILs.
+
+Logs archived at the session scratchpad (`allbash-{off,on}.log`); not
+committed (large), verdict recorded here. This is the first full-suite
+run on the final tree in both modes — the trybot-equivalent breadth the
+proposal needs. (Note: an all.bash run with GOEXPERIMENT set bakes that
+default into the installed toolchain; the local toolchain was rebuilt
+plain afterwards.)
