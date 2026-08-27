@@ -77,9 +77,10 @@ case runtime maintainers ask for and rarely get.
    one 2-node Sapphire Rapids box. Minimum credible: one arm64 multi-node
    and/or one 4-node x86; re-run the pathology harness + locality sweep
    there. The harness makes this mechanical.
-3. **Full `all.bash` + trybot-equivalent sweep** on the final tree (the
-   branch has run targeted batteries; upstream needs the whole suite, both
-   build modes).
+3. **Full `all.bash` + trybot-equivalent sweep** — ✅ DONE 2026-08-27:
+   ALL TESTS PASSED in both build modes on the final tree (`68cbbd30f2`,
+   536 package results each, zero FAILs). See RESULTS.md "Upstream gap
+   item 3".
 4. **Decide the node-capacity constant** — ✅ DECIDED 2026-08-27 (user
    approved N=4): frozen at `numaMaxHeapNodes = 4` with pre-registered
    verification gates N4-G1..G5 (v4 plan); N=8 documented as a build-time
@@ -89,8 +90,11 @@ case runtime maintainers ask for and rarely get.
    self-contained rationale, and split into a reviewable CL series — the
    v3 final review already prescribed the first tranche (Layer 0/1 + WS-A
    as ~7 CLs); v4 placement/windows/A5 is a second tranche that can trail.
-6. **Chase the two unreproduced local test flakes** (or at minimum convert
-   them into tracked issues with the captured context).
+6. **Chase the two unreproduced local test flakes** — ✅ CLOSED 2026-08-27:
+   0 failures in a 120-run dedicated stress chase on the final tree (60 per
+   build mode, full output capture); both originals predate the now-fixed
+   baseline hint-layout bug (plausible mechanism, unprovable). Watch note
+   stands. See RESULTS.md "Upstream gap item 6".
 7. Proposal mechanics — ✅ DRAFTED 2026-08-27: distilled design doc at
    `proposal-draft.md` (staging plan and non-goals included); CL series
    breakdown at `cl-series-plan.md`.
