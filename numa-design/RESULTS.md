@@ -4588,3 +4588,35 @@ Raws in `bench-data/v4-taskLF/`; rotating n=12 sweeps, GOMAXPROCS=1.
 Standing verdict: the 1P alloc-micro gate remains FAIL at ~+4-5% geomean
 (ON build only; off build census-identical; 1P real-workload json +1.35%),
 with a proven path to ~+2% if pursued.
+
+---
+
+# v4 Task A5 — calibration (pre-registered, review H2): rate-only detection frozen
+
+Tree ebc788c5a1 (counters-only instrumentation), GODEBUG=numa=2 diagnostic
+runs on numa-dell (non-measured by design). Elapsed-normalized M-wake rates
+and latency EWMA per ≥100ms window:
+
+| Regime | wakes/s | latency EWMA |
+|---|---|---|
+| garbage 4GiB 256P (primary; must never trip) | **49–84** | 74–182µs |
+| CreateGoroutines 256P (storm; must trip) | **7,813–8,774** | 17–127µs |
+| CreateGoroutinesCapture 256P (storm; must trip) | **8,865–12,294** | 9–94µs |
+| PingPongHog 256P (clean micro; must not trip) | **0** | (no folds — stale) |
+
+Verdicts, per the design's pre-registered calibration rules:
+- **The latency arm is dropped.** Garbage's EWMA overlaps and exceeds the
+  storms' — its rare wakes are exactly the slow STW-herd ones (the review's
+  H2 prediction, confirmed). Latency cannot discriminate; rate separates the
+  regimes by ~100× with no overlap.
+- **Frozen: rate-only trip at `numaWakeRateTrip` = 1024 wakes/s**
+  (elapsed-normalized; ~geometric mean of garbage-max 84 and storm-min
+  7,813 — 12.2× above one, 7.6× below the other), **2 consecutive
+  over-threshold windows to trip** (single-window anomaly robustness).
+- **The stamp machinery goes**: rate-only means a waker-side counter
+  increment at the three wake sites and nothing else — no wakeStamp, no
+  mPark fold, no nanotime on any wake path; the zero-stamp and rwmutex
+  concerns dissolve with it.
+- The reviewer's guessed-constants warning was quantitatively right in both
+  directions: the drafted 41k/s threshold sat 5× ABOVE the real storms —
+  the detector as originally drafted would never have tripped at all.
