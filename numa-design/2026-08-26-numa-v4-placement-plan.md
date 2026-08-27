@@ -413,7 +413,54 @@ Runs only after Tasks 3–6 are green on numa-dell. Gates and bars are locked in
   `numa-design/bench-data/v4-g2-*/`, one commit per battery; ledger updated;
   verdict recorded (ship / fail-and-stop per Global Constraints).
 
-### Task L (stage 3, conditional): lock-callchain attribution
+### Task L (instantiated 2026-08-27, user-directed): 1P alloc micro attribution
+
+Target: the P5 FAIL — Malloc8 +7.53% (p=0.014, ±52% bimodal spread), Malloc16
+~ (p=0.089), geomean +5.96% vs stock at GOMAXPROCS=1 on numa-dell (tree
+cf2bbbfff1). Protocol, pre-registered before execution:
+
+- **L1 — replication first** (the bimodality caveat demands it): n=20
+  interleaved off/on rounds, single session, `Malloc8$|Malloc16$`,
+  benchstat. If not significant at n=20, the P5 reading is re-adjudicated
+  as 1P-bimodality noise and L2 does not run.
+- **L2 — ablation ladder**, one session, four arms interleaved, n=10 each:
+  A0 stock; A1 full experiment; A2 experiment with the windowed page path
+  disarmed (numaWindowsActive never set — isolates stage 4); A3 experiment
+  with numaHeapStreamsEnabled forced false (no per-node streams/routing —
+  isolates WS-B homing+routing). Pairwise benchstat vs A0. The placement
+  hook is not a suspect (1P is confined ⇒ hook returns at its numaConfined
+  check).
+- **L3 — candidate fix, pre-registered**: if A2 recovers the cost, skip the
+  windowed path while CONFINED (a confined process's memory is single-node
+  by construction — windows are pure overhead there). Gates for that fix:
+  Malloc micro ≤ +2% vs stock, AND the WS-A confined-mode pathology result
+  must not degrade (garbage 128P confined arm re-run, non-inferiority vs
+  its v3 reading's shape in a fresh single session).
+
+### Task A5 (added 2026-08-27, user-directed): adaptive enforcement stand-down
+
+Goal: pass BOTH forked gates by detecting the wake-latency regime at runtime
+and standing enforcement down when it costs more than it buys. Two-phase
+(design round with adversarial review, then implementation), same discipline
+as Tasks 2/P. Design space to adjudicate in the design doc:
+
+- **Signal**: (a) direct M-wake latency — waker stamps nanotime at
+  notewakeup (startm), wakee measures at stopm resume; exact, on an
+  already-expensive path; (b) M park/wake churn rate — clock-free counter;
+  the regressing regime IS high churn. Doc must pick one (or a hybrid),
+  with measured overhead.
+- **Response**: reuse the WS-A stand-down shape — one-way (or
+  long-cooldown) enforcement latch, eager widen best-effort, per-thread
+  convergence at park via the existing numaFixThreadPlacement pattern.
+  Oscillation is the review probe area: apply→latency→widen→relatency loops
+  must be impossible by construction.
+- **Pre-registered gates**: G2-sched-micros ≤ +2% (all four benchmarks, the
+  currently-failing pair included) AND G2-primary ≥ 5% (the enforcement
+  benefit must survive on the low-churn workload — the detector must NOT
+  fire there), single sessions, plus the standing hard gates (census, 1P,
+  -race, TestNUMA battery).
+
+### Task L-orig (stage 3, conditional, superseded scope): lock-callchain attribution
 
 Scope, arms, method, and n are locked in the stage-3 decision block above. This task is instantiated (appended to this plan with concrete steps) only when a gate FAIL after stages 1–2 gives it a target; if all gates pass it collapses to one archived confirmation capture noted in RESULTS.md.
 
