@@ -4864,3 +4864,24 @@ an interleaved same-session comparison.
 
 **Standing decision: `numaMaxHeapNodes = 4` is frozen as the shipped
 constant; N=8 is a documented build-time variant.** Gap item 4 closed.
+
+---
+
+# Upstream gap item 5 (comment half) — hygiene pass applied
+
+Date: 2026-08-27. Commit `64cca37634`.
+
+All 214 comment sites citing campaign-internal artifacts across 26
+runtime source files rewritten as self-contained rationale (inventory
++ per-site rewrites were agent-drafted, human-reviewed conventions;
+full re-sweep confirms zero remaining tagged sites in non-test
+sources). Two deliberate non-comment deltas, both intended: the
+GODEBUG decline string "layer1 inactive" → "bind-all mempolicy
+inactive", and the stale sysmon wake-tick comment now describes its
+live enforcement role. Census evidence: off build zero-function diff;
+ON build bit-identical with the string change reverted (comments
+proven codegen-neutral). Local gating suites green both modes.
+
+Remaining for item 5: the mechanical series cut (partition
+`git diff master...HEAD` into the CLs of `cl-series-plan.md` on a
+clean branch) — deferred until filing is green-lit.
