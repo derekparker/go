@@ -1416,10 +1416,15 @@ func (h *mheap) allocSpan(npages uintptr, typ spanAllocType, spanclass spanClass
 				// land in-window then, and growing 4 MiB per cache
 				// fill would be pure waste.
 				*c = h.pages.allocToCacheNode(routeNode)
-				if c.empty() && !h.pages.numaWindowLatch[routeNode] {
-					if g, ok := h.grow(1, routeNode); ok {
-						growth += g
-						*c = h.pages.allocToCacheNode(routeNode)
+				if c.empty() {
+					// Same usable-window guard as the direct path
+					// below: numaWindowSpan covers both the latch and
+					// the invalid-window case (Task L A2).
+					if _, _, wok := h.pages.numaWindowSpan(routeNode); wok {
+						if g, ok := h.grow(1, routeNode); ok {
+							growth += g
+							*c = h.pages.allocToCacheNode(routeNode)
+						}
 					}
 				}
 			}
@@ -1492,9 +1497,21 @@ func (h *mheap) allocSpan(npages uintptr, typ spanAllocType, spanclass spanClass
 		var ok bool
 		base, scav, ok = h.pages.allocNode(npages, routeNode)
 		if !ok {
-			if g, grewOK := h.grow(npages, routeNode); grewOK {
-				growth += g
-				base, scav, _ = h.pages.allocNode(npages, routeNode)
+			// Grow-once only while the node's window is usable (valid
+			// and unlatched): a node whose window can NEVER hit -- the
+			// invalid-window case on rare wrapped randomized layouts --
+			// would otherwise pay a homed grow per direct allocSpan
+			// forever, since the out-of-window latch requires a valid
+			// window to fire (found by the Task L A2 ablation, which
+			// measured that exact state at +22% and unbounded VA
+			// growth). The unarmed-sentinel case (valid window, not
+			// grown into yet) keeps the grow: that IS the bootstrap
+			// that arms the window.
+			if _, _, wok := h.pages.numaWindowSpan(routeNode); wok {
+				if g, grewOK := h.grow(npages, routeNode); grewOK {
+					growth += g
+					base, scav, _ = h.pages.allocNode(npages, routeNode)
+				}
 			}
 		}
 	}

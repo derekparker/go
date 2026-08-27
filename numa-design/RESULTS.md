@@ -4512,3 +4512,49 @@ STW-sec/GC +226% / STW-sec/op +213% (tens of µs absolute; 1P STW was already
 a v3 exploratory flag). 256P: STW-sec/op +47.6% (p=0.029). These follow the
 per-node-stream design (more, smaller streams to sweep/manage) and warrant a
 look if STW matters at the target deployment sizes.
+
+---
+
+# v4 Task L — 1P alloc micro attribution: WS-B-era structural cost, not v4
+
+Pre-registered in the plan at fec32e3892; arms and raws in
+`bench-data/v4-taskL/`. All sweeps GOMAXPROCS=1 on numa-dell, rotating order
+(one fixed-order session was run first by mistake, is marked superseded in the
+archive, and was fully reproduced by its rotated redo), benchstat.
+
+- **L1 replication (n=20, machine in its tight mode, ±0–5%):** the cost is
+  REAL — Malloc8 +6.72%, Malloc16 +2.42% (both p=0.000), geomean +4.55%.
+  The P5 session's ±52% spreads were bimodality, the effect underneath is not.
+- **L2/L3 ablation ladder (rotating, n=12, ±0–1%):** geomean vs stock —
+  full v4 ON +4.52%; streams/routing/windows disabled at runtime +3.43%;
+  additionally BIND-all disabled +3.44%; additionally confinement disabled
+  (instead) +3.23%. Every runtime NUMA mechanism is exonerated: the bulk of
+  the cost survives with all of them off.
+- **L4 introduction-point pin (rotating, n=12):** v4-final ON geomean
+  **+4.22%**; v3-final (pre-v4, 273a776194) ON geomean **+4.23%** — identical.
+  v4 added ~nothing net (it shifted cost between the micros: v4 is worse on
+  Malloc8, better on Malloc16; v3 the reverse).
+
+**Attribution:** the 1P alloc-micro cost is a **compile-time structural cost
+of the experiment-ON build's shared allocator paths**, present since WS-B
+(task 9's per-node mcentral restructure — 2×numaMaxHeapNodes spanSet arrays
+per mcentral and the reshaped cacheSpan — is the prime suspect: it is the
+piece that remains when every runtime mechanism is ablated). It is NOT
+bimodality, NOT the v4 windows, NOT routing at runtime, NOT BIND-all, NOT
+confinement. The off build remains provably byte-identical (census), and the
+1P *real-workload* gate (json) passes at +1.35% — the micro overstates
+deployment impact. Remediation, if ever needed, must target the ON build's
+data-structure footprint (e.g. sizing the per-node arrays to the topology at
+runtime is impossible for compile-time arrays; a smaller numaMaxHeapNodes
+variant or an mcentral layout that keeps per-node sets out of the hot
+cacheline are the plausible directions). The L3 candidate fix from the plan
+("skip the windowed path while confined") is moot — the windows are not the
+cost — and was not implemented.
+
+**Collateral find (A2), fixed:** with streams on but windows never armed —
+the production analog is a node whose window is INVALID (rare wrapped
+randomized layouts) — the routed allocSpan path paid a homed grow per refill
+forever (+22% and unbounded VA growth in the A2 arm), because the
+out-of-window latch can only fire for valid windows. Both routed grow-once
+sites now guard on `numaWindowSpan` usability (valid + unlatched); the
+unarmed-sentinel bootstrap keeps its grow. Census clean; battery green.
