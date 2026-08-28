@@ -254,7 +254,12 @@ func (c *mcache) allocLarge(size uintptr, noscan bool) *mspan {
 	deductSweepCredit(npages*pageSize, npages)
 
 	spc := makeSpanClass(0, noscan)
-	s := mheap_.alloc(npages, spc)
+	// Large objects bypass mcentral's per-node refill routing entirely
+	// (routing is deliberately scoped to mcentral.cacheSpan); pass
+	// numaAllocNodeAuto so allocSpan keeps determining the grow-homing
+	// node itself, at grow frequency, exactly as before per-node
+	// routing existed.
+	s := mheap_.alloc(npages, spc, numaAllocNodeAuto)
 	if s == nil {
 		throw("out of memory")
 	}

@@ -882,6 +882,32 @@ func numaGrowNode() (stream int32, homed bool) {
 	if !numaHeapStreamsEnabled {
 		return 0, false
 	}
+	if goexperiment.Numa && numaPlacementActive() {
+		// The goexperiment.Numa guard is compile-time: without it the
+		// placement branch reads mutable vars the off build cannot fold
+		// away, growing this function past the inlining threshold and
+		// changing the off binary's generated code.
+		//
+		// Placement path: key routing and growth homing by
+		// the current P's assigned home -- no syscall, and it is the
+		// node enforcement (numaNoteSchedule) converges this M to:
+		// memory goes where the consumer is KEPT, not where it happened
+		// to be observed. The home < numaMaxHeapNodes check is
+		// defensive: placement eligibility already
+		// declines when any CPU-bearing node id >= numaMaxHeapNodes,
+		// but this function's contract -- node is always a valid index
+		// into the per-node spanSet/arenaHints/curArena arrays -- is
+		// enforced HERE for the getcpu path below and must be enforced
+		// for the placement key too, not inherited from a predicate
+		// computed once at startup.
+		gp := getg()
+		if gp != nil && gp.m != nil && gp.m.p != 0 {
+			if home, ok := gp.m.p.ptr().numa.home(); ok && int32(home) < numaMaxHeapNodes {
+				return int32(home), true
+			}
+		}
+		// No P (or no home): fall through to the getcpu observation.
+	}
 	node := numaCurrentNode()
 	if node < 0 || node >= numaMaxHeapNodes {
 		return 0, false

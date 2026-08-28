@@ -1128,9 +1128,14 @@ func (s spanAllocType) manual() bool {
 //
 // spanclass indicates the span's size class and scannability.
 //
+// node is the NUMA node argument threaded down to
+// allocSpan/grow -- pass numaAllocNodeAuto for the original
+// behavior (allocSpan determines the grow-homing node itself, at grow
+// frequency).
+//
 // Returns a span that has been fully initialized. span.needzero indicates
 // whether the span has been zeroed. Note that it may not be.
-func (h *mheap) alloc(npages uintptr, spanclass spanClass) *mspan {
+func (h *mheap) alloc(npages uintptr, spanclass spanClass, node int32) *mspan {
 	// Don't do any operations that lock the heap on the G stack.
 	// It might trigger stack growth, and the stack growth code needs
 	// to be able to allocate heap.
@@ -1141,7 +1146,7 @@ func (h *mheap) alloc(npages uintptr, spanclass spanClass) *mspan {
 		if !isSweepDone() {
 			h.reclaim(npages)
 		}
-		s = h.allocSpan(npages, spanAllocHeap, spanclass)
+		s = h.allocSpan(npages, spanAllocHeap, spanclass, node)
 	})
 	return s
 }
@@ -1167,7 +1172,7 @@ func (h *mheap) allocManual(npages uintptr, typ spanAllocType) *mspan {
 	if !typ.manual() {
 		throw("manual span allocation called with non-manually-managed type")
 	}
-	return h.allocSpan(npages, typ, 0)
+	return h.allocSpan(npages, typ, 0, numaAllocNodeAuto)
 }
 
 // setSpans modifies the span map so [spanOf(base), spanOf(base+npage*pageSize))
@@ -1347,8 +1352,12 @@ func (h *mheap) freeMSpanLocked(s *mspan) {
 // allocSpan must be called on the system stack both because it acquires
 // the heap lock and because it must block GC transitions.
 //
+// node is the NUMA node argument for any heap growth this call
+// triggers -- see resolveGrowNode and the
+// numaAllocNode* sentinels above for its meaning.
+//
 //go:systemstack
-func (h *mheap) allocSpan(npages uintptr, typ spanAllocType, spanclass spanClass) (s *mspan) {
+func (h *mheap) allocSpan(npages uintptr, typ spanAllocType, spanclass spanClass, node int32) (s *mspan) {
 	// Function-global state.
 	gp := getg()
 	base, scav := uintptr(0), uintptr(0)
@@ -1358,6 +1367,28 @@ func (h *mheap) allocSpan(npages uintptr, typ spanAllocType, spanclass spanClass
 	// allocations. Where the page size is less than the physical page
 	// size, we already manage to do this by default.
 	needPhysPageAlign := physPageAlignedStacks && typ == spanAllocStack && pageSize < physPageSize
+
+	// NUMA stream-window routing: heap spans
+	// only, and only under a syscall-free node key -- the caller's
+	// explicit refill node (mcentral's path; getcpu already paid at
+	// refill frequency there), or the current P's placement home (two
+	// byte loads). numaAllocNodeAuto callers without placement stay
+	// exactly as lazy as today (resolveGrowNode at grow frequency);
+	// no getcpu ever runs at allocSpan frequency.
+	// routeNode < 0 means "no routing": every branch below collapses
+	// to stock behavior.
+	routeNode := int32(-1)
+	if goexperiment.Numa && typ == spanAllocHeap && numaHeapStreamsEnabled && numaHeapHomingActive() {
+		if node >= 0 && node < numaMaxHeapNodes {
+			routeNode = node
+		} else if node == numaAllocNodeAuto && numaPlacementActive() {
+			if pp := gp.m.p.ptr(); pp != nil {
+				if home, ok := pp.numa.home(); ok && int32(home) < numaMaxHeapNodes {
+					routeNode = int32(home)
+				}
+			}
+		}
+	}
 
 	// If the allocation is small enough, try the page cache!
 	// The page cache does not support aligned allocations, so we cannot use
@@ -1369,7 +1400,36 @@ func (h *mheap) allocSpan(npages uintptr, typ spanAllocType, spanclass spanClass
 		// If the cache is empty, refill it.
 		if c.empty() {
 			lock(&h.lock)
-			*c = h.pages.allocToCache()
+			if goexperiment.Numa && routeNode >= 0 {
+				// Windowed fill first. On a miss, grow
+				// homed ONCE and retry, mirroring the direct path's
+				// strictly bounded shape -- without this, the plain fill
+				// below grabs the lowest free addresses (typically
+				// another node's stream window), and every small span
+				// carved from this 64-page cache is remote-labeled for
+				// its lifetime and recycles into the wrong node's
+				// spanSets: one transient miss becomes a persistent
+				// pollution regime (observed as bimodal ~72%-vs-94%
+				// locality across launches on a 2-node machine). Skipped when
+				// the node's window is latched off -- growth cannot
+				// land in-window then, and growing 4 MiB per cache
+				// fill would be pure waste.
+				*c = h.pages.allocToCacheNode(routeNode)
+				if c.empty() {
+					// Same usable-window guard as the direct path
+					// below: numaWindowSpan covers both the latch and
+					// the invalid-window case.
+					if _, _, wok := h.pages.numaWindowSpan(routeNode); wok {
+						if g, ok := h.grow(1, routeNode); ok {
+							growth += g
+							*c = h.pages.allocToCacheNode(routeNode)
+						}
+					}
+				}
+			}
+			if c.empty() {
+				*c = h.pages.allocToCache()
+			}
 			unlock(&h.lock)
 		}
 
@@ -1404,7 +1464,7 @@ func (h *mheap) allocSpan(npages uintptr, typ spanAllocType, spanclass spanClass
 		base, _ = h.pages.find(npages + extraPages)
 		if base == 0 {
 			var ok bool
-			growth, ok = h.grow(npages+extraPages, numaGrowNodeArg())
+			growth, ok = h.grow(npages+extraPages, resolveGrowNode(node))
 			if !ok {
 				unlock(&h.lock)
 				return nil
@@ -1418,12 +1478,49 @@ func (h *mheap) allocSpan(npages uintptr, typ spanAllocType, spanclass spanClass
 		scav = h.pages.allocRange(base, npages)
 	}
 
+	if base == 0 && goexperiment.Numa && routeNode >= 0 {
+		// Routed direct path (strictly
+		// bounded): one windowed alloc; on miss, one homed grow (which
+		// latches the node's window off if growth lands outside it);
+		// one windowed retry; then unconditional fall-through to the
+		// stock unrestricted sequence below regardless of why these
+		// missed. Homed-grow-BEFORE-unrestricted-reuse is the point:
+		// the stock order (reuse-anywhere first) is exactly the
+		// cross-node consumption measurement showed defeats placement
+		// locality; the footprint this trades is bounded (one grow,
+		// verified against RSS in benchmarks). If the grow
+		// here succeeds but the retry misses (out-of-window growth),
+		// the unrestricted alloc below is satisfied by that growth
+		// without growing again, so the stock branch's `growth`
+		// assignment stays effectively unreachable and the scavenge
+		// accounting at HaveSpan sees this growth.
+		var ok bool
+		base, scav, ok = h.pages.allocNode(npages, routeNode)
+		if !ok {
+			// Grow-once only while the node's window is usable (valid
+			// and unlatched): a node whose window can NEVER hit -- the
+			// invalid-window case on rare wrapped randomized layouts --
+			// would otherwise pay a homed grow per direct allocSpan
+			// forever, since the out-of-window latch requires a valid
+			// window to fire (an ablation study, which
+			// measured that exact state at +22% and unbounded VA
+			// growth). The unarmed-sentinel case (valid window, not
+			// grown into yet) keeps the grow: that IS the bootstrap
+			// that arms the window.
+			if _, _, wok := h.pages.numaWindowSpan(routeNode); wok {
+				if g, grewOK := h.grow(npages, routeNode); grewOK {
+					growth += g
+					base, scav, _ = h.pages.allocNode(npages, routeNode)
+				}
+			}
+		}
+	}
 	if base == 0 {
 		// Try to acquire a base address.
 		base, scav = h.pages.alloc(npages)
 		if base == 0 {
 			var ok bool
-			growth, ok = h.grow(npages, numaGrowNodeArg())
+			growth, ok = h.grow(npages, resolveGrowNode(node))
 			if !ok {
 				unlock(&h.lock)
 				return nil
@@ -1671,6 +1768,54 @@ func (h *mheap) initSpan(s *mspan, typ spanAllocType, spanclass spanClass, base,
 	// Make sure the newly allocated span will be observed
 	// by the GC before pointers into the span are published.
 	publicationBarrier()
+}
+
+// Sentinels for the node argument threaded through mheap.alloc /
+// allocSpan: a level above mheap.grow's own
+// node < 0 "don't home" sentinel (see numaGrowNodeArg above grow's
+// doc comment), because allocSpan's callers fall into two different
+// cases that a single sentinel can't distinguish:
+//
+//   - numaAllocNodeAuto: the caller has no refill-routing decision to
+//     offer (allocManual, mcache.allocLarge) -- allocSpan should
+//     determine the grow-homing node itself, at grow frequency, via
+//     numaGrowNodeArg (a fresh getcpu reading), exactly the original
+//     behavior for these callers.
+//   - numaAllocNodeNoHome: the caller (mcentral.grow) already made a
+//     genuine-vs-not determination this refill cycle via
+//     numaRefillNode, and it came back not genuine. Growth must still
+//     decline to home (matching numaGrowNodeArg's own homed=false
+//     collapse), but WITHOUT a second getcpu call -- that would
+//     violate the "getcpu once per refill" contract, and would almost
+//     always just reconfirm the same non-genuine answer anyway (the
+//     conditions that make a reading non-genuine -- disabled streams,
+//     node >= numaMaxHeapNodes -- are static for the process, not
+//     transient, except for an outright failed getcpu).
+//
+// Both are negative and distinct from mheap.grow's own node < 0
+// sentinel space (resolveGrowNode below is exactly the translation
+// from this level's sentinels to that one).
+const (
+	numaAllocNodeAuto   int32 = -1
+	numaAllocNodeNoHome int32 = -2
+)
+
+// resolveGrowNode translates an mheap.alloc/allocSpan-level node
+// argument (see the sentinels above) into the node argument
+// mheap.grow itself expects (a genuine node, or any negative value to
+// mean "don't home" -- numaGrowNodeArg's own convention). Called
+// lazily, only from within allocSpan's actual grow-call branches, so a
+// numaAllocNodeAuto caller still only pays for a getcpu reading when a
+// grow genuinely happens, exactly as before refill routing existed.
+func resolveGrowNode(node int32) int32 {
+	switch node {
+	case numaAllocNodeAuto:
+		return numaGrowNodeArg()
+	case numaAllocNodeNoHome:
+		return -1
+	default:
+		return node
+	}
 }
 
 // numaGrowNodeArg computes mheap.grow's node argument from
