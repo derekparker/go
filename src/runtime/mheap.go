@@ -1839,6 +1839,24 @@ func (h *mheap) grow(npage uintptr, node int32) (uintptr, bool) {
 	v := h.curArena[idx].base
 	h.curArena[idx].base = nBase
 
+	if goexperiment.Numa && node >= 0 {
+		// Homed growth
+		// landing outside the node's stream window means the window no
+		// longer represents this node's memory (genuine hint-run
+		// exhaustion -- mallocinit's in-window-first hint reorder makes
+		// anything else unreachable) -- permanently suppress the
+		// windowed path for this node. Arenas stay correctly tagged;
+		// only the window heuristic dies.
+		if lo, hi, ok := h.pages.numaWindowSpan(idx); ok {
+			if v < lo.addr() || nBase > hi.addr() {
+				h.pages.numaWindowLatch[idx] = true
+				if debug.numa > 0 {
+					println("numa: stream window latched off, node", idx, "growth at", hex(v))
+				}
+			}
+		}
+	}
+
 	// Transition the space we're going to use from Reserved to Prepared.
 	//
 	// The allocation is always aligned to the heap arena

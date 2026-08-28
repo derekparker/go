@@ -49,6 +49,7 @@ package runtime
 
 import (
 	"internal/goarch"
+	"internal/goexperiment"
 	"internal/runtime/atomic"
 	"internal/runtime/gc"
 	"unsafe"
@@ -255,6 +256,42 @@ type pageAlloc struct {
 	// are allocated and not worth searching.
 	searchAddr offAddr
 
+	// NUMA stream windows (GOEXPERIMENT=numa; see
+	// mpagealloc_numa.go). Everything here is written
+	// and read only from code reachable behind goexperiment.Numa call
+	// sites (mpagealloc_numa.go and its gated callers), so the off
+	// build carries only the numaMaxHeapNodes==1-sized zero-value
+	// fields and no code.
+	//
+	// numaWindows[n] is the address window of NUMA node n's heap arena
+	// stream ([lo, hi), chunk-aligned, computed once in mallocinit from
+	// the actual hint addresses; lo == hi means "no valid window").
+	//
+	// numaSearchAddr[n] is the windowed analog of searchAddr and obeys
+	// the SAME invariant: it points into inUse or is maxSearchAddr()
+	// (the unarmed/exhausted sentinel); additionally, no free memory in
+	// window n lies below it. It starts at the sentinel and is first
+	// armed by growth or a free landing inside the window.
+	//
+	// numaWindowLatch[n] latches true when homed growth for node n
+	// landed outside node n's window (hint-run exhaustion): from then
+	// on the windowed path is permanently suppressed for node n (the
+	// window no longer represents the node's memory; per-arena node
+	// tags remain the truth).
+	numaWindows     [numaMaxHeapNodes]struct{ lo, hi offAddr }
+	numaSearchAddr  [numaMaxHeapNodes]offAddr
+	numaWindowLatch [numaMaxHeapNodes]bool
+
+	// numaWindowsActive gates the windowed searchAddr maintenance
+	// hooks in grow/free/pageCache.flush/scavenge (<= numaMaxHeapNodes
+	// compares each). Armed once, in numaSchedinit, only when the
+	// windows can ever be consumed (streams enabled AND multi-node
+	// homing active) -- experiment-on single-node hosts never pay for
+	// the hooks. The window-consuming entry points
+	// (allocNode/allocToCacheNode) do not read this: an un-maintained
+	// window simply stays at the unarmed sentinel and misses.
+	numaWindowsActive bool
+
 	// start and end represent the chunk indices
 	// which pageAlloc knows about. It assumes
 	// chunks in the range [start, end) are
@@ -397,6 +434,14 @@ func (p *pageAlloc) grow(base, size uintptr) {
 	// new address, just like in free.
 	if b := (offAddr{base}); b.lessThan(p.searchAddr) {
 		p.searchAddr = b
+	}
+	if goexperiment.Numa && p.numaWindowsActive {
+		// Windowed mirror: growth into a
+		// stream window arms/lowers that window's searchAddr. Gated on
+		// homing (multi-node) so experiment-on single-node hosts pay
+		// nothing; compile-time guard keeps the off build
+		// byte-identical.
+		p.numaWindowLower(base)
 	}
 
 	// Add entries into chunks, which is sparse, if needed. Then,
@@ -943,6 +988,14 @@ func (p *pageAlloc) free(base, npages uintptr) {
 	// If we're freeing pages below the p.searchAddr, update searchAddr.
 	if b := (offAddr{base}); b.lessThan(p.searchAddr) {
 		p.searchAddr = b
+	}
+	if goexperiment.Numa && p.numaWindowsActive {
+		// Windowed mirror of the lowering
+		// above: a free into a stream window re-arms that window's
+		// searchAddr. Gated on homing (multi-node) so experiment-on
+		// single-node hosts pay nothing; compile-time guard keeps the
+		// off build byte-identical.
+		p.numaWindowLower(base)
 	}
 	limit := base + npages*pageSize - 1
 	if npages == 1 {

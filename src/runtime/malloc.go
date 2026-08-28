@@ -723,6 +723,17 @@ func mallocinit() {
 			hint.addr = p
 			hint.next, mheap_.arenaHints[node] = mheap_.arenaHints[node], hint
 		}
+
+		if goexperiment.Numa && numaHeapStreamsEnabled {
+			// Derive each stream's address window from the
+			// hint addresses just generated (never from an assumed
+			// layout -- randomizeHeapBase is baseline-ON, its spacing
+			// differs, and its random prefix wraps mod 256), and
+			// reorder any wrap-trimmed stream's hint chain so the
+			// in-window hints are consumed first. See
+			// numaInitStreamWindows (mpagealloc_numa.go).
+			numaInitStreamWindows()
+		}
 	} else {
 		// 32-bit: tight VA, the ultimate tight-VA-fallback case.
 		// numaHeapStreamsEnabled is already false here (its zero

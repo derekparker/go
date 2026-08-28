@@ -91,6 +91,7 @@
 package runtime
 
 import (
+	"internal/goexperiment"
 	"internal/goos"
 	"internal/runtime/atomic"
 	"internal/runtime/sys"
@@ -794,6 +795,14 @@ func (p *pageAlloc) scavengeOne(ci chunkIdx, searchIdx uint, max uintptr) uintpt
 			lock(p.mheapLock)
 			if b := (offAddr{addr}); b.lessThan(p.searchAddr) {
 				p.searchAddr = b
+			}
+			if goexperiment.Numa && p.numaWindowsActive {
+				// Windowed mirror: like pageCache.flush,
+				// this free-back bypasses pageAlloc.free, so the
+				// per-window searchAddr must be lowered here too (see
+				// the flush hook in mpagecache.go for the stale-high
+				// failure mode).
+				p.numaWindowLower(addr)
 			}
 			p.chunkOf(ci).free(base, npages)
 			p.update(addr, uintptr(npages), true, false)

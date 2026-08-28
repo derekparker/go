@@ -132,6 +132,17 @@ func numaSchedinit() {
 	numaBuildNodeCPUMaskCache()
 	numaSetProcessBindAll()
 	numaDetectStartupAffinity()
+	if numaHeapStreamsEnabled && numaHeapHomingActive() {
+		// Arm the windowed searchAddrs and their maintenance hooks
+		// (see pageAlloc.numaArmWindows for why each window's
+		// searchAddr must be seeded from the CURRENT inUse set rather
+		// than left for the first post-arm lowering -- pre-arm heap
+		// growth already holds free pages). This is the earliest point
+		// with the topology known; mallocinit computed the windows but
+		// could not know whether the machine is multi-node. Still
+		// single-threaded (m0 only).
+		mheap_.pages.numaArmWindows()
+	}
 	if debug.numa > 0 {
 		println("numa: nodes", numaTopology.NumNodes, "allowed", numaTopology.NumAllowedNodes)
 	}
