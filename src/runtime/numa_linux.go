@@ -1038,3 +1038,203 @@ func numaDetectStartupAffinity() {
 	}
 	numaStartupFullAffinity = numaAffinityPopcount(numaStartupAffinity[:r]) == numaOnlineCPUCount()
 }
+
+// ---- P/goroutine node placement ----
+//
+// Each P gets a home node
+// (numaAssignPHomes, proportional contiguous partition); the M running
+// a P converges to that P's node (numaNoteSchedule's placement path);
+// refill routing and heap-growth homing key off the same assignment
+// (numaGrowNode). Every consumer checks numaPlacementActive first --
+// the pairing rule: assignment may only be consumed while enforcement
+// is active.
+
+// numaPlacementEligible is the startup half of numaPlacementActive,
+// computed ONCE by numaPlacementInit from schedinit, immediately after
+// numaConfineIfSmall has made the confinement decision (single-threaded,
+// m0 only -- the same window as every other numa startup decision, and
+// deliberately AFTER confinement so mutual exclusivity holds by
+// construction).
+var numaPlacementEligible bool
+
+// numaPlacementActive reports whether P-home placement is consumed
+// anywhere. numaStoodDown can in fact never latch in a
+// placement-eligible process (stand-down requires numaConfined, and a
+// confined process is permanently placement-ineligible -- see
+// numaPlacementInit); the term is defense-in-depth, not a live path.
+func numaPlacementActive() bool {
+	return numaPlacementEligible && !numaStoodDown.Load()
+}
+
+// numaPlacementDeclined prints the decline reason under GODEBUG=numa=1.
+func numaPlacementDeclined(reason string) {
+	if debug.numa > 0 {
+		println("numa: placement declined:", reason)
+	}
+}
+
+// numaPlacementInit computes numaPlacementEligible. Runs once from
+// schedinit (via the goexperiment.Numa-gated call site there), after
+// numaConfineIfSmall. The checks mirror numaShouldConfine's ordering
+// and diagnostics.
+func numaPlacementInit() {
+	if numaTopology.NumNodes < 2 {
+		// Single-node (or unknown) machine: silently ineligible, the
+		// same no-print rule numaShouldConfine applies to this case.
+		return
+	}
+	if numaTopology.TruncatedNodes {
+		numaPlacementDeclined("topology truncated")
+		return
+	}
+	if !numaHeapStreamsEnabled {
+		numaPlacementDeclined("heap streams disabled")
+		return
+	}
+	// The per-node spanSet/arenaHints/curArena arrays are
+	// sized numaMaxHeapNodes, and the placement key feeds them via
+	// numaGrowNode. A CPU-bearing node with an id past that bound
+	// (sparse/CXL ids, >8-node boxes) would home Ps to an index the
+	// heap arrays do not have -- the whole feature declines instead.
+	for i := int32(0); i < numaTopology.NumNodes; i++ {
+		if numaTopology.Nodes[i].NumCPUs > 0 && numaTopology.Nodes[i].ID >= numaMaxHeapNodes {
+			numaPlacementDeclined("CPU-bearing node id beyond heap streams")
+			return
+		}
+	}
+	if !numaHasSetAffinity {
+		numaPlacementDeclined("no sched_setaffinity on this arch")
+		return
+	}
+	if !numaStartupFullAffinity {
+		numaPlacementDeclined("narrowed startup affinity")
+		return
+	}
+	if numaConfined.Load() {
+		numaPlacementDeclined("confined (fill-one-socket active)")
+		return
+	}
+	numaPlacementEligible = true
+	if debug.numa > 0 {
+		println("numa: placement eligible")
+	}
+}
+
+// numaPlacementQuotas computes per-node P quotas for nprocs Ps over the
+// CPU-bearing nodes described by cpus (index = node id; 0 = no CPUs on
+// that node), writing them to quotas (same indexing; len(cpus) ==
+// len(quotas) <= numaMaxHeapNodes). Pure function: largest-remainder
+// proportional split (int64 products), remainder
+// distributed one P per node in decreasing-remainder order with ties to
+// the lower node id, then the >=1 rule: every CPU-bearing node gets at
+// least one P while some node still has more than one to give.
+func numaPlacementQuotas(nprocs int32, cpus, quotas []int32) {
+	clear(quotas)
+	var total int64
+	for _, c := range cpus {
+		total += int64(c)
+	}
+	if total == 0 || nprocs <= 0 {
+		return
+	}
+	var assigned int32
+	for i, c := range cpus {
+		q := int32(int64(nprocs) * int64(c) / total)
+		quotas[i] = q
+		assigned += q
+	}
+	var bumped [numaMaxHeapNodes]bool
+	for assigned < nprocs {
+		best, bestRem := -1, int64(-1)
+		for i, c := range cpus {
+			if c == 0 || bumped[i] {
+				continue
+			}
+			if rem := int64(nprocs) * int64(c) % total; rem > bestRem {
+				best, bestRem = i, rem
+			}
+		}
+		if best < 0 {
+			break // unreachable: remainder count < CPU-bearing node count
+		}
+		bumped[best] = true
+		quotas[best]++
+		assigned++
+	}
+	for {
+		zero := -1
+		for i, c := range cpus {
+			if c > 0 && quotas[i] == 0 {
+				zero = i
+				break
+			}
+		}
+		if zero < 0 {
+			return
+		}
+		donor, donorQuota := -1, int32(1)
+		for i, q := range quotas {
+			if q > donorQuota {
+				donor, donorQuota = i, q
+			}
+		}
+		if donor < 0 {
+			return // nprocs < CPU-bearing node count: some nodes stay at 0
+		}
+		quotas[donor]--
+		quotas[zero]++
+	}
+}
+
+// numaAssignPHomes (re)assigns contiguous home-node ranges to
+// allp[:nprocs]. Called from schedinit (right after numaPlacementInit --
+// the bootstrap procresize runs BEFORE the placement
+// decision, so waiting for "the next procresize" would leave every home
+// unassigned until the first STW, exactly the ramp-up phase in which
+// the heap gets laid out and homed) and from procresize under
+// sched.lock with the world stopped -- so plain stores are race-free,
+// and GOMAXPROCS changes recompute quotas by construction. When
+// placement is inactive it clears every home, so a stale assignment can
+// never be consumed after (defense-in-depth; see numaPlacementActive).
+func numaAssignPHomes(nprocs int32) {
+	if !numaPlacementActive() {
+		for i := int32(0); i < nprocs; i++ {
+			allp[i].numa.clearHome()
+		}
+		return
+	}
+	var cpus, quotas [numaMaxHeapNodes]int32
+	for i := int32(0); i < numaTopology.NumNodes; i++ {
+		id := numaTopology.Nodes[i].ID
+		if id >= 0 && id < numaMaxHeapNodes {
+			cpus[id] = numaTopology.Nodes[i].NumCPUs
+		}
+	}
+	numaPlacementQuotas(nprocs, cpus[:], quotas[:])
+	node, remaining := int32(0), quotas[0]
+	for i := int32(0); i < nprocs; i++ {
+		for remaining == 0 && node < numaMaxHeapNodes-1 {
+			node++
+			remaining = quotas[node]
+		}
+		if remaining == 0 {
+			// Defensive only: numaPlacementQuotas distributes exactly
+			// nprocs Ps whenever total CPUs > 0, which eligibility
+			// guarantees. Leave the P unassigned rather than invent a
+			// home (consumers fall back to getcpu).
+			allp[i].numa.clearHome()
+			continue
+		}
+		allp[i].numa.setHome(int8(node))
+		remaining--
+	}
+	if debug.numa > 0 {
+		print("numa: P homes:")
+		for n := int32(0); n < numaMaxHeapNodes; n++ {
+			if quotas[n] > 0 {
+				print(" node", n, "=[", quotas[n], "]")
+			}
+		}
+		println()
+	}
+}

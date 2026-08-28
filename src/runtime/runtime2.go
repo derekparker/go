@@ -934,6 +934,16 @@ type p struct {
 	// goroutinesCreated is the total count of goroutines created by this P.
 	goroutinesCreated uint64
 
+	// numa is this P's NUMA placement state: the home node
+	// numaAssignPHomes assigned it (see numaAssignPHomes and
+	// numaPlacementActive in numa_linux.go). Placed before xRegs, never
+	// last, for the same reason as m.numa: with the experiment off
+	// pNUMAState is empty (struct{}), and a zero-size field in last
+	// position would force trailing padding and grow p; here it costs
+	// zero bytes, keeping the off build's p byte-identical to one with
+	// no NUMA field at all. See numa_pstate_on.go / numa_pstate_off.go.
+	numa pNUMAState
+
 	// xRegs is the per-P extended register state used by asynchronous
 	// preemption. This is an empty struct on platforms that don't use extended
 	// register state.

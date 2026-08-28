@@ -134,6 +134,19 @@ func (p *PageAlloc) ArmNUMAWindows() {
 	(*pageAlloc)(p).numaArmWindows()
 }
 
+// NumaCurrentPHomeForTest returns the calling goroutine's current P's
+// assigned placement home, or -1 (no P, no home, or placement off).
+func NumaCurrentPHomeForTest() int32 {
+	gp := getg()
+	if gp == nil || gp.m == nil || gp.m.p == 0 {
+		return -1
+	}
+	if home, ok := gp.m.p.ptr().numa.home(); ok {
+		return int32(home)
+	}
+	return -1
+}
+
 // NumaArenaNodeOfForTest returns the home-node tag of the heap arena
 // containing addr (0 for untagged/unhomed arenas -- same convention as
 // numaArenaNode).

@@ -98,3 +98,23 @@ func numaHeapHomingActive() bool {
 //go:nosplit
 func numaBindGrowth(addr unsafe.Pointer, size uintptr, node int32) {
 }
+
+// numaPlacementInit is a no-op on non-Linux platforms: P-placement
+// eligibility depends on Linux-only topology and affinity machinery
+// (see numa_linux.go). Its call site in schedinit is gated on
+// goexperiment.Numa.
+func numaPlacementInit() {
+}
+
+// numaPlacementActive is always false on non-Linux platforms, for the
+// same reason as numaPlacementInit above; see numa_linux.go for the
+// real implementation.
+func numaPlacementActive() bool {
+	return false
+}
+
+// numaAssignPHomes is a no-op on non-Linux platforms: with
+// numaPlacementActive always false, no P home is ever consumed. Its
+// call sites (schedinit, procresize) are gated on goexperiment.Numa.
+func numaAssignPHomes(nprocs int32) {
+}

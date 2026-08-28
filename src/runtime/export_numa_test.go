@@ -9,15 +9,30 @@
 // referencing them would break every non-Linux build of the runtime test
 // archive, so this file carries its own //go:build linux tag.
 //
+// This file's (amd64 || arm64) restriction is a test-scoping one, not a
+// link-safety one: every export below except NumaGetCPUNodeForTest
+// (split out into export_numa_getcpu_test.go, which carries a wider tag
+// -- see that file) depends on numaSetThreadAffinity, which only has a
+// real implementation on amd64/arm64 (see numa_linux_affinity.go /
+// numa_linux_affinity_other.go and numaHasSetAffinity); elsewhere it is
+// always a false-returning stub. So on every other Linux architecture, a
+// test relying on these exports would either always-skip or always-fail
+// rather than exercise real behavior. This file (and numa_linux_test.go,
+// which carries the same restriction) is kept scoped to the
+// architectures affinity actually works on -- the ones CI/this task's
+// hardware exercise. Widening this to every getcpu-capable architecture
+// is tracked as future work alongside numaHasSetAffinity itself (see
+// numa_linux.go's numaShouldConfine).
+//
 // The additional goexperiment.numa tag matters independently of the
 // above: this file is package runtime (not runtime_test), so it is
 // compiled into the runtime test archive even with the experiment off.
 // Without this tag, an export like NumaSetThreadAffinitySelfForTest below
 // would give the experiment-off test binary a reachable call path into
-// confinement code, defeating the dead-code elimination the series'
-// binary census checks for. Every export in this file is only ever
-// referenced from numa_linux_test.go, which already carries this same
-// tag, so gating the whole file this way costs nothing.
+// confinement code, defeating the dead-code elimination Gate 8's census
+// checks for. Every export in this file is only ever referenced from
+// numa_linux_test.go, which already carries this same tag, so gating the
+// whole file this way costs nothing.
 
 //go:build linux && goexperiment.numa
 
@@ -64,8 +79,8 @@ func NumaSetThreadAffinitySelfForTest() bool {
 }
 
 // NumaHasSetAffinityForTest reports whether this platform implements
-// numaSetThreadAffinity (see numaHasSetAffinity in
-// numa_linux_affinity.go).
+// numaSetThreadAffinity (see numaHasSetAffinity in numa_linux_affinity.go
+// / numa_linux_affinity_other.go).
 func NumaHasSetAffinityForTest() bool { return numaHasSetAffinity }
 
 // NumaIsNodeCPUCountForTest reports whether n equals some node's CPU count.
@@ -91,13 +106,47 @@ func NumaConfinedForTest() bool { return numaConfined.Load() }
 // explicit taskset of its own) is cpuset/taskset-narrowed for reasons
 // outside this package's control.
 //
-// Deliberately reads numaStartupFullAffinity (a snapshot
-// numaDetectStartupAffinity took once, unconditionally, from schedinit
-// while m0 was still the only thread) rather than re-reading
-// sched_getaffinity(0, ...) live on the calling M: the startup-time
-// snapshot is captured before any of this process's own
-// GOEXPERIMENT=numa narrowing could possibly have run, so it can never
-// confuse the runtime's own doing with the environment's.
+// Deliberately reads numaStartupFullAffinity/numaStartupAffinity (a
+// snapshot numaDetectStartupAffinity took once, unconditionally, from
+// schedinit while m0 was still the only thread) rather than re-reading
+// sched_getaffinity(0, ...) live on the calling M: an earlier version of
+// this function did exactly that live re-read, and on real multi-node
+// hardware it produced false positives -- the calling test goroutine's
+// own M can itself be soft-affinity-narrowed by this SAME test binary's
+// own node-mask soft affinity (task 10) at the moment this function
+// runs, which has nothing to do with the environment and would
+// otherwise make every test using this helper spuriously Skip. The
+// startup-time snapshot is immune to that: it is captured before any
+// scheduling, and therefore before any soft-affinity or confinement
+// narrowing, could possibly have run.
 func NumaHostAffinityNarrowedForTest() bool {
 	return !numaStartupFullAffinity
+}
+
+// NumaPlacementQuotasForTest runs the pure quota partition function
+// behind numaAssignPHomes on an arbitrary topology (v4 stage 2).
+// len(cpus) must be <= numaMaxHeapNodes.
+func NumaPlacementQuotasForTest(nprocs int32, cpus []int32) []int32 {
+	quotas := make([]int32, len(cpus))
+	numaPlacementQuotas(nprocs, cpus, quotas)
+	return quotas
+}
+
+// NumaPlacementActiveForTest reports whether P-home placement is
+// currently consumed (see numaPlacementActive in numa_linux.go).
+func NumaPlacementActiveForTest() bool { return numaPlacementActive() }
+
+// NumaPHomesForTest snapshots every current P's assigned NUMA home
+// (-1 = unassigned). Reads allp without synchronization -- callers must
+// not race it against a concurrent GOMAXPROCS change.
+func NumaPHomesForTest() []int8 {
+	homes := make([]int8, gomaxprocs)
+	for i := range homes {
+		if home, ok := allp[i].numa.home(); ok {
+			homes[i] = home
+		} else {
+			homes[i] = -1
+		}
+	}
+	return homes
 }

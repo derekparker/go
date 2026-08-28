@@ -228,6 +228,104 @@ func parsePlacement(t *testing.T, out, label string) (aff int, mode int) {
 	return 0, 0
 }
 
+// TestNUMAPlacementQuota exercises the pure largest-remainder quota
+// function behind numaAssignPHomes (v4 stage 2, design
+// numa-design/v4-placement-design.md §3/§9). Table cases lock in: even
+// splits, the tie→lower-id rule, largest-remainder distribution, the
+// ≥1 redistribution rule firing (skewed CPU counts) and deliberately
+// NOT firing (more nodes than Ps), CPU-less nodes never receiving Ps,
+// and the degenerate zero-procs case.
+func TestNUMAPlacementQuota(t *testing.T) {
+	tests := []struct {
+		nprocs int32
+		cpus   []int32
+		want   []int32
+	}{
+		{256, []int32{128, 128}, []int32{128, 128}},
+		{200, []int32{128, 128}, []int32{100, 100}},
+		{3, []int32{128, 128}, []int32{2, 1}},                 // tie -> lower node id
+		{1, []int32{128, 128}, []int32{1, 0}},                 // fewer Ps than nodes
+		{5, []int32{64, 128}, []int32{2, 3}},                  // largest remainder -> node 0
+		{4, []int32{1000, 1, 1, 1}, []int32{1, 1, 1, 1}},      // >=1 rule genuinely fires
+		{2, []int32{128, 128, 128, 128}, []int32{1, 1, 0, 0}}, // >=1 rule must NOT fire
+		{6, []int32{0, 128, 0, 128}, []int32{0, 3, 0, 3}},     // CPU-less nodes skipped
+		{0, []int32{128, 128}, []int32{0, 0}},
+	}
+	for _, tt := range tests {
+		got := runtime.NumaPlacementQuotasForTest(tt.nprocs, tt.cpus)
+		if len(got) != len(tt.want) {
+			t.Fatalf("quotas(%d, %v): got %v, want %v", tt.nprocs, tt.cpus, got, tt.want)
+		}
+		var sum int32
+		for i := range got {
+			sum += got[i]
+			if got[i] != tt.want[i] {
+				t.Errorf("quotas(%d, %v) = %v, want %v", tt.nprocs, tt.cpus, got, tt.want)
+				break
+			}
+		}
+		if tt.nprocs > 0 && sum != tt.nprocs {
+			t.Errorf("quotas(%d, %v) = %v: sum %d != nprocs", tt.nprocs, tt.cpus, got, sum)
+		}
+	}
+}
+
+// TestNUMAPlacementActivePredicate checks the pairing-rule predicate's
+// environment-independent invariants (full eligibility is exercised on
+// real multi-node hardware by the placement hardware tests): placement
+// can never be active while confinement is (mutual exclusivity, design
+// §2), and never on a single-node machine or under a narrowed inherited
+// affinity.
+func TestNUMAPlacementActivePredicate(t *testing.T) {
+	active := runtime.NumaPlacementActiveForTest()
+	if runtime.NumaConfinedForTest() && active {
+		t.Fatal("placement active while confined: mutual exclusivity violated")
+	}
+	if runtime.NumaNumNodes() < 2 && active {
+		t.Fatal("placement active on a single-node machine")
+	}
+	if runtime.NumaHostAffinityNarrowedForTest() && active {
+		t.Fatal("placement active despite narrowed startup affinity")
+	}
+}
+
+// TestNUMAPlacementProcresize churns GOMAXPROCS and asserts the per-P
+// home assignment invariants after each change: with placement active,
+// homes are assigned contiguously (non-decreasing node ids, every P
+// covered); with placement inactive (single-node box, narrowed
+// affinity, confined, ...), every home is cleared. Exercises the
+// procresize call site (v4 placement design §3) on any Linux machine;
+// the quota VALUES are covered by TestNUMAPlacementQuota and the
+// multi-node behavior by the hardware tests.
+func TestNUMAPlacementProcresize(t *testing.T) {
+	defer runtime.GOMAXPROCS(runtime.GOMAXPROCS(0))
+	for _, n := range []int{1, 4, 2, 8} {
+		runtime.GOMAXPROCS(n)
+		homes := runtime.NumaPHomesForTest()
+		if len(homes) != n {
+			t.Fatalf("GOMAXPROCS(%d): got %d homes", n, len(homes))
+		}
+		if runtime.NumaPlacementActiveForTest() {
+			last := int8(0)
+			for i, h := range homes {
+				if h < 0 {
+					t.Fatalf("GOMAXPROCS(%d): P %d unassigned while placement active: %v", n, i, homes)
+				}
+				if h < last {
+					t.Fatalf("GOMAXPROCS(%d): homes not contiguous: %v", n, homes)
+				}
+				last = h
+			}
+		} else {
+			for i, h := range homes {
+				if h >= 0 {
+					t.Fatalf("GOMAXPROCS(%d): P %d has home %d while placement inactive", n, i, h)
+				}
+			}
+		}
+	}
+}
+
 // TestNUMAStreamWindows checks the REAL mallocinit-computed stream
 // windows (v4 stage 4 Task P2): with heap streams enabled, every valid
 // window is chunk-aligned and pairwise disjoint, and each node's first

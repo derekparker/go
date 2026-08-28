@@ -959,6 +959,14 @@ func schedinit() {
 		// (numaSetProcessBindAll) already
 		// ran in numaSchedinit above and stays the fallback.
 		numaConfineIfSmall(procs)
+		// P-home placement decides AFTER confinement (mutual
+		// exclusivity: a confined process is single-node and gets no
+		// placement) and assigns homes right here rather than waiting
+		// for the next procresize -- the bootstrap procresize above ran
+		// before this decision, and the first STW can be a whole heap
+		// ramp-up away.
+		numaPlacementInit()
+		numaAssignPHomes(procs)
 	}
 
 	// World is effectively started now, as P's can run.
@@ -6180,6 +6188,15 @@ func procresize(nprocs int32) *p {
 		}
 		pp.init(i)
 		atomicstorep(unsafe.Pointer(&allp[i]), unsafe.Pointer(pp))
+	}
+
+	if goexperiment.Numa {
+		// Recompute every P's NUMA home for the new nprocs (quotas are
+		// proportional to node CPU counts, so a GOMAXPROCS change moves
+		// them). sched.lock is held and the world is stopped here --
+		// the only write context pNUMAState allows. Clears all homes
+		// when placement is inactive.
+		numaAssignPHomes(nprocs)
 	}
 
 	gp := getg()
