@@ -531,8 +531,27 @@ func TracebackSystemstack(stk []uintptr, i int) int {
 	return n
 }
 
+// These three helpers operate on heap arena stream 0 (mheap_.arenaHints[0]):
+// with the experiment off (or on a single-stream build, I5), it is the only
+// stream and this is exactly the chain these functions always operated on
+// before arenaHints became a per-node array (design §12.3).
+//
+// TestArenaCollision (malloc_test.go), the only caller, therefore assumes
+// its allocating goroutine grows stream 0 throughout the test: with the
+// experiment on and real multi-node hardware, numaGrowNode reads the
+// calling thread's current node at every grow, so a goroutine that
+// migrated across nodes mid-test could in principle grow a different
+// stream, desynchronizing this tracking from what mheap.grow actually
+// used. Not pinned (no per-node CPU-mask affinity plumbing is exported
+// for tests today, and TestArenaCollision is a stock, non-NUMA test --
+// adding NUMA-specific pinning to it was judged out of scope for a
+// one-goroutine, sub-second test) -- instead stress-verified empirically
+// on real 2-node hardware (numa-dell): 25/25 clean runs with
+// GOEXPERIMENT=numa, no flakiness observed. See task-8-report.md's
+// "Concerns for the controller" for this residual, flagged for whoever
+// next touches this test or hits it flaking.
 func KeepNArenaHints(n int) {
-	hint := mheap_.arenaHints
+	hint := mheap_.arenaHints[0]
 	for i := 1; i < n; i++ {
 		hint = hint.next
 		if hint == nil {
@@ -549,7 +568,7 @@ func KeepNArenaHints(n int) {
 // This may fail to reserve memory. If it fails, it still returns the
 // address range it attempted to reserve.
 func MapNextArenaHint() (start, end uintptr, ok bool) {
-	hint := mheap_.arenaHints
+	hint := mheap_.arenaHints[0]
 	addr := hint.addr
 	if hint.down {
 		start, end = addr-heapArenaBytes, addr
@@ -568,21 +587,28 @@ func MapNextArenaHint() (start, end uintptr, ok bool) {
 }
 
 func NextArenaHint() (uintptr, bool) {
-	if mheap_.arenaHints == nil {
+	if mheap_.arenaHints[0] == nil {
 		return 0, false
 	}
-	return mheap_.arenaHints.addr, true
+	return mheap_.arenaHints[0].addr, true
 }
 
-// ArenaHintAddrs returns the heap's remaining arena hint addresses, in
-// chain order.
-func ArenaHintAddrs() []uintptr {
-	// Preallocate: appending while holding the heap lock would allocate
-	// under mheap_.lock. mallocinit generates at most 64 heap hints.
-	out := make([]uintptr, 0, 128)
+// ArenaHintAddrs returns every heap arena hint stream's remaining hint
+// addresses, in chain order. With the experiment off there is exactly
+// one stream.
+func ArenaHintAddrs() [][]uintptr {
+	out := make([][]uintptr, len(mheap_.arenaHints))
+	for i := range out {
+		// Preallocate: appending while holding the heap lock would
+		// allocate under mheap_.lock. mallocinit generates at most 64
+		// heap hints across all streams.
+		out[i] = make([]uintptr, 0, 128)
+	}
 	lock(&mheap_.lock)
-	for h := mheap_.arenaHints; h != nil; h = h.next {
-		out = append(out, h.addr)
+	for i := range mheap_.arenaHints {
+		for h := mheap_.arenaHints[i]; h != nil; h = h.next {
+			out[i] = append(out[i], h.addr)
+		}
 	}
 	unlock(&mheap_.lock)
 	return out

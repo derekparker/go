@@ -61,3 +61,40 @@ func numaStandDownWiden() {
 // Linux-specific, has something to call on every GOOS.
 func numaFixThreadPlacement() {
 }
+
+// numaGrowNode always returns (0, false) on non-Linux platforms: NUMA node
+// discovery via getcpu is Linux-only (see numa_linux.go). homed == false
+// is correct here regardless -- there is no genuine per-node
+// reading to home to on a platform with no getcpu path. mheap.grow's
+// callers (allocSpan, via numaGrowNodeArg) call this on every GOOS,
+// unconditionally, not just with goexperiment.Numa set, so this stub exists
+// purely so those call sites compile everywhere. On non-Linux, every
+// heapArena still gets tagged node 0 (numaArenaSetNode/numaArenaNode,
+// mheap.go), which mcentral.uncacheSpan uses to route a
+// refill's span back to its home node's spanSet --
+// heapArena.node is not just a diagnostic/test lookup, it is real
+// refill-routing plumbing everywhere, including here, where node 0 is
+// simply the only node that is ever tagged.
+func numaGrowNode() (stream int32, homed bool) {
+	return 0, false
+}
+
+// numaHeapHomingActive is always false on non-Linux platforms, for the same
+// reason as numaGrowNode above; see numa_linux.go for the real
+// implementation. Its call site (via numaBindGrowth, from mheap.grow) is
+// gated on goexperiment.Numa, so this body never runs with the experiment
+// off.
+//
+//go:nosplit
+func numaHeapHomingActive() bool {
+	return false
+}
+
+// numaBindGrowth is a no-op on non-Linux platforms, for the same reason as
+// numaBindArena above (which it wraps): NUMA mbind is Linux-only. Its call
+// site in mheap.grow is gated on goexperiment.Numa, so this body never runs
+// with the experiment off.
+//
+//go:nosplit
+func numaBindGrowth(addr unsafe.Pointer, size uintptr, node int32) {
+}

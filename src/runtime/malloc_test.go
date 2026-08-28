@@ -893,22 +893,23 @@ func TestArenaHintChainGeneration(t *testing.T) {
 	// heapAddrBits-8 while hint generation placed the random prefix
 	// byte at randHeapAddrBits-8, so two stray randHeapBase bits were
 	// OR'd into the prefix's low bits, collapsing distinct prefixes
-	// into duplicate hint addresses on most launches. The hint chain
-	// must hold pairwise-distinct addresses with at most one
+	// into duplicate hint addresses on most launches. Each hint
+	// stream must hold pairwise-distinct addresses with at most one
 	// non-ascending step (the prefix byte's single mod-256 wrap).
-	addrs := ArenaHintAddrs()
-	seen := make(map[uintptr]bool, len(addrs))
-	descents := 0
-	for i, a := range addrs {
-		if seen[a] {
-			t.Errorf("duplicate arena hint address %#x", a)
+	for node, addrs := range ArenaHintAddrs() {
+		seen := make(map[uintptr]bool, len(addrs))
+		descents := 0
+		for i, a := range addrs {
+			if seen[a] {
+				t.Errorf("stream %d: duplicate hint address %#x", node, a)
+			}
+			seen[a] = true
+			if i > 0 && a <= addrs[i-1] {
+				descents++
+			}
 		}
-		seen[a] = true
-		if i > 0 && a <= addrs[i-1] {
-			descents++
+		if descents > 1 {
+			t.Errorf("stream %d: %d non-ascending steps, want at most 1 (addrs %#x)", node, descents, addrs)
 		}
-	}
-	if descents > 1 {
-		t.Errorf("%d non-ascending steps in arena hint chain, want at most 1 (addrs %#x)", descents, addrs)
 	}
 }
