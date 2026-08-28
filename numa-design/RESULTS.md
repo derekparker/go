@@ -4885,3 +4885,34 @@ proven codegen-neutral). Local gating suites green both modes.
 Remaining for item 5: the mechanical series cut (partition
 `git diff master...HEAD` into the CLs of `cl-series-plan.md` on a
 clean branch) — deferred until filing is green-lit.
+
+---
+
+# Upstream gap item 5 (series half) — CL series cut: COMPLETE
+
+Date: 2026-08-28. Branch `numa-cl-series` @ `74502cf254`, pushed to the
+lab Forgejo (git.lab.ia) alongside `fix-randomized-heap-base-mask`
+(`b714f2822e`, the standalone stock fix, one commit ahead of lab master
+for PR review).
+
+15 commits from upstream base `8058a57773`: CL0 (stock prefix-mask fix,
+cherry-picked from the standalone branch) + tranche 1 (CLs 1–7:
+topology, syscall plumbing, scaffolding, BIND-all task policy, per-chunk
+VMA/cgo coverage, confinement, hardware battery) + tranche 2 (CLs 8–14:
+heap streams, page-allocator windows, P homes, span routing, mcentral
+keying, soft affinity, adaptive stand-down; P homes re-ordered before
+its consumers).
+
+Per-commit validation (agent-executed, ledgered in the session
+scratchpad, spot-verified): full make.bash, runtime battery in both
+build modes, gofmt, hardened per-function off-census (subset-of-final
+at every step; CL14 census identical to final: 0/0/0 of 1469
+functions). Cross-checks at sensitive CLs: 9 extra linux GOARCH
+runtime builds (CL2), darwin/arm64 + windows/amd64 builds (CL5/6/13).
+End state verified byte-identical to the implementation branch's src/
+(`git diff` empty), including the getcpu test-doc staleness fix
+(`35a106490c`) applied to both branches.
+
+Filing packet: `series-proposal.md` (motivation, associated issues
+#78044/#12298/#73193, prior-work lineage incl. Vyukov 2014, the CL
+table, non-goals, disclosed costs).
