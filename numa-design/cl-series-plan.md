@@ -29,7 +29,7 @@ compiles, passes tests, and keeps the off-build census clean on its own.
 
 - `runtime: fix randomized-heap-base prefix mask misalignment` — the
   `randHeapBasePrefixMask`/`randHeapAddrBits` fix plus
-  `TestArenaHintChainsSane`. Mailable immediately, no proposal needed;
+  `TestArenaHintChainGeneration`. Mailable immediately, no proposal needed;
   the series is easier to review with sane hint chains as a precondition.
 
 ## Tranche 1 — topology, balancer exemption, confinement (~7 CLs)

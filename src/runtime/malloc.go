@@ -362,12 +362,13 @@ const (
 	randHeapAddrBits = heapAddrBits - 1 - goarch.IsAmd64
 
 	// randHeapBasePrefixMask clears the top byte of the randomized heap base
-	// address — the byte hint generation replaces with randHeapBasePrefix+i.
+	// address -- the byte hint generation replaces with randHeapBasePrefix+i.
 	// The prefix occupies bits [randHeapAddrBits-8, randHeapAddrBits), so the
 	// mask must be defined from randHeapAddrBits, not heapAddrBits: a wider
-	// mask would leak randHeapBase bits into the prefix byte's low bits via
-	// the OR in hint generation, forcing them set and collapsing distinct
-	// prefixes to duplicate hint addresses.
+	// mask would let stray randHeapBase bits overlap the prefix byte in the
+	// OR that hint generation performs, and wherever such a stray bit is 1,
+	// the corresponding bit of every generated prefix is forced to 1,
+	// collapsing distinct prefixes into duplicate hint addresses.
 	randHeapBasePrefixMask = ^uintptr(0xff << (randHeapAddrBits - 8))
 )
 

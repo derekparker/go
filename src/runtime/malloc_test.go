@@ -887,7 +887,7 @@ func TestScanAllocIssue77573(t *testing.T) {
 	})
 }
 
-func TestArenaHintChainsSane(t *testing.T) {
+func TestArenaHintChainGeneration(t *testing.T) {
 	// Regression test for the randomized-heap-base prefix mask:
 	// randHeapBasePrefixMask used to clear the top byte at
 	// heapAddrBits-8 while hint generation placed the random prefix
