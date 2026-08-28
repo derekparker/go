@@ -909,6 +909,7 @@ func schedinit() {
 		parseRuntimeDebugVars(gogetenv("GODEBUG"))
 	}
 	finishDebugVarsSetup()
+	numaSchedinit()
 	gcinit()
 
 	// Allocate stack space that can be used when crashing due to bad stack

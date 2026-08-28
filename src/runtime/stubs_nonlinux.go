@@ -10,3 +10,8 @@ package runtime
 func sbrk0() uintptr {
 	return 0
 }
+
+// numaSchedinit is a no-op on non-Linux platforms: NUMA topology discovery
+// is Linux-only (see numa_linux.go).
+func numaSchedinit() {
+}
