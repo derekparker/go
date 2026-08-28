@@ -5,19 +5,23 @@
 package linux
 
 const (
-	SYS_CLOSE         = 3
-	SYS_MPROTECT      = 10
-	SYS_FCNTL         = 72
-	SYS_PRCTL         = 157
-	SYS_EPOLL_CTL     = 233
-	SYS_EPOLL_PWAIT   = 281
-	SYS_EPOLL_CREATE1 = 291
-	SYS_EPOLL_PWAIT2  = 441
-	SYS_EVENTFD2      = 290
-	SYS_OPENAT        = 257
-	SYS_PREAD64       = 17
-	SYS_READ          = 0
-	SYS_UNAME         = 63
+	SYS_CLOSE             = 3
+	SYS_MPROTECT          = 10
+	SYS_FCNTL             = 72
+	SYS_PRCTL             = 157
+	SYS_EPOLL_CTL         = 233
+	SYS_EPOLL_PWAIT       = 281
+	SYS_EPOLL_CREATE1     = 291
+	SYS_EPOLL_PWAIT2      = 441
+	SYS_EVENTFD2          = 290
+	SYS_OPENAT            = 257
+	SYS_PREAD64           = 17
+	SYS_READ              = 0
+	SYS_UNAME             = 63
+	SYS_MBIND             = 237
+	SYS_GET_MEMPOLICY     = 239
+	SYS_SET_MEMPOLICY     = 238
+	SYS_SCHED_SETAFFINITY = 203
 
 	EFD_NONBLOCK = 0x800
 

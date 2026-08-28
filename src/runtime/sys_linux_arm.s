@@ -51,6 +51,7 @@
 #define SYS_connect (SYS_BASE + 283)
 #define SYS_socket (SYS_BASE + 281)
 #define SYS_brk (SYS_BASE + 45)
+#define SYS_getcpu (SYS_BASE + 345)
 
 #define ARM_BASE (SYS_BASE + 0x0f0000)
 
@@ -637,6 +638,15 @@ TEXT runtime·sched_getaffinity(SB),NOSPLIT,$0
 	MOVW	$SYS_sched_getaffinity, R7
 	SWI	$0
 	MOVW	R0, ret+12(FP)
+	RET
+
+TEXT runtime·getcpu(SB),NOSPLIT,$0
+	MOVW	cpu+0(FP), R0
+	MOVW	node+4(FP), R1
+	MOVW	$0, R2
+	MOVW	$SYS_getcpu, R7
+	SWI	$0
+	MOVW	R0, ret+8(FP)
 	RET
 
 // b __kuser_get_tls @ 0xffff0fe0

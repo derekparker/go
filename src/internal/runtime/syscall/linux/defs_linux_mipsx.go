@@ -7,19 +7,23 @@
 package linux
 
 const (
-	SYS_CLOSE         = 4006
-	SYS_FCNTL         = 4055
-	SYS_MPROTECT      = 4125
-	SYS_PRCTL         = 4192
-	SYS_EPOLL_CTL     = 4249
-	SYS_EPOLL_PWAIT   = 4313
-	SYS_EPOLL_CREATE1 = 4326
-	SYS_EPOLL_PWAIT2  = 4441
-	SYS_EVENTFD2      = 4325
-	SYS_OPENAT        = 4288
-	SYS_PREAD64       = 4200
-	SYS_READ          = 4003
-	SYS_UNAME         = 4122
+	SYS_CLOSE             = 4006
+	SYS_FCNTL             = 4055
+	SYS_MPROTECT          = 4125
+	SYS_PRCTL             = 4192
+	SYS_EPOLL_CTL         = 4249
+	SYS_EPOLL_PWAIT       = 4313
+	SYS_EPOLL_CREATE1     = 4326
+	SYS_EPOLL_PWAIT2      = 4441
+	SYS_EVENTFD2          = 4325
+	SYS_OPENAT            = 4288
+	SYS_PREAD64           = 4200
+	SYS_READ              = 4003
+	SYS_UNAME             = 4122
+	SYS_MBIND             = 4268
+	SYS_GET_MEMPOLICY     = 4269
+	SYS_SET_MEMPOLICY     = 4270
+	SYS_SCHED_SETAFFINITY = 4239
 
 	EFD_NONBLOCK = 0x80
 
