@@ -187,6 +187,14 @@ func numaInitTopology() {
 // numaAllowedNodemask is left unpublished. set_mempolicy's own result is
 // checked too -- a failing set_mempolicy also leaves numaAllowedNodemask
 // unpublished.
+//
+// Staleness: this function is called once, at startup. It is never
+// called from the heap-growth path or on any timer, so
+// numaAllowedNodemask is a snapshot of cpuset.mems as of that moment,
+// not a live view. A container that repartitions its cpuset mid-run is
+// not observed until a process restart; see numaBindArena's doc comment
+// for why re-checking more often is not worth it. This staleness is
+// accepted by design.
 func numaSetProcessBindAll() {
 	if numaTopology.NumNodes < 2 {
 		return
@@ -220,4 +228,78 @@ func numaSetProcessBindAll() {
 		return
 	}
 	numaAllowedNodemask.Store(mask[0])
+}
+
+// numaBindArena sets MPOL_BIND, over the same allowed-node mask
+// numaSetProcessBindAll computed, as the VMA policy for the heap arena
+// range [addr, addr+size). No span bookkeeping, no mcache/m.numaNode
+// tracking, no per-M node lookup: one uniform BIND-all mbind per chunk,
+// unconditionally.
+//
+// The task-wide policy set by numaSetProcessBindAll is per-thread state:
+// it covers the thread that set it and every thread cloned from it
+// afterwards -- which is every thread the runtime itself creates -- but
+// it never reaches threads that already existed before the runtime
+// initialized, such as C threads created by a cgo constructor. A VMA
+// policy is per-range, not per-thread: it exempts [addr, addr+size)
+// from automatic NUMA balancing against every thread that touches it,
+// no matter where that thread came from. This call is what makes the
+// balancer exemption hold process-wide.
+//
+// numaBindArena is called from mheap.grow, with h.lock held, immediately
+// after each sysMap of newly-backed heap memory (mmap with MAP_FIXED
+// resets any VMA policy the range previously had). It must stay
+// nosplit-safe and add nothing slower than one mbind syscall under that
+// lock: no allocation, no lock acquisition, no other syscalls. mheap.grow's
+// true granularity is a palloc chunk (~4 MiB), not a 64 MiB arena, so this
+// runs once per ~4 MiB of heap growth -- rare relative to malloc, but far
+// more often than "per arena".
+//
+// Init-order guard: mheap.grow runs before numaSchedinit (goargs/goenvs
+// allocate heap memory before finishDebugVarsSetup, which precedes
+// numaSchedinit, in schedinit). Until numaSetProcessBindAll publishes a
+// non-empty numaAllowedNodemask, numaBindArena no-ops rather than issuing
+// an mbind with an empty mask (which the kernel would silently reject
+// with EINVAL). Those early-grown ranges carry no VMA policy of their
+// own; they are balancer-exempt only via the task-wide policy set by
+// numaSetProcessBindAll, which is why that call is load-bearing and not
+// just a belt-and-suspenders duplicate of the arena mbind.
+//
+// numaBindArena does not catch up already-mapped ranges once the mask
+// becomes available: those early ranges stay covered by the task-wide
+// policy alone (see above), and a catch-up walk was judged not worth
+// its complexity.
+//
+// numaAllowedNodemask is read here, never refreshed: this function does
+// not call numaSetProcessBindAll (or otherwise re-query cpuset.mems)
+// itself. Two reasons. First, this is the heap-growth path -- it runs
+// under h.lock, nosplit, once per ~4 MiB grow -- and adding a
+// get_mempolicy/set_mempolicy syscall pair here to check whether the
+// cpuset moved would put syscalls exactly where the design goes out of
+// its way to avoid them. Second, there is no portable notification a
+// cgroup's cpuset.mems/cpuset.cpus changed that the runtime could block
+// on instead of polling; polling on every grow would just reintroduce the
+// same cost. So a cpuset narrowed after this process's mask was last
+// read is stale here until a process restart -- accepted by design, not
+// a bug.
+//
+// mbind errors are ignored: this is deliberate (see the design
+// rationale above -- the policy is an exemption hint, and there is no
+// useful recovery from a failed mbind on this path), not a
+// silently-swallowed bug.
+//
+// Scavenger interaction: VMA policies survive sysUnused (MADV_FREE /
+// MADV_DONTNEED); pages that refault after being scavenged are re-placed
+// under the surviving policy, so scavenged-and-reused ranges need no
+// re-mbind here.
+//
+//go:nosplit
+func numaBindArena(addr unsafe.Pointer, size uintptr) {
+	w0 := numaAllowedNodemask.Load()
+	if w0 == 0 {
+		return
+	}
+	var mask numaNodemask
+	mask[0] = w0
+	linux.Syscall6(linux.SYS_MBIND, uintptr(addr), size, uintptr(_MPOL_BIND), uintptr(unsafe.Pointer(&mask[0])), numaMaxNode, 0)
 }
