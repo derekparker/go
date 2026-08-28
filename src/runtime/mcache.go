@@ -277,8 +277,9 @@ func (c *mcache) allocLarge(size uintptr, noscan bool) *mspan {
 	gcController.update(int64(s.npages*pageSize), 0)
 
 	// Put the large span in the mcentral swept list so that it's
-	// visible to the background sweeper.
-	mheap_.central[spc].mcentral.fullSwept(mheap_.sweepgen).push(s)
+	// visible to the background sweeper. Route it to its own home
+	// node's set, same as uncacheSpan.
+	mheap_.central[spc].mcentral.fullSwept(mheap_.sweepgen, numaArenaNode(s.base())).push(s)
 
 	// Adjust s.limit down to the object-containing part of the span.
 	//

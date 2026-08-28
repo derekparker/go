@@ -329,6 +329,64 @@ func TestNUMAPlacementProcresize(t *testing.T) {
 	}
 }
 
+// TestNUMAPlacementRefillLocality (v4 stage 2) asserts the in-process
+// version of gate G2-locality's property: with placement active and an
+// UNPINNED parallel allocation workload, the /numa/span-refills
+// counters must show >= 90% local refills over the workload window --
+// the deterministic P-home refill key plus per-thread enforcement is
+// exactly what makes unpinned locality hold (v3's getcpu-keyed routing
+// measured only 53-75% local here). Requires multi-node hardware.
+func TestNUMAPlacementRefillLocality(t *testing.T) {
+	if !runtime.NumaPlacementActiveForTest() {
+		t.Skip("placement not active (single-node, narrowed affinity, streams disabled, ...)")
+	}
+	var wg sync.WaitGroup
+	stop := make(chan struct{})
+	for i := 0; i < runtime.GOMAXPROCS(0); i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			sink := make([][]byte, 0, 512)
+			for {
+				select {
+				case <-stop:
+					return
+				default:
+				}
+				// Vary size classes and keep short-lived batches alive
+				// long enough to force span turnover and mcache refills.
+				for sz := 16; sz <= 8192; sz *= 4 {
+					sink = append(sink, make([]byte, sz))
+				}
+				if len(sink) >= 512 {
+					sink = sink[:0]
+				}
+			}
+		}()
+	}
+	// G2-locality protocol (v4 plan): the gate reading is the
+	// STEADY-STATE counter delta -- warm up first (window arming,
+	// first stream growth, and cache priming concentrate remote
+	// refills in the ramp; the gate's real subjects are steady-state
+	// by construction), then snapshot, measure, snapshot.
+	time.Sleep(2 * time.Second)
+	before := readSpanRefillCounters(t)
+	time.Sleep(2 * time.Second)
+	close(stop)
+	wg.Wait()
+	after := readSpanRefillCounters(t)
+	dl := after.local - before.local
+	dr := after.remote - before.remote
+	if dl+dr < 1000 {
+		t.Skipf("only %d refills observed; workload too small to judge locality", dl+dr)
+	}
+	share := float64(dl) / float64(dl+dr)
+	t.Logf("steady-state refills local=%d remote=%d share=%.2f%%", dl, dr, share*100)
+	if share < 0.90 {
+		t.Errorf("unpinned steady-state local refill share %.2f%% < 90%% with placement active", share*100)
+	}
+}
+
 // TestNUMAStreamWindows checks the REAL mallocinit-computed stream
 // windows (v4 stage 4 Task P2): with heap streams enabled, every valid
 // window is chunk-aligned and pairwise disjoint, and each node's first

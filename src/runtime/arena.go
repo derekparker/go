@@ -1118,8 +1118,12 @@ func (h *mheap) allocUserArenaChunk() *mspan {
 	s.userArenaChunkFree = makeAddrRange(base, base+s.elemsize)
 
 	// Put the large span in the mcentral swept list so that it's
-	// visible to the background sweeper.
-	h.central[spc].mcentral.fullSwept(h.sweepgen).push(s)
+	// visible to the background sweeper. Route it to its own home
+	// node's set. User arena chunks are always grown for node 0 above
+	// (sysAlloc's node argument) because no per-node reading exists for
+	// this class of span, so this is advisory placement only, never a
+	// correctness dependency.
+	h.central[spc].mcentral.fullSwept(h.sweepgen, numaArenaNode(s.base())).push(s)
 
 	// Set up an allocation header. Avoid write barriers here because this type
 	// is not a real type, and it exists in an invalid location.

@@ -459,6 +459,24 @@ func initMetrics() {
 					in.sysStats.gcMiscSys + in.sysStats.otherSys
 			},
 		},
+		// Named /numa/span-refills/{local,remote}:spans
+		// -- dimension (local vs. remote) in the path, unit (spans) in
+		// the unit slot -- rather than
+		// /numa/span-refills:{local,remote}, which would put the dimension
+		// in the unit slot. Metric names freeze once shipped, so the
+		// correct shape is used from the start.
+		"/numa/span-refills/local:spans": {
+			compute: func(_ *statAggregate, out *metricValue) {
+				out.kind = metricKindUint64
+				out.scalar = numaSpanRefillLocal.Load()
+			},
+		},
+		"/numa/span-refills/remote:spans": {
+			compute: func(_ *statAggregate, out *metricValue) {
+				out.kind = metricKindUint64
+				out.scalar = numaSpanRefillRemote.Load()
+			},
+		},
 		"/sched/gomaxprocs:threads": {
 			compute: func(_ *statAggregate, out *metricValue) {
 				out.kind = metricKindUint64
