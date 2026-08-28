@@ -1,0 +1,225 @@
+// Copyright 2026 The Go Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file.
+
+package numa
+
+import (
+	"internal/bytealg"
+	"internal/strconv"
+)
+
+// maxCPUs is the largest CPU id ParseCPUList and ReadTopology will record,
+// matching the length of Topology.CPUToNode.
+const maxCPUs = 8192
+
+// ParseNodeList parses a Linux kernel list-format value naming NUMA node
+// ids (e.g. the contents of /sys/devices/system/node/online, "0-1\n") into
+// dst, and returns the number of ids written.
+//
+// Node ids >= MaxNodes are silently skipped rather than written out of
+// range. If data contains more ids than fit in dst, ParseNodeList returns
+// an error.
+func ParseNodeList(dst []int32, data []byte) (int, error) {
+	n, _, err := parseList(dst, data, MaxNodes)
+	return n, err
+}
+
+// ParseNodeListTruncated is like ParseNodeList, but additionally reports
+// whether any node id >= MaxNodes was present in data and silently
+// skipped. ReadTopology uses this to detect a host with more NUMA nodes
+// than Topology can represent, so callers can stand down NUMA
+// optimizations instead of silently treating a >MaxNodes host as if it
+// only had nodes [0, MaxNodes).
+func ParseNodeListTruncated(dst []int32, data []byte) (n int, truncated bool, err error) {
+	return parseList(dst, data, MaxNodes)
+}
+
+// ParseCPUList parses a Linux kernel list-format value naming CPU ids (e.g.
+// the contents of /sys/devices/system/node/nodeN/cpulist, "0,2,4,6\n") into
+// dst, and returns the number of ids written.
+//
+// CPU ids >= 8192 are silently skipped rather than written out of range. If
+// data contains more ids than fit in dst, ParseCPUList returns an error.
+func ParseCPUList(dst []int32, data []byte) (int, error) {
+	n, _, err := parseList(dst, data, maxCPUs)
+	return n, err
+}
+
+// parseList parses a Linux kernel "list format" value: a comma-separated
+// list of entries, each either a single id ("5") or an inclusive range
+// ("2-7"), terminated by a single trailing newline. See cpuset(7) "Formats"
+// for the format this mirrors (used throughout /sys/devices/system/node).
+//
+// Ids >= limit are skipped rather than written to dst; truncated reports
+// whether any id was actually skipped for that reason.
+func parseList(dst []int32, data []byte, limit int32) (n int, truncated bool, err error) {
+	i := bytealg.IndexByte(data, '\n')
+	if i < 0 {
+		return 0, false, errMalformedFile
+	}
+	data = data[:i]
+
+	for len(data) > 0 {
+		var tok []byte
+		if i := bytealg.IndexByte(data, ','); i >= 0 {
+			tok = data[:i]
+			data = data[i+1:]
+		} else {
+			tok = data
+			data = nil
+		}
+
+		start, end, err := parseRange(tok)
+		if err != nil {
+			return 0, false, err
+		}
+
+		for v := start; v <= end; v++ {
+			if v >= int64(limit) {
+				// Ids only increase within a range, and ranges
+				// are visited in increasing order, so nothing
+				// past this point (in this range or any later
+				// token) can be in range either... except a
+				// later token isn't guaranteed to be
+				// increasing, so only stop this range, not
+				// the whole list.
+				truncated = true
+				break
+			}
+			if n >= len(dst) {
+				return 0, false, errBufferTooSmall
+			}
+			dst[n] = int32(v)
+			n++
+		}
+	}
+
+	return n, truncated, nil
+}
+
+// parseCPUListIntoNodeMap parses a Linux kernel list-format value naming
+// CPU ids (see ParseCPUList) and, for each CPU id in data, records nodeID
+// directly in dst[id]. It returns the number of CPU ids recorded.
+//
+// This exists so ReadTopology can fill Topology.CPUToNode without an
+// intermediate []int32 buffer sized to hold every CPU id (up to maxCPUs
+// entries, 32 KiB as int32 on the stack): ReadTopology runs during
+// schedinit on m0's g0, which has a much smaller stack budget than that.
+//
+// CPU ids >= maxCPUs are silently skipped, matching ParseCPUList.
+func parseCPUListIntoNodeMap(dst *[maxCPUs]int8, nodeID int8, data []byte) (int, error) {
+	i := bytealg.IndexByte(data, '\n')
+	if i < 0 {
+		return 0, errMalformedFile
+	}
+	data = data[:i]
+
+	n := 0
+	for len(data) > 0 {
+		var tok []byte
+		if i := bytealg.IndexByte(data, ','); i >= 0 {
+			tok = data[:i]
+			data = data[i+1:]
+		} else {
+			tok = data
+			data = nil
+		}
+
+		start, end, err := parseRange(tok)
+		if err != nil {
+			return 0, err
+		}
+
+		for v := start; v <= end; v++ {
+			if v >= maxCPUs {
+				// See parseList: only this range stops early.
+				break
+			}
+			dst[v] = nodeID
+			n++
+		}
+	}
+
+	return n, nil
+}
+
+// parseRange parses a single list entry, either "N" or "N-M" (inclusive,
+// M >= N).
+func parseRange(tok []byte) (start, end int64, err error) {
+	dash := bytealg.IndexByte(tok, '-')
+	if dash < 0 {
+		v, err := parseUint(tok)
+		if err != nil {
+			return 0, 0, err
+		}
+		return v, v, nil
+	}
+
+	start, err = parseUint(tok[:dash])
+	if err != nil {
+		return 0, 0, err
+	}
+	end, err = parseUint(tok[dash+1:])
+	if err != nil {
+		return 0, 0, err
+	}
+	if end < start {
+		return 0, 0, errMalformedFile
+	}
+	return start, end, nil
+}
+
+// parseUint parses tok as a non-negative base-10 integer.
+func parseUint(tok []byte) (int64, error) {
+	if len(tok) == 0 {
+		return 0, errMalformedFile
+	}
+	// Neither cmd/compile nor gccgo allocates for this string
+	// conversion, since it does not escape.
+	v, err := strconv.ParseInt(string(tok), 10, 64)
+	if err != nil || v < 0 {
+		return 0, errMalformedFile
+	}
+	return v, nil
+}
+
+// ParseDistance parses a Linux kernel NUMA distance table row (e.g. the
+// contents of /sys/devices/system/node/nodeN/distance, "10 20 20 30\n"), a
+// space-separated list of distance values, into dst, and returns the
+// number of values written.
+//
+// If data contains more values than fit in dst, ParseDistance returns an
+// error.
+func ParseDistance(dst []uint8, data []byte) (int, error) {
+	i := bytealg.IndexByte(data, '\n')
+	if i < 0 {
+		return 0, errMalformedFile
+	}
+	data = data[:i]
+
+	n := 0
+	for len(data) > 0 {
+		var tok []byte
+		if i := bytealg.IndexByte(data, ' '); i >= 0 {
+			tok = data[:i]
+			data = data[i+1:]
+		} else {
+			tok = data
+			data = nil
+		}
+
+		v, err := parseUint(tok)
+		if err != nil || v > 0xff {
+			return 0, errMalformedFile
+		}
+
+		if n >= len(dst) {
+			return 0, errBufferTooSmall
+		}
+		dst[n] = uint8(v)
+		n++
+	}
+
+	return n, nil
+}

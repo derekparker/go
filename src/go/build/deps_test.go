@@ -105,6 +105,7 @@ var depsRules = `
 	< internal/runtime/math
 	< internal/runtime/maps
 	< internal/runtime/cgroup
+	< internal/runtime/numa
 	< internal/runtime/gc/scan
 	< runtime
 	< runtime/secret
