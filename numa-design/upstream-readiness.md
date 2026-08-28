@@ -86,11 +86,13 @@ case runtime maintainers ask for and rarely get.
    five pre-registered gates N4-G1..G5 PASS (primary −10.00% p=0.000 n=10;
    battery green; census clean; windows 4 TiB). N=8 documented as a
    build-time variant. See RESULTS.md "Task N4".
-5. **Series hygiene pass** — ✅ COMMENT HALF DONE 2026-08-27: all 214
-   internal-tag comment sites rewritten self-contained (`64cca37634`,
-   census-proven codegen-neutral; one deliberate GODEBUG string rename).
-   Remaining: the mechanical series cut per `cl-series-plan.md` (CL 0 +
-   two tranches), deferred until filing is green-lit.
+5. **Series hygiene pass** — ✅ DONE 2026-08-28: comment pass
+   (`64cca37634`, 214 sites, census-proven codegen-neutral) AND the
+   series cut: branch `numa-cl-series` (15 commits, per-commit
+   make.bash/tests/census, end state byte-identical to this branch's
+   src/), pushed to the lab Forgejo with the standalone
+   `fix-randomized-heap-base-mask` branch. See RESULTS.md and
+   `series-proposal.md`.
 6. **Chase the two unreproduced local test flakes** — ✅ CLOSED 2026-08-27:
    0 failures in a 120-run dedicated stress chase on the final tree (60 per
    build mode, full output capture); both originals predate the now-fixed
