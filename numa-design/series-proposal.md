@@ -106,33 +106,33 @@ branch `fix-randomized-heap-base-mask` for pre-Gerrit review):**
 
 | # | Commit | Title | Size |
 |---|---|---|---|
-| 0 | `bf577e8255` | runtime: fix randomized heap base prefix mask misalignment | 3 files, +55/−8 |
+| 0 | `54996ae7af` | runtime: fix randomized heap base prefix mask misalignment | 3 files, +55/−8 |
 
 **Tranche 1 — topology, balancer exemption, confinement** (independently
 valuable; lands the −30% single-socket win with no allocator changes):
 
 | # | Commit | Title | Size |
 |---|---|---|---|
-| 1 | `5fd1f971da` | internal/runtime/numa: NUMA topology discovery on Linux | 7 files, +857 |
-| 2 | `65e6ca7cfd` | runtime: linux syscall plumbing for mbind, set_mempolicy, and getcpu | 22 files, +304/−130 |
-| 3 | `cf453326ae` | runtime: GOEXPERIMENT=numa scaffolding and GODEBUG=numa diagnostics | 8 files, +97 |
-| 4 | `92bdb9d394` | runtime: exempt the heap from automatic NUMA balancing with a BIND-all task policy | 1 file, +160 |
-| 5 | `469ce12b8c` | runtime: per-chunk VMA policy so the balancer exemption covers pre-runtime and cgo threads | 3 files, +105 |
-| 6 | `5c4078a301` | runtime: fill-one-socket NUMA confinement with one-way stand-down | 8 files, +787/−10 |
-| 7 | `827e9de588` | runtime: NUMA hardware test battery and testprogs | 5 files, +506 |
+| 1 | `c3d93b98f3` | internal/runtime/numa: NUMA topology discovery on Linux | 7 files, +857 |
+| 2 | `e4fdc29e98` | runtime: linux syscall plumbing for mbind, set_mempolicy, and getcpu | 22 files, +304/−130 |
+| 3 | `a1b385ff3a` | runtime: GOEXPERIMENT=numa scaffolding and GODEBUG=numa diagnostics | 8 files, +97 |
+| 4 | `50f2b52f8d` | runtime: exempt the heap from automatic NUMA balancing with a BIND-all task policy | 1 file, +160 |
+| 5 | `911ea8c5fa` | runtime: per-chunk VMA policy so the balancer exemption covers pre-runtime and cgo threads | 3 files, +105 |
+| 6 | `01653a3de2` | runtime: fill-one-socket NUMA confinement with one-way stand-down | 8 files, +787/−10 |
+| 7 | `88bb60654d` | runtime: NUMA hardware test battery and testprogs | 5 files, +506 |
 
 **Tranche 2 — full-machine placement** (lands the 93–97% locality and
 the −8..−10% full-width win):
 
 | # | Commit | Title | Size |
 |---|---|---|---|
-| 8 | `61d49fc235` | runtime: per-node heap arena hint streams | 13 files, +1109/−113 |
-| 9 | `475d7462d6` | runtime: per-node address windows in the page allocator | 10 files, +1372/−50 |
-| 10 | `bef919cf9f` | runtime: NUMA P homes | 9 files, +483/−13 |
-| 11 | `c7bedab846` | runtime: route span allocation by P home | 5 files, +247/−9 |
-| 12 | `8fb981264a` | runtime: node-keyed mcentral span recycling | 10 files, +1381/−116 |
-| 13 | `11eb873717` | runtime: soft NUMA thread affinity | 15 files, +1610/−81 |
-| 14 | `74502cf254` | runtime: adaptive NUMA enforcement stand-down | 10 files, +441/−7 |
+| 8 | `6e89caccbe` | runtime: per-node heap arena hint streams | 13 files, +1109/−113 |
+| 9 | `d854271871` | runtime: per-node address windows in the page allocator | 10 files, +1372/−50 |
+| 10 | `d89bd0d979` | runtime: NUMA P homes | 9 files, +483/−13 |
+| 11 | `e291adcb73` | runtime: route span allocation by P home | 5 files, +247/−9 |
+| 12 | `891fcf86a8` | runtime: node-keyed mcentral span recycling | 10 files, +1381/−116 |
+| 13 | `eec40813ac` | runtime: soft NUMA thread affinity | 15 files, +1610/−81 |
+| 14 | `e83443fe12` | runtime: adaptive NUMA enforcement stand-down | 10 files, +441/−7 |
 
 Ordering note vs the original plan: P homes moved ahead of span-routing
 and mcentral keying (they consume the P-home key), and the per-chunk VMA

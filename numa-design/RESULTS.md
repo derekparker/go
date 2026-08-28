@@ -4916,3 +4916,20 @@ End state verified byte-identical to the implementation branch's src/
 Filing packet: `series-proposal.md` (motivation, associated issues
 #78044/#12298/#73193, prior-work lineage incl. Vyukov 2014, the CL
 table, non-goals, disclosed costs).
+
+---
+
+# Series feedback round 1 (2026-08-28)
+
+Review feedback on the prefix-mask fix applied: the mask-rationale
+comment's compressed "forcing them set" phrasing spelled out (the OR
+forces the corresponding prefix bit to 1 wherever a stray randHeapBase
+bit is 1), and the regression test renamed
+TestArenaHintChain(s)Sane → TestArenaHintChainGeneration for upstream.
+Applied on the main branch (`8e8aacb107`), the standalone fix branch
+(amended → `dded1ac115`, force-updated on lab), and folded through the
+CL series by rebuilding the chain (CL0 changes ⇒ all SHAs move; one
+expected conflict at the heap-streams CL resolved to the new final
+text). New series HEAD `e83443fe12`, force-updated on lab. Checkpoint
+validation: make.bash + both-mode battery green at CL0/CL8/HEAD;
+end state byte-identical to main HEAD (git diff empty).
