@@ -20,7 +20,7 @@ with `numactl`.
 The design adds no public API. Configuration is limited to `GODEBUG`
 knobs for diagnostics and overrides. With the experiment disabled the
 new code is compiled out entirely, and with it enabled, every feature
-declines itself on hardware or in configurations where it cannot help:
+disables itself on hardware or in configurations where it cannot help:
 single-node machines, processes already placed by an operator, and
 systems where the required syscalls are unavailable.
 
@@ -32,7 +32,8 @@ latency and contended interconnect bandwidth. Multi-die processors push
 the same structure into a single package, which can present several
 NUMA nodes to the operating system depending on its configuration.
 Wherever the structure exists, the penalty for ignoring it shows up as
-a tax on every cache miss that lands on the wrong side of the machine.
+a tax on every access served by remote memory when local memory could
+have served it.
 
 The Go runtime is almost entirely blind to this structure:
 
@@ -104,7 +105,7 @@ it falls.
 
 At startup the runtime reads the NUMA topology from sysfs
 (`/sys/devices/system/node`): the set of online nodes, each node's CPU
-list, and each node's memory presence. It intersects this with the
+list, and whether each node has local memory. It intersects this with the
 process's CPU affinity mask from `sched_getaffinity`, so a process
 started under `numactl` or in a container with a restricted cpuset sees
 only the nodes it may actually use. Nodes with CPUs but no local memory
@@ -114,14 +115,16 @@ uniform.
 Discovery is best-effort by design. If sysfs is unreadable, the
 topology is malformed, or only one usable node remains after the
 affinity intersection, the experiment quietly disables itself and the
-runtime behaves exactly as it does today. Topology is read once;
-hotplug is out of scope.
+runtime behaves exactly as it does today. Topology is read once at
+startup: CPUs or memory nodes brought online or taken offline later
+(hotplug) are not tracked, and the runtime keeps the topology it first
+saw for the life of the process.
 
 The runtime also gains internal wrappers for three syscalls it does not
 currently use, across all Linux GOARCHes: `mbind(2)`,
 `set_mempolicy(2)`, and `getcpu(2)`. If any of them is unavailable (for
-example, blocked by a seccomp filter), the features depending on it
-decline individually.
+example, blocked by a seccomp filter), the features depending on it are
+disabled individually.
 
 ### Exempting the heap from automatic NUMA balancing
 
@@ -138,23 +141,38 @@ and therefore off-limits to balancing.
 The runtime applies this in two layers:
 
 1. A process-wide task policy via `set_mempolicy(MPOL_BIND, all
-   nodes)`, set during runtime initialization. This covers the common
-   case cheaply.
+   nodes)`, set once during runtime initialization. The two layers
+   cover different gaps. The task policy is breadth: for the cost of
+   one syscall at startup it covers every mapping whose pages are
+   faulted in by a thread that inherited the policy, which in practice
+   is all memory the runtime maps, including allocator metadata the
+   per-mapping layer below never touches. Its nodemask is read back
+   from the kernel (`get_mempolicy(MPOL_F_MEMS_ALLOWED)`) rather than
+   derived from sysfs, so it respects a container's `cpuset.mems`
+   without any parsing.
 2. A per-mapping `mbind(MPOL_BIND, all nodes)` on each heap region as
-   it is mapped. The task policy alone is not sufficient: mappings
-   touched first by threads that never inherited the policy, notably
-   threads created by C code before the Go runtime initialized, or cgo
-   threads with their own policies, would otherwise remain eligible for
-   balancing. Binding the VMA itself closes the gap regardless of which
-   thread faults the pages in.
+   it is mapped. This layer is the guarantee for the heap specifically:
+   a task policy only applies to faults taken by threads that inherited
+   it, so heap pages touched first by threads created before the Go
+   runtime initialized, or by cgo threads carrying their own policies,
+   would otherwise remain eligible for balancing. Binding the VMA
+   itself closes that gap regardless of which thread faults the pages
+   in.
 
 Only heap memory is exempted. Balancing continues to apply to
 everything else in the process (cgo allocations, mapped files), where
 the kernel's heuristics remain the right tool.
 
 This layer is independent of everything below it and is worth having
-even without the placement machinery: on the measured system it
-eliminates millions of minor faults per run outright.
+even without the placement machinery. The elimination is preventive,
+not reactive: the balancer works by periodically write-protecting
+sampled ranges so the next touch faults, and it skips
+policy-covered memory when choosing what to sample, so over the exempt
+heap those protections are never installed and the faults simply never
+occur. There is nothing to absorb or handle more cheaply; the work
+disappears. On the system measured in the Evaluation section, the same
+GC-heavy benchmark run takes 2.78 million NUMA hint faults on stock Go
+and exactly 0 with the exemption in place, while also running faster.
 
 ### Fill-one-socket confinement
 
@@ -214,22 +232,34 @@ per-node window size (proposed: 4 TiB), and `B` the heap's randomized
 base address. The page allocator's address space is divided into
 windows:
 
-    window(n) = [B + n*W, B + (n+1)*W)        for n in 0..N-1
-    node(a)   = (a - B) / W                   for any heap address a
+    window(n)  = [B + n*W, B + (n+1)*W)       for n in 0..N-1
+    node(addr) = (addr - B) / W               for any heap address addr
 
 Two mechanisms cooperate to keep allocations inside their window:
 
-- *Per-node arena hint streams.* Today the runtime keeps one chain of
+- *Per-node arena hint streams:* Today the runtime keeps one chain of
   arena hints, the preferred addresses at which to `mmap` new heap
   arenas. This proposal keeps one hint stream per node, each seeding
   its addresses inside that node's window, so heap growth on behalf of
   node `n` maps new arenas into `window(n)`.
-- *Windowed page allocation.* An allocation on behalf of a P homed to
-  node `n` searches `window(n)` first. If the window cannot satisfy the
-  request, the search falls back through the other windows in a bounded
-  ladder, and finally to an unconstrained search. Placement can degrade
-  under address-space pressure; allocation can never fail because of
-  it.
+- *Windowed page allocation:* An allocation on behalf of a P homed to
+  node `n` runs a strictly bounded sequence. First, one search
+  constrained to `window(n)`. On a miss, one attempt to grow the heap
+  into `window(n)`, then one constrained retry. If that also misses,
+  the allocation falls through to the stock unconstrained search over
+  the whole heap, growing wherever it can, exactly as the allocator
+  behaves today. "Bounded" means bounded work, not a loop: each step
+  runs at most once per allocation, so the worst case is a fixed,
+  small number of extra searches. The final unconstrained step is not
+  the same as searching each window in turn: it ignores window
+  boundaries entirely, so it can be satisfied by free memory in any
+  window, by ranges that straddle a window edge, and by address space
+  no window covers. One ordering choice is deliberate: on a window
+  miss the allocator prefers growing the home window over reusing free
+  memory in other nodes' windows, because reuse-anywhere-first is
+  precisely the cross-node consumption that defeats placement.
+  Placement can degrade under address-space pressure; allocation can
+  never fail because of it.
 
 Note what this partitioning does and does not do. It does not bind any
 page to any node; there is no per-node `mbind`, and the OOM-on-one-node
@@ -237,7 +267,7 @@ failure modes of hard binding are structurally impossible. Actual page
 placement still happens by first touch. The window's job is to make
 locality *composable*: because threads are softly affine to their
 node's CPUs (below), the first touch of a page in `window(n)` almost
-always happens on node `n`, and because `node(a)` is computable from
+always happens on node `n`, and because `node(addr)` is computable from
 the address alone in a few instructions, every later layer (span
 recycling, diagnostics) can tell where memory lives with no per-page
 metadata and no syscalls.
@@ -247,20 +277,23 @@ metadata and no syscalls.
 With the address space partitioned, the span lifecycle is made
 node-aware at its two ends:
 
-- *Refill.* When a P's mcache refills from a central list or grows the
+- *Refill:* When a P's mcache refills from a central list or grows the
   heap, the request carries the P's home node, and the pages come from
   that node's window.
-- *Recycle.* Central free lists are keyed by node as well as span
+- *Recycle:* Central free lists are keyed by node as well as span
   class. When a span is swept and returned, it goes back to the list
   for `node(span base address)`, and refills for a P prefer its home
   node's list, falling back to other nodes' lists before growing the
   heap.
 
 The second half is what makes the first durable. Without node-keyed
-recycling, spans launder across nodes through the central lists in
-steady state, and refill locality decays back toward blind. With it,
-memory that starts local tends to stay local through arbitrarily many
-recycle generations.
+recycling, spans drift across nodes through the shared central lists
+in steady state: a span freed by a P on node 0 sits in a global list
+and is next handed to whichever P asks, so after a few free/reuse
+cycles the correspondence between where a span's pages live and who is
+using them is gone, and refill locality decays back toward blind. With
+node-keyed recycling, memory that starts local tends to stay local
+through arbitrarily many recycle generations.
 
 ### Soft thread affinity and adaptive stand-down
 
@@ -274,22 +307,37 @@ M releases its P; and it never constrains which P an M may acquire or
 which G a P may run.
 
 One workload shape is genuinely hurt by even this much: programs
-dominated by high-frequency thread sleep/wake cycles (heavy timer or
-network wake storms at very high `GOMAXPROCS`), where narrowing the
-wake-target CPU set adds latency to every wakeup. Rather than shipping
-a tuning knob, the runtime detects the regime and yields: a detector
-watches the process-wide thread wake rate, and if it exceeds a
-calibrated threshold (proposed: 2048 wakes/s sustained across 8
-consecutive 100 ms windows), enforcement stands down and affinities are
-widened. The detector re-arms epoch-based with a bounded number of
-enforcement/stand-down transitions, so it cannot oscillate. A
-`GODEBUG=numaenforce` setting overrides the detector in both
-directions, for debugging.
+dominated by sustained high-frequency thread sleep/wake cycles (heavy
+timer or network wake storms at very high `GOMAXPROCS`), where
+narrowing the wake-target CPU set adds latency to every wakeup. The
+runtime softens this pathology itself rather than shipping a tuning
+knob: it detects the regime and removes its own enforcement. A
+detector in sysmon watches the process-wide thread wake rate, and when
+the rate holds at or above a calibrated threshold (proposed: 2048
+wakes per second across 8 consecutive 100 ms windows, thresholds
+chosen so that GC-induced wake bursts, which are taller but die out
+quickly, do not trip it), enforcement stands down: every thread's
+kernel affinity mask is widened back to the full allowed set, and Ms
+stop narrowing. From that point the program's threads schedule exactly
+as they do without the experiment, so the cost of the pathological
+interaction is limited to the detection window rather than paid for
+the life of the process.
+
+Stand-down is not necessarily permanent. After ten seconds of
+accumulated below-threshold time, the detector re-arms and enforcement
+resumes, with threads re-narrowing lazily as they schedule. Two limits
+keep this from oscillating: consecutive transitions are separated by
+at least the ten-second cooldown, and after eight stand-downs over the
+life of the process the latch becomes permanent. So enforcement can
+adapt to a program whose behavior changes phase, but the total number
+of flips is small and bounded. A `GODEBUG=numaenforce` setting pins
+the decision in either direction (always enforce, or never), for
+debugging.
 
 ### Observability
 
 `GODEBUG=numa=1` reports the discovered topology and each feature's
-enable/decline decision with its reason at startup; `numa=2` adds
+enable-or-disable decision with its reason at startup; `numa=2` adds
 verbose detail (window layout, per-node hint streams, enforcement
 transitions). These are diagnostics, not configuration: the only
 behavioral knob is the `numaenforce` override above.
@@ -301,8 +349,13 @@ isolates OS specifics behind per-OS files so other platforms can follow
 later). No scheduler restructuring: run queues,
 steal order, and wake paths are untouched. No hard memory binding of
 any region to a single node. No page migration. No NUMA-aware channel
-or goroutine placement. Default-on is explicitly a separate, future
-decision with its own bar.
+or goroutine placement: co-locating a channel's memory with the
+goroutines communicating over it (#12298), or scheduling a goroutine
+near the data it uses, requires exactly the scheduler integration this
+proposal avoids (see the Rationale section); making allocation
+NUMA-aware and homing Ps and threads is the foundation such work would
+build on, as a separate, later proposal. Default-on is explicitly a
+separate, future decision with its own bar.
 
 ## Rationale and alternatives considered
 
@@ -317,8 +370,9 @@ binding turns one node's memory pressure into allocation failure or
 swap while the other node has free memory, fights operator and
 container placement, and is irreversible damage when the runtime
 guesses wrong. First touch plus affinity achieves nearly the same
-placement with none of the failure modes; the fallback ladder means the
-worst case is remote memory, exactly what we have everywhere today.
+placement with none of the failure modes; the allocation fallback
+sequence means the worst case is remote memory, exactly what we have
+everywhere today.
 
 *The full NUMA scheduler (per-node run queues, node-preferring steal).*
 Vyukov's 2014 design remains the natural end state, but it rebuilds the
@@ -346,7 +400,9 @@ inside the runtime.
 ## Compatibility
 
 No API changes, no new public identifiers, and no behavior change of
-any kind unless `GOEXPERIMENT=numa` is set at toolchain build time.
+any kind unless a program is built with `GOEXPERIMENT=numa` (set in
+the environment at `go build` time, or baked in as a default when the
+toolchain itself is built, as with any experiment).
 With the experiment off the new code is compiled out; with it on, Go
 programs' observable behavior is unchanged apart from performance and
 the documented `GODEBUG` outputs. The proposal is Go 1 compatible.
@@ -390,8 +446,19 @@ worth reviewing:
   kernel balancer happens to serve well (stable working sets, unpinned,
   no confinement). This is the deliberate trade of the whole design;
   the placement layers are what win it back.
-- RSS is flat throughout, and the off-build is byte-identical in every
-  function to a stock build.
+- Memory: resident set size is statistically flat against stock across
+  the measured workloads. The design adds a fixed amount of runtime
+  metadata, independent of heap size: the central free lists, arena
+  hint chains, and page-allocator search state are replicated per node,
+  a small constant footprint at `N = 4`. The address-space windows are
+  layout, not reservations; pages are mapped only as the heap actually
+  grows, as today, so a program's virtual and resident footprint do not
+  grow with the window size. The one measured pressure point is the
+  grow-before-reuse ordering in the windowed allocator, which can map
+  memory in the home window while free memory exists in another node's
+  window; the fallback sequence bounds this, and it did not move RSS in
+  any measured workload.
+- The off-build is byte-identical in every function to a stock build.
 
 All numbers are from one machine so far; validating on a second
 platform (a multi-node EPYC or arm64 system) is called out under Open
@@ -420,7 +487,7 @@ passing tests. I would do this work.
   two-socket systems and multi-die parts of up to four nodes, keeps the
   structural cost near its floor, and costs 4 windows x 4 TiB of
   address space.
-  Machines with more CPU-bearing nodes than `N` decline the placement
+  Machines with more CPU-bearing nodes than `N` disable the placement
   layer (phase 1 still applies). Whether 4 is the right number, and
   whether it should eventually become link-time configurable, is open.
 - *Second-platform validation.* Before graduating beyond an
