@@ -86,6 +86,13 @@ This is a long-standing gap with a history:
   landed in Go 1.25) established the relevant precedent: the runtime
   adapting itself to the machine and container it finds itself on,
   automatically, with no new API, superseding a userland workaround.
+- [CL 714801](https://go.dev/cl/714801) (`runtime: prefer to restart
+  Ps on the same M after STW`, for [#65694](https://go.dev/issue/65694),
+  Go 1.26) began giving the scheduler a stable M/P pairing across
+  stop-the-world, explicitly anticipating "a more general affinity for
+  specific Ms" as future work. This proposal is a step in that
+  direction: it gives that affinity a reason (the P's node) and
+  extends it to the kernel's view of where the thread may run.
 
 This proposal follows the same shape as #73193: teach the runtime about
 the hardware it is on, do the obviously right thing by default (under
@@ -233,6 +240,24 @@ exactly as they do today. The home simply answers one question
 wherever the runtime needs it: "when this P asks for memory, which
 node should it come from?"
 
+Two consequences of that choice are worth stating plainly. First, the
+locality this design achieves does not depend on the scheduler keeping
+any particular M and P together: the home belongs to the P, and
+whichever M acquires a P applies that P's node affinity (below), so
+placement follows the P wherever it goes. The scheduler's recent move
+toward stable M/P pairing across stop-the-world (CL 714801) is
+complementary, making re-application rarer and keeping caches warm,
+but the numbers in the Evaluation section do not lean on it: it is
+equally present in the stock baseline they are measured against.
+Second, a G can still migrate across nodes, through the global run
+queue or by being stolen by a P homed elsewhere, exactly as today.
+When that happens, its existing working set becomes remote, and this
+proposal does not chase it: the G's subsequent allocations are simply
+local to its new node, so locality recovers at the allocation rate
+rather than by page migration. A node-preferring steal order is the
+natural answer to that residual, and it is precisely the scheduler
+territory this proposal leaves to a future proposal (see Rationale).
+
 ### Per-node heap address ranges
 
 To route memory by node, the runtime needs to control, and later
@@ -321,19 +346,41 @@ which G a P may run.
 One workload shape is genuinely hurt by even this much: programs
 dominated by sustained high-frequency thread sleep/wake cycles (heavy
 timer or network wake storms at very high `GOMAXPROCS`), where
-narrowing the wake-target CPU set adds latency to every wakeup. The
-runtime softens this pathology itself rather than shipping a tuning
-knob: it detects the regime and removes its own enforcement. A
-detector in sysmon watches the process-wide thread wake rate, and when
-the rate holds at or above a calibrated threshold (proposed: 2048
-wakes per second across 8 consecutive 100 ms windows, thresholds
-chosen so that GC-induced wake bursts, which are taller but die out
-quickly, do not trip it), enforcement stands down: every thread's
-kernel affinity mask is widened back to the full allowed set, and Ms
-stop narrowing. From that point the program's threads schedule exactly
-as they do without the experiment, so the cost of the pathological
-interaction is limited to the detection window rather than paid for
-the life of the process.
+narrowing the wake-target CPU set adds latency to every wakeup. This
+is not hypothetical; it is the one regression the prototype's gates
+caught with enforcement unconditionally on. Wake-latency-bound
+scheduler microbenchmarks (goroutine create/capture storms at 256
+procs) regressed 15-19% in wall time, and hardware counters show
+where it went: on-CPU work barely moved (about +7% user cycles per
+op) while wall time rose 23%, so the regression is almost entirely
+off-CPU time -- runnable work waiting, because a narrowed M cannot be
+woken onto the other node's idle CPUs.
+
+The runtime softens this pathology itself rather than shipping a
+tuning knob: it detects the regime and removes its own enforcement. A
+detector in sysmon watches the process-wide thread wake rate, and
+when the rate holds at or above a calibrated threshold, enforcement
+stands down: every thread's kernel affinity mask is widened back to
+the full allowed set, and Ms stop narrowing. From that point the
+program's threads schedule exactly as they do without the experiment,
+so the cost of the pathological interaction is limited to the
+detection window rather than paid for the life of the process.
+
+The proposed trip is 2048 wakes per second held across 8 consecutive
+100 ms windows, and both numbers are calibrated rather than guessed,
+from the runtime's own wake counters recorded over full runs of both
+regimes on two-node hardware. The recordings settled the shape of the
+detector, not just its constants: GC-heavy workloads produce wake
+herds that *burst* higher than any storm (13.9k to 36k wakes/s at
+phase boundaries, against the storms' sustained 7.8k to 12.3k/s), so
+an instantaneous rate cannot separate the regimes. Sustainment can:
+in every recorded run the GC herds die within 4 consecutive windows,
+while a storm exceeds the threshold in every window indefinitely. The
+proposed threshold sits 3.8x below the storms' minimum sustained
+rate, and the required streak is twice the longest GC-herd run ever
+observed. On the measured system, a full run of the GC-heavy
+pathological workload takes zero trips, and a storm stands
+enforcement down within roughly 800 ms of onset.
 
 Stand-down is not necessarily permanent. After ten seconds of
 accumulated below-threshold time, the detector re-arms and enforcement
@@ -440,7 +487,9 @@ should rest on, all from pre-registered gates with benchstat
   **30-33% faster** than stock, and within noise of the same binary
   under `numactl`.
 - *Stand-down:* on a synthetic wake-storm workload the detector stands
-  enforcement down as designed, and all scheduler microbenchmarks are
+  enforcement down within roughly 800 ms as designed, a full run of
+  the GC-heavy pathological workload takes zero trips (verified with
+  `GODEBUG` accounting), and all four scheduler microbenchmarks are
   statistically indistinguishable from stock.
 
 The costs, equally measured, because a proposal that hides them is not
@@ -502,6 +551,22 @@ passing tests. I would do this work.
   Machines with more CPU-bearing nodes than `N` disable the placement
   layer (phase 1 still applies). Whether 4 is the right number, and
   whether it should eventually become link-time configurable, is open.
+- *The enforcement detector.* This is the most experimental piece of
+  the design, and I expect it to draw the most review scrutiny: a
+  calibrated detector with a cooldown and a trip cap is real
+  machinery, and its constants, while measured, are measured on one
+  platform. Two simplifications are available if review prefers them.
+  The re-arm could be dropped entirely, making enforcement stand-down
+  one-way like confinement's, which deletes the cooldown and trip-cap
+  machinery at the cost of never recovering affinity in a program
+  whose storm phase ends. Or enforcement could ship default-off
+  behind `GODEBUG=numaenforce` until there is field experience. The
+  evidence for the pathology itself is indirect but consistent (the
+  wall-time regression is attributed to off-CPU time by hardware
+  counters); a runtime execution trace of a storm with enforcement
+  pinned on, directly showing the growth in runnable-to-running
+  latency, is planned validation that would put the mechanism beyond
+  argument.
 - *Second-platform validation.* Before graduating beyond an
   experiment, the numbers should be reproduced on at least one
   additional topology (4-node x86 and/or multi-node arm64). The

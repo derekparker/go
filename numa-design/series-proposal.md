@@ -73,6 +73,15 @@ scheduler microbenchmarks statistically indistinguishable from stock.
   deleted when ablation showed it contributed nothing), and thread
   affinity is soft, with a calibrated detector that stands it down in the
   one regime it hurts.
+- **CL 714801, "runtime: prefer to restart Ps on the same M after
+  STW" (Michael Pratt, for #65694, Go 1.26)**: the scheduler's first
+  step toward stable M/P affinity, with "a more general affinity for
+  specific Ms" explicitly named as future work. It is in this series'
+  baseline (it predates the fork point), so every measured delta is on
+  top of it. The soft thread affinity in CLs 13-14 extends the same
+  direction outward to the kernel scheduler, with the P's home node as
+  the affinity's reason; the stable pairing it provides makes affinity
+  re-application rarer.
 - **Linux automatic NUMA balancing**: the mechanism stock Go leans on
   today. The series treats it as the baseline to beat and to exempt: a
   `MPOL_BIND`-to-all-nodes VMA policy on every heap chunk changes no
