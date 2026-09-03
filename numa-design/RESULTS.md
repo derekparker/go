@@ -4961,7 +4961,14 @@ runtime sources rebuilt by go test at `655ce13379`), workload
 
 Artifacts: `bench-data/trace-standdown/` (sched pprofs, bench outputs,
 meta); raw traces (35-37MB each) retained on numa-dell in
-`~/trace-standdown-20260903-124030/`. Caveat: tracing itself adds
-overhead (traceLocker ~10% of delay samples) and compresses the wall
-delta (traced wall gap +17.6% vs +21.2% untraced); the per-op delay
-ratio is the robust readout.
+`~/trace-standdown-20260903-124030/`. Caveat: the modern tracer's 1-2%
+typical overhead does NOT hold for this workload, and that is measured,
+not assumed: traced wall is 2.07x untraced for enforce-off (751.8 ->
+1558 ns/op) and 2.01x for enforce-on (910.9 -> 1833). This benchmark is
+the tracer's adversarial extreme -- the ~750ns op consists almost
+entirely of scheduler transitions, each emitting a trace event with a
+frame-pointer unwind, so per-event cost dominates. The inflation is
+roughly additive and config-independent (+806ns/op off, +922ns/op on),
+which is why it compresses the relative wall delta (+21.2% untraced ->
++17.6% traced) without corrupting the delay-profile ratio; the per-op
+delay ratio is the robust readout.
