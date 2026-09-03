@@ -151,17 +151,29 @@ The runtime applies this in two layers:
    derived from sysfs, so it respects a container's `cpuset.mems`
    without any parsing.
 2. A per-mapping `mbind(MPOL_BIND, all nodes)` on each heap region as
-   it is mapped. This layer is the guarantee for the heap specifically:
-   a task policy only applies to faults taken by threads that inherited
-   it, so heap pages touched first by threads created before the Go
-   runtime initialized, or by cgo threads carrying their own policies,
-   would otherwise remain eligible for balancing. Binding the VMA
-   itself closes that gap regardless of which thread faults the pages
-   in.
+   it is mapped. This layer is the guarantee for the heap specifically,
+   and it exists because of how the kernel resolves policy at fault
+   time: a fault is governed by the VMA's own policy if one is set, and
+   otherwise by the policy of the *faulting thread*. A task policy is a
+   per-thread attribute, inherited at thread creation; it is not a
+   property of the process or of any mapping, and a mapping created by
+   a policy-carrying thread does not remember that policy. So the task
+   policy covers faults taken by the runtime's threads and their
+   descendants, but not faults taken by threads that predate runtime
+   initialization (threads started by C constructors in a cgo binary,
+   or the host application's threads when Go is built as a c-archive or
+   c-shared library) or that have since installed their own policy. And
+   such threads do fault Go heap pages: a C-created thread that calls
+   into Go runs Go code, allocates, and touches the heap like any
+   other. Binding the heap VMA itself closes that gap: the policy
+   travels with the memory range and governs the fault no matter which
+   thread takes it.
 
-Only heap memory is exempted. Balancing continues to apply to
-everything else in the process (cgo allocations, mapped files), where
-the kernel's heuristics remain the right tool.
+Only Go heap memory is exempted, and the guarantee runs in one
+direction: any thread touching the Go heap is covered, but nothing
+here covers or constrains C code's own memory. Balancing continues to
+apply to everything else in the process (cgo allocations, mapped
+files), where the kernel's heuristics remain the right tool.
 
 This layer is independent of everything below it and is worth having
 even without the placement machinery. The elimination is preventive,
