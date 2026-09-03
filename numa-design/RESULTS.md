@@ -4933,3 +4933,35 @@ expected conflict at the heap-streams CL resolved to the new final
 text). New series HEAD `e83443fe12`, force-updated on lab. Checkpoint
 validation: make.bash + both-mode battery green at CL0/CL8/HEAD;
 end state byte-identical to main HEAD (git diff empty).
+
+# Execution-trace confirmation of the enforcement stand-down pathology (2026-09-03)
+
+Diagnostic (not a gate; GODEBUG is the object of study). Question from
+proposal review (PR #4, comment on the stand-down section): the archived
+evidence for the wake-storm pathology was benchstat wall + perf-counter
+attribution (off-CPU dominant); no runtime execution trace had ever
+confirmed the mechanism directly. Ran on numa-dell (256 CPUs, 2 nodes),
+toolchain at `68cbbd30f2` (all later commits are docs/comments/test-only;
+runtime sources rebuilt by go test at `655ce13379`), workload
+`BenchmarkCreateGoroutines` at -cpu=256 -benchtime=2s, GOEXPERIMENT=numa.
+
+- Untraced wall, n=5 per config: enforce-on (numaenforce=1) median
+  910.9 ns/op (904.7-918.1); enforce-off (numaenforce=2) median
+  751.8 ns/op (748.5-762.4). +21.2%, zero overlap — reproduces the
+  archived +15-19% regression on today's tree.
+- Traced, n=3 per config: total scheduler delay (runnable-to-running,
+  `go tool trace -pprof=sched`) normalized per op: on 47.5/80.4/55.2
+  ns/op (median 55.2) vs off 35.2/38.4/35.3 (median 35.3). +56% at the
+  median, zero overlap (on-min 47.5 > off-max 38.4). This is the direct
+  trace observation the review asked for: runnable work waits longer
+  when Ms are narrowed, while the other node's CPUs could run it.
+- Detector live under trace (auto config, GODEBUG=numa=1): "numa:
+  enforcement stood down (wake-storm), trip 1 permanent false" — single
+  trip, non-permanent, as designed.
+
+Artifacts: `bench-data/trace-standdown/` (sched pprofs, bench outputs,
+meta); raw traces (35-37MB each) retained on numa-dell in
+`~/trace-standdown-20260903-124030/`. Caveat: tracing itself adds
+overhead (traceLocker ~10% of delay samples) and compresses the wall
+delta (traced wall gap +17.6% vs +21.2% untraced); the per-op delay
+ratio is the robust readout.

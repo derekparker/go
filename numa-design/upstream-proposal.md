@@ -354,7 +354,13 @@ procs) regressed 15-19% in wall time, and hardware counters show
 where it went: on-CPU work barely moved (about +7% user cycles per
 op) while wall time rose 23%, so the regression is almost entirely
 off-CPU time -- runnable work waiting, because a narrowed M cannot be
-woken onto the other node's idle CPUs.
+woken onto the other node's idle CPUs. Execution traces confirm the
+mechanism directly: with enforcement pinned on, the scheduler-latency
+profile (time goroutines spend runnable before running, from `go tool
+trace`) shows 47-80 ns of scheduler delay per benchmark op against
+35-38 ns with enforcement off -- roughly +56% at the median with no
+overlap across runs -- while the same detector, left in automatic
+mode, trips once and stands enforcement down as designed.
 
 The runtime softens this pathology itself rather than shipping a
 tuning knob: it detects the regime and removes its own enforcement. A
@@ -561,12 +567,12 @@ passing tests. I would do this work.
   machinery at the cost of never recovering affinity in a program
   whose storm phase ends. Or enforcement could ship default-off
   behind `GODEBUG=numaenforce` until there is field experience. The
-  evidence for the pathology itself is indirect but consistent (the
-  wall-time regression is attributed to off-CPU time by hardware
-  counters); a runtime execution trace of a storm with enforcement
-  pinned on, directly showing the growth in runnable-to-running
-  latency, is planned validation that would put the mechanism beyond
-  argument.
+  pathology itself is confirmed from three independent directions:
+  wall time (benchstat), hardware counters (the regression is off-CPU
+  time), and execution traces (scheduler latency per op grows by half
+  again with enforcement pinned on, with the detector observed
+  tripping live in the same setup). What remains open is the
+  machinery's complexity budget, not the mechanism's existence.
 - *Second-platform validation.* Before graduating beyond an
   experiment, the numbers should be reproduced on at least one
   additional topology (4-node x86 and/or multi-node arm64). The

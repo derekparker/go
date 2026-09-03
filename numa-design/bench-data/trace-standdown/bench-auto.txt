@@ -1,0 +1,264 @@
+numa: stream window node 0 lo 0x15f8000000 hi 0x415f8000000 hints 16 run 16
+numa: stream window node 1 lo 0x415f8000000 hi 0x815f8000000 hints 16 run 16
+numa: stream window node 2 lo 0x815f8000000 hi 0xc15f8000000 hints 16 run 16
+numa: stream window node 3 lo 0xc15f8000000 hi 0x1015f8000000 hints 16 run 16
+numa: soft affinity eligible (process started with full affinity)
+numa: nodes 2 allowed 2
+numa: confinement declined: GOMAXPROCS not explicitly set
+numa: placement eligible
+numa: P homes: node0=[128] node1=[128]
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: P homes: node0=[128] node1=[128]
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: P homes: node0=[128] node1=[128]
+numa: soft affinity narrowed M to node 1
+numa: P homes: node0=[128] node1=[128]
+numa: soft affinity narrowed M to node 1
+numa: P homes: node0=[128] node1=[128]
+numa: soft affinity narrowed M to node 1
+numa: P homes: node0=[128] node1=[128]
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: P homes: node0=[128] node1=[128]
+numa: soft affinity narrowed M to node 1
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+goos: linux
+goarch: amd64
+pkg: runtime
+cpu: INTEL(R) XEON(R) PLATINUM 8592+
+BenchmarkCreateGoroutines-256     	numa: soft affinity narrowed M to node 1
+numa: P homes: node0=[128] node1=[128]
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: P homes: node0=[128] node1=[128]
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: P homes: node0=[128] node1=[128]
+numa: soft affinity narrowed M to node 1
+numa: P homes: node0=[128] node1=[128]
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: P homes: node0=[128] node1=[128]
+numa: soft affinity narrowed M to node 1
+numa: P homes: node0=[128] node1=[128]
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: P homes: node0=[128] node1=[128]
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: P homes: node0=[128] node1=[128]
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: enforcement stood down (wake-storm), trip 1 permanent false
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+ 1433306	      1611 ns/op
+numa: P homes: node0=[128] node1=[128]
+PASS
+ok  	runtime	4.105s

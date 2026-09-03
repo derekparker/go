@@ -1,0 +1,45 @@
+=== sched latency profile: on ===
+Main binary filename not available.
+Type: delay
+Showing nodes accounting for 34187.71us, 50.17% of 68142.28us total
+Dropped 7 nodes (cum <= 340.71us)
+Showing top 8 nodes out of 26
+      flat  flat%   sum%        cum   cum%
+18806.59us 27.60% 27.60% 18806.59us 27.60%  runtime.systemstack_switch
+ 6686.34us  9.81% 37.41%  6686.34us  9.81%  runtime.traceLocker.stack
+ 3091.20us  4.54% 41.95%  3091.20us  4.54%  runtime.goexit1
+ 1595.07us  2.34% 44.29%  1595.07us  2.34%  runtime.Gosched
+ 1253.63us  1.84% 46.13%  1253.63us  1.84%  runtime.gcTrigger.test
+ 1111.62us  1.63% 47.76% 17811.52us 26.14%  runtime.gcMarkDone
+  939.46us  1.38% 49.14%   939.46us  1.38%  runtime/trace.(*traceMultiplexer).startLocked.func1
+  703.81us  1.03% 50.17%   703.81us  1.03%  runtime.(*scavengerState).sleep
+=== sched latency profile: off ===
+Main binary filename not available.
+Type: delay
+Showing nodes accounting for 35103.30us, 69.08% of 50814.84us total
+Dropped 5 nodes (cum <= 254.07us)
+Showing top 8 nodes out of 39
+      flat  flat%   sum%        cum   cum%
+16897.47us 33.25% 33.25% 16897.47us 33.25%  runtime.systemstack_switch
+ 6308.61us 12.41% 45.67%  6308.61us 12.41%  runtime.traceLocker.stack
+ 3354.24us  6.60% 52.27%  3354.24us  6.60%  runtime.goschedIfBusy
+ 2586.94us  5.09% 57.36%  2586.94us  5.09%  runtime.goexit1
+ 1851.45us  3.64% 61.00% 17390.66us 34.22%  runtime.gcMarkDone
+ 1733.82us  3.41% 64.42%  1733.82us  3.41%  runtime.Gosched
+ 1503.11us  2.96% 67.37%  1503.11us  2.96%  runtime.gcTrigger.test
+  867.65us  1.71% 69.08%   867.65us  1.71%  runtime.lock2
+=== sched latency profile: auto ===
+Main binary filename not available.
+Type: delay
+Showing nodes accounting for 32176.58us, 52.32% of 61499.59us total
+Dropped 14 nodes (cum <= 307.50us)
+Showing top 8 nodes out of 20
+      flat  flat%   sum%        cum   cum%
+16447.30us 26.74% 26.74% 16447.30us 26.74%  runtime.systemstack_switch
+ 6725.76us 10.94% 37.68%  6725.76us 10.94%  runtime.traceLocker.stack
+ 4414.53us  7.18% 44.86%  4414.53us  7.18%  runtime.goexit1
+ 2174.53us  3.54% 48.39% 18688.96us 30.39%  runtime.gcMarkDone
+ 1186.88us  1.93% 50.32%  1186.88us  1.93%  runtime.gcTrigger.test
+  968.70us  1.58% 51.90%   968.70us  1.58%  runtime.Gosched
+  255.74us  0.42% 52.31%   255.74us  0.42%  runtime.chansend1
+    3.14us 0.0051% 52.32%  4885.95us  7.94%  runtime_test.benchmarkCreateGoroutines.func1

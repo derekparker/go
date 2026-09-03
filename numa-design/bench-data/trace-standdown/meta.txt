@@ -1,0 +1,2 @@
+toolchain: go version go1.28-devel_68cbbd30f2 Thu Aug 27 13:57:29 2026 -0700 linux/amd64
+655ce13379 numa-design: prior-work CL 714801; ground the stand-down section in measurement

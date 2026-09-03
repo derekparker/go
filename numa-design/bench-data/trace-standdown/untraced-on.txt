@@ -1,0 +1,5 @@
+BenchmarkCreateGoroutines-256     	 2696845	       908.2 ns/op
+BenchmarkCreateGoroutines-256     	 2687102	       917.8 ns/op
+BenchmarkCreateGoroutines-256     	 2692122	       904.7 ns/op
+BenchmarkCreateGoroutines-256     	 2894010	       918.1 ns/op
+BenchmarkCreateGoroutines-256     	 2641850	       910.9 ns/op
