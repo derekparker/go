@@ -4972,3 +4972,68 @@ roughly additive and config-independent (+806ns/op off, +922ns/op on),
 which is why it compresses the relative wall delta (+21.2% untraced ->
 +17.6% traced) without corrupting the delay-profile ratio; the per-op
 delay ratio is the robust readout.
+
+# Soft-affinity ablation + real-workload storm probe (2026-09-04)
+
+Two diagnostics behind the stand-down brainstorm (PR #4 review: "would a
+real workload face this, and would upstream take the detector?"). Both
+on numa-dell, frozen gate binary `/tmp/g2/numa-bin/garbage` and a
+locality-probe rebuilt at `655ce13379`. GODEBUG is the object of study
+in the ablation arms. Raw archives: `bench-data/affinity-ablation/`;
+run dirs `~/probe-a-20260904-135120`, `~/probe-b-20260904-141136` on
+numa-dell.
+
+## Probe A: what does kernel thread affinity actually buy? Almost nothing.
+
+Garbage 4096MB/256P, interleaved arms, 1 warmup + 10 recorded each,
+numa-auto vs numa + GODEBUG=numaenforce=2 (enforcement latched off,
+everything else identical):
+
+- wall sec/op: 2.832m ±1% vs 2.900m ±2% -- removing affinity costs
+  +2.39% (p=0.002 n=10).
+- user+sys sec/op (the campaign primary): 236.4m vs 232.5m -- NO
+  significant difference (p=0.280).
+- STW, GC bytes, RSS: all ~.
+
+G2-locality sweep (R=5, widths 2/8/32/128/256), auto vs noaff medians:
+95.63/95.15/92.56/93.15/96.31% vs 95.75/95.11/92.58/93.95/95.38%.
+Indistinguishable; every width >=90% in both configs. The metric is
+physically meaningful: refill locality is classified against getcpu
+(the thread's actual node at refill time), not P-home arithmetic
+(mcentral.go numaRefillNode), and routing itself follows getcpu -- so
+without affinity the routing adapts to wherever the kernel runs the
+thread, and the kernel barely moves threads on an otherwise-idle box.
+
+Conclusion: the 93-97% locality and effectively all of the -8..-10%
+win come from the memory layers. Kernel affinity enforcement
+contributes +2.4% wall on the flagship workload and nothing
+significant on the primary metric.
+
+## Probe B: is the wake-storm regime real-world? Yes.
+
+Plain net/http server (small JSON handler, keep-alive), built
+GOEXPERIMENT=numa, unpinned, GOMAXPROCS=256; closed-loop loopback
+loadgen (experiment-off build, GOMAXPROCS=64), 512 conns, ~44-45k qps,
+server at only ~6-7% CPU (loadgen-bound; heavier load not achieved
+with a single client process).
+
+- Detector (auto arms): tripped in 3/3 runs -- "numa: enforcement
+  stood down (wake-storm), trip 1 permanent false". An ordinary
+  short-request server sustains >2048 wakes/s; the storm regime is not
+  benchmark-only.
+- Cost of pinned enforcement to the server (on vs off, n=3 medians):
+  qps 44188 vs 44402 (-0.5%); p50 8.9ms vs 7.8ms (+~1ms, closed-loop
+  so client queuing dominates absolutes); p90/p99 within noise. Far
+  milder than the +21% microbenchmark regression.
+
+## Synthesis
+
+The detector protects a regime that is common in the real world -- but
+the thing it protects (kernel affinity) buys ~2.4% wall on the
+flagship workload and nothing on the primary metric, while locality
+does not depend on it at all. The complexity trade now points at
+dropping kernel-affinity enforcement (and the detector with it) from
+the upstream proposal rather than defending it. Doc accuracy note
+found on the way: the proposal says refills "carry the P's home node";
+the implementation routes by getcpu. Fix whichever way the affinity
+decision lands.

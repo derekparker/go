@@ -1,0 +1,2 @@
+binary: -rwxr-xr-x. 1 deparker deparker 5143332 Aug 27 15:44 /tmp/g2/numa-bin/garbage
+284853632f numa-design: quantify tracer overhead in the trace-experiment caveat

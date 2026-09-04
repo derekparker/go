@@ -1,0 +1,4380 @@
+numa: stream window node 0 lo 0x240ed0000000 hi 0x280ed0000000 hints 16 run 16
+numa: stream window node 1 lo 0x280ed0000000 hi 0x2c0ed0000000 hints 16 run 16
+numa: stream window node 2 lo 0x2c0ed0000000 hi 0x300ed0000000 hints 16 run 16
+numa: stream window node 3 lo 0x300ed0000000 hi 0x340ed0000000 hints 16 run 16
+numa: soft affinity eligible (process started with full affinity)
+numa: nodes 2 allowed 2
+numa: confinement declined: GOMAXPROCS not explicitly set
+numa: placement eligible
+numa: P homes: node0=[128] node1=[128]
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: P homes: node0=[128] node1=[128]
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+server gomaxprocs=256 pid=3343017
+numa: soft affinity narrowed M to node 0
+numa: P homes: node0=[128] node1=[128]
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: P homes: node0=[128] node1=[128]
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: P homes: node0=[128] node1=[128]
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: P homes: node0=[128] node1=[128]
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: P homes: node0=[128] node1=[128]
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: P homes: node0=[128] node1=[128]
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: P homes: node0=[128] node1=[128]
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: P homes: node0=[128] node1=[128]
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: P homes: node0=[128] node1=[128]
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: P homes: node0=[128] node1=[128]
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: P homes: node0=[128] node1=[128]
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: P homes: node0=[128] node1=[128]
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: P homes: node0=[128] node1=[128]
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: P homes: node0=[128] node1=[128]
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: P homes: node0=[128] node1=[128]
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: P homes: node0=[128] node1=[128]
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: P homes: node0=[128] node1=[128]
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: P homes: node0=[128] node1=[128]
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: P homes: node0=[128] node1=[128]
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: P homes: node0=[128] node1=[128]
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: P homes: node0=[128] node1=[128]
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: P homes: node0=[128] node1=[128]
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: P homes: node0=[128] node1=[128]
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: P homes: node0=[128] node1=[128]
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: P homes: node0=[128] node1=[128]
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: P homes: node0=[128] node1=[128]
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: P homes: node0=[128] node1=[128]
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: P homes: node0=[128] node1=[128]
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: P homes: node0=[128] node1=[128]
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: P homes: node0=[128] node1=[128]
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: P homes: node0=[128] node1=[128]
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: P homes: node0=[128] node1=[128]
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 0
+numa: P homes: node0=[128] node1=[128]
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 1
+numa: soft affinity narrowed M to node 0
+numa: soft affinity narrowed M to node 1
+numa: enforcement stood down (wake-storm), trip 1 permanent false
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]
+numa: P homes: node0=[128] node1=[128]

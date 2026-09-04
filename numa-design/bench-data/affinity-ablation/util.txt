@@ -1,0 +1,13 @@
+sweep-c64 conc=64 server-util=5.2% of 256 cpus
+sweep-c192 conc=192 server-util=5.9% of 256 cpus
+sweep-c512 conc=512 server-util=7.3% of 256 cpus
+chosen conc=512
+off-r1 conc=512 server-util=7.4% of 256 cpus
+on-r1 conc=512 server-util=6.4% of 256 cpus
+auto-r1 conc=512 server-util=6.5% of 256 cpus
+off-r2 conc=512 server-util=7.2% of 256 cpus
+on-r2 conc=512 server-util=6.2% of 256 cpus
+auto-r2 conc=512 server-util=6.8% of 256 cpus
+off-r3 conc=512 server-util=7.6% of 256 cpus
+on-r3 conc=512 server-util=6.3% of 256 cpus
+auto-r3 conc=512 server-util=6.4% of 256 cpus
