@@ -484,23 +484,25 @@ run.
   the exemption in place (`/proc/vmstat` deltas), while the exempted
   run is also faster.
 - *Placement:* span-refill locality on unpinned runs rises from
-  **53-75% (varying with width) to 93-97% at every measured width**
-  (GOMAXPROCS 2, 8, 32, 128, 256; 5 launches per width since the
-  randomized heap base makes layout a per-launch property). Locality
+  **53-75% (varying with width) to 93-96% at every measured width**
+  on the affinity-free tree (GOMAXPROCS 2, 8, 32, 128, 256; 5
+  launches per width since the randomized heap base makes layout a
+  per-launch property; per-width medians 92.7-96.3%, minimum launch
+  92.4%). Locality
   is classified against the faulting thread's *physical* node, read
   via `getcpu` at refill time, so the number cannot be satisfied by
   bookkeeping: it measures where memory actually is relative to the
   CPU using it.
 - *Full width:* on the pathological GC workload (garbage, 4 GiB live
-  set, `GOMAXPROCS=256`, the regime confinement cannot help), **8-10%
-  faster (p <= 0.005, n=10)** across the recorded gates. Those gates
-  ran on the prototype with thread affinity still present; a
-  dedicated same-day interleaved ablation (n=10 per arm) bounds
-  affinity's contribution at **2.4 points of the wall-time win
-  (p=0.002) and none of the user+sys win (p=0.28)**, so the
-  configuration this proposal ships retains roughly 6-8% wall and the
-  full user+sys improvement. Re-running the headline gates on the
-  affinity-free tree is part of the planned series validation.
+  set, `GOMAXPROCS=256`, the regime confinement cannot help), the
+  exact configuration this proposal describes, with no thread
+  affinity, measures **9.1% faster wall time and 5.4% faster user+sys
+  (both p=0.000, n=10)** against a stock build of the same source.
+  Earlier gates on the prototype with thread affinity still present
+  read 8-10% wall across recorded runs; the dedicated interleaved
+  ablation (n=10 per arm) bounds affinity's contribution at 2.4
+  points of wall (p=0.002) and none of user+sys (p=0.28), consistent
+  with the affinity-free result.
 - *Confined case:* a single-socket-sized process, unpinned, runs
   **30-33% faster** than stock, and within noise of the same binary
   under `numactl --cpunodebind --membind`.

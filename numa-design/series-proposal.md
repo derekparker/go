@@ -35,11 +35,13 @@ migration). The series makes the runtime NUMA-aware behind an off-by-default
 experiment off it is provably inert (per-function binary census at every
 commit of the series).
 
-Measured on the reference hardware with the experiment on: refill locality
-**93–97% at every width with exactly 0 balancer hint faults**, **−8 to
-−10%** wall time at full width on the pathological GC workload (p ≤ 0.005),
-**−30 to −33%** for the confined single-socket case, RSS flat, and
-scheduler microbenchmarks statistically indistinguishable from stock.
+Measured on the reference hardware with the experiment on (affinity-free
+tree, 2026-09-08 re-gate): refill locality **93–96% at every width with
+exactly 0 balancer hint faults**, **−9.1% wall / −5.4% user+sys**
+(p = 0.000, n = 10) at full width on the pathological GC workload,
+**−30 to −33%** for the confined single-socket case, RSS flat, and no
+scheduler behavior change of any kind (the series contains no thread
+affinity or scheduler hooks).
 
 ## Associated issues
 
@@ -104,22 +106,22 @@ scheduler microbenchmarks statistically indistinguishable from stock.
 
 ## The series
 
-**Revision 2026-09-08 -- enforcement dropped.** The soft-affinity
-ablation and real-workload storm probe (RESULTS.md 2026-09-04) showed
-kernel thread affinity contributes +2.4% wall and nothing on the
-user+sys primary on the flagship gate, with refill locality unchanged
-without it, while an ordinary net/http server trips the wake-storm
-detector immediately -- the machinery ships only to disable itself on
-the most common deployment shape. The upstream series therefore drops
-CLs 13 (soft NUMA thread affinity) and 14 (adaptive enforcement
-stand-down), ending at node-keyed mcentral: 13 commits total. The
-table below still lists all 15 as they exist on the current
-`numa-cl-series` branch; the branch rebuild that removes the
-enforcement code (and the matching implementation-branch change, gate
-re-runs on the affinity-free tree included) is the next mechanical
-step.
+**Revision 2026-09-08 -- enforcement dropped (complete).** The
+soft-affinity ablation and real-workload storm probe (RESULTS.md
+2026-09-04) showed kernel thread affinity contributes +2.4% wall and
+nothing on the user+sys primary on the flagship gate, with refill
+locality unchanged without it, while an ordinary net/http server trips
+the wake-storm detector immediately -- the machinery shipped only to
+disable itself on the most common deployment shape. The series
+therefore drops the planned soft-affinity and enforcement-stand-down
+CLs and ends at node-keyed mcentral. The implementation branch removal
+is `a225a5261d` (src/ byte-identical to CL 12), the branch is
+truncated accordingly, and the headline gates were re-run with both
+arms built from the affinity-free tree: wall **-9.08%** and user+sys
+**-5.37%** (both p=0.000, n=10), locality **92.7-96.3%** medians with
+every width over the 90% bar (RESULTS.md 2026-09-08).
 
-Branch `numa-cl-series` (pushed to the lab Forgejo), 15 commits from base
+Branch `numa-cl-series` (pushed to the lab Forgejo), 13 commits from base
 `8058a57773` (upstream master at the campaign fork point). Every commit
 individually passes a full `make.bash`, the runtime NUMA/pagealloc test
 battery in both build modes, gofmt, and a per-function experiment-off
@@ -157,8 +159,11 @@ the −8..−10% full-width win):
 | 10 | `d89bd0d979` | runtime: NUMA P homes | 9 files, +483/−13 |
 | 11 | `e291adcb73` | runtime: route span allocation by P home | 5 files, +247/−9 |
 | 12 | `891fcf86a8` | runtime: node-keyed mcentral span recycling | 10 files, +1381/−116 |
-| 13 | `eec40813ac` | runtime: soft NUMA thread affinity *(dropped from the upstream series, 2026-09-08)* | 15 files, +1610/−81 |
-| 14 | `e83443fe12` | runtime: adaptive NUMA enforcement stand-down *(dropped from the upstream series, 2026-09-08)* | 10 files, +441/−7 |
+
+(Two further CLs, soft NUMA thread affinity and the adaptive
+enforcement stand-down, were built, per-commit validated, and then
+dropped from the series after the 2026-09-04 ablation; their content
+survives in the audit history and in RESULTS.md.)
 
 Ordering note vs the original plan: P homes moved ahead of span-routing
 and mcentral keying (they consume the P-home key), and the per-chunk VMA

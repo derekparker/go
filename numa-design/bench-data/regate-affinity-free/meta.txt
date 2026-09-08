@@ -1,0 +1,2 @@
+a225a5261d runtime: drop soft NUMA thread affinity and adaptive enforcement stand-down
+go version go1.28-devel_a225a5261d Tue Sep 8 15:39:08 2026 -0700 linux/amd64

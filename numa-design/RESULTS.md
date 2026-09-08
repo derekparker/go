@@ -5037,3 +5037,30 @@ the upstream proposal rather than defending it. Doc accuracy note
 found on the way: the proposal says refills "carry the P's home node";
 the implementation routes by getcpu. Fix whichever way the affinity
 decision lands.
+
+# Enforcement removal + headline re-gate on the affinity-free tree (2026-09-08)
+
+Acted on the 2026-09-04 ablation: soft NUMA thread affinity and the
+adaptive stand-down are gone from the implementation
+(`a225a5261d`, a pure reverse-apply of the CL13+14 diff; resulting
+src/ byte-identical to series CL12 `891fcf86a8`, verified empty diff).
+Local validation: make.bash, `go test runtime -short` and the
+NUMA/pagealloc battery green in both build modes.
+
+Headline re-gate on numa-dell, BOTH arms built fresh from the
+affinity-free tree (bootstrap toolchain frozen at `~/go-bootstrap`),
+garbage 4096MB/256P, interleaved, 1 warmup + 10 recorded per arm:
+
+- wall sec/op: 3.320m ±5% -> 3.019m ±8%, **-9.08% (p=0.000 n=10)**
+- user+sys sec/op: 255.1m ±2% -> 241.4m ±6%, **-5.37% (p=0.000 n=10)**
+- peak RSS ~ (p=0.105); STW-sec/GC +10.66% (p=0.019) -- the
+  previously flagged STW/GC-metadata note stands, unchanged in kind.
+- G2 locality on the same tree: medians 95.12/95.07/92.74/93.75/96.34%
+  at widths 2/8/32/128/256, minimum 92.43%; every width >= 90%. PASS.
+
+The affinity-free configuration holds the full headline win. Branch
+surgery: `numa-cl-series` truncated to 13 commits (ends `891fcf86a8`,
+node-keyed mcentral); PR #3 review branch rebuilt as fix + phase 1 +
+phase 2 (CLs 8-12) with end tree byte-identical to implementation
+HEAD. Raws: `bench-data/regate-affinity-free/`; run dir
+`~/regate-20260908-184004` on numa-dell.
