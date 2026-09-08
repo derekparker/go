@@ -4,9 +4,10 @@
 
 // Export guts for testing -- split out of export_numa_test.go.
 //
-// NumaGetCPUNodeForTest calls numaGetCPUNode directly, which has a
-// working getcpu(2) implementation on every GOOS=linux architecture
-// (see numa_linux_getcpu.go and the getcpu wrapper in each
+// NumaGetCPUNodeForTest lives here, rather than in export_numa_test.go,
+// so its dependencies stay minimal: it calls numaGetCPUNode directly,
+// which has a working getcpu(2) implementation on every GOOS=linux
+// architecture (see numa_linux_getcpu.go and the getcpu wrapper in each
 // sys_linux_*.s).
 //
 // It deliberately does NOT go through numaCurrentNode (numa_linux.go),
@@ -17,9 +18,9 @@
 // other node to report on a single-node host), but it would make a test
 // built on top of it vacuous on every single-node host -- including
 // qemu/CI runners, which is most of the hardware available to actually
-// execute TestNUMAGetcpu on most linux architectures. Calling
-// numaGetCPUNode directly exercises the real getcpu syscall
-// unconditionally, single-node or not.
+// execute TestNUMAGetcpu across architectures. Calling numaGetCPUNode
+// directly exercises the real getcpu syscall unconditionally,
+// single-node or not.
 //
 // This file keeps the same goexperiment.numa tag as export_numa_test.go
 // and numa_linux_getcpu_test.go, for the same dead-code-elimination

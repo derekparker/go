@@ -123,14 +123,6 @@ func NumaHostAffinityNarrowedForTest() bool {
 	return !numaStartupFullAffinity
 }
 
-// NumaWidenCountForTest returns the number of times numaWidenBeforeClone
-// has actually widened a soft-narrowed M since process start (review
-// adjudication (b)): a race-safe way to confirm the newm1/newosproc/cgo
-// widen path fired at all during M-creation churn, closing the
-// automated-coverage gap TestNUMASoftAffinity's I2 distinct-node
-// assertion leaves under -race (see that test's doc comment).
-func NumaWidenCountForTest() uint64 { return numaWidenCount.Load() }
-
 // NumaPlacementQuotasForTest runs the pure quota partition function
 // behind numaAssignPHomes on an arbitrary topology (v4 stage 2).
 // len(cpus) must be <= numaMaxHeapNodes.
@@ -158,39 +150,3 @@ func NumaPHomesForTest() []int8 {
 	}
 	return homes
 }
-
-// A5 adaptive-enforcement test hooks: drive the sysmon-side trip/re-arm
-// state machine with synthetic window readings and observe the latch,
-// epoch, and trip counter. Callers must reset with
-// NumaEnforceResetForTest and are responsible for not racing real
-// sysmon activity in ways that matter (the state machine is
-// sysmon-single-writer in production; tests drive it from one
-// goroutine, which preserves that).
-func NumaEnforceEvalForTest(ratePerSec, elapsed int64) { numaEnforceEval(ratePerSec, elapsed) }
-func NumaEnforceStoodDownForTest() bool                { return numaEnforceStoodDown.Load() }
-func NumaEnforceEpochForTest() uint32                  { return numaEnforceEpoch.Load() }
-func NumaEnforceTripsForTest() int32                   { return numaEnforceTrips }
-func NumaEnforceResetForTest() {
-	numaEnforceSysmonMasked.Store(true) // hermetic: live sysmon evals off
-	numaEnforceStoodDown.Store(false)
-	numaEnforceOverStreak = 0
-	numaEnforceQuietNs = 0
-	numaEnforceTrips = 0
-	numaEnforcePermanent = false
-}
-
-// NumaEnforceReleaseForTest returns the state machine to live sysmon
-// ownership (deferred by tests after NumaEnforceResetForTest).
-func NumaEnforceReleaseForTest() {
-	numaEnforceStoodDown.Store(false)
-	numaEnforceOverStreak = 0
-	numaEnforceQuietNs = 0
-	numaEnforceTrips = 0
-	numaEnforcePermanent = false
-	numaEnforceSysmonMasked.Store(false)
-}
-
-// NumaWakeRateTripForTest / NumaEnforceTripStreakForTest export the
-// frozen detection constants.
-func NumaWakeRateTripForTest() int64      { return numaWakeRateTrip }
-func NumaEnforceTripStreakForTest() int32 { return numaEnforceTripStreak }

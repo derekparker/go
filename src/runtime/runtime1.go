@@ -317,7 +317,6 @@ var debug struct {
 	invalidptr               int32
 	madvdontneed             int32 // for Linux; issue 28466
 	numa                     int32
-	numaenforce              int32
 	scavtrace                int32
 	scheddetail              int32
 	schedtrace               int32
@@ -379,7 +378,6 @@ var dbgvars = []*dbgVar{
 	{name: "invalidptr", value: &debug.invalidptr},
 	{name: "madvdontneed", value: &debug.madvdontneed},
 	{name: "numa", value: &debug.numa},
-	{name: "numaenforce", value: &debug.numaenforce},
 	{name: "panicnil", atomic: &debug.panicnil},
 	{name: "profstackdepth", value: &debug.profstackdepth, def: 128},
 	{name: "sbrk", value: &debug.sbrk},

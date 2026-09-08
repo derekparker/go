@@ -7,7 +7,6 @@ package runtime
 import (
 	"internal/abi"
 	"internal/goarch"
-	"internal/goexperiment"
 	"internal/runtime/atomic"
 	"internal/runtime/syscall/linux"
 	"internal/strconv"
@@ -100,37 +99,6 @@ func futexwakeup(addr *uint32, cnt uint32) {
 }
 
 func getCPUCount() int32 {
-	// Node-mask soft affinity can have the calling M's
-	// kernel CPU affinity transiently narrowed to a single NUMA node's
-	// CPUs as a scheduling hint (numaNoteSchedule/numaApplySoftAffinity)
-	// -- indistinguishable, from sched_getaffinity's point of view, from
-	// genuine operator placement. Reading that live, narrowed mask below
-	// would make defaultGOMAXPROCS collapse to one node's CPU count
-	// whenever this function happens to run on a soft-narrowed M, most
-	// notably via runtime.SetDefaultGOMAXPROCS's explicit
-	// customGOMAXPROCS=false recompute -- the same class of feedback
-	// loop already closed
-	// off for fill-one-socket confinement's own narrowed
-	// mask, by only ever engaging confinement under sched.customGOMAXPROCS
-	// (which is never auto-updated). Soft affinity has no such guard --
-	// it narrows regardless of customGOMAXPROCS -- so this function needs
-	// its own. numaStartupAffinity holds this process's true starting
-	// mask, always the full online mask whenever soft affinity could
-	// have engaged at all (numaSoftAffinityEligible requires
-	// numaStartupFullAffinity), so substitute its popcount instead of
-	// reading the live, possibly-narrowed thread mask. The collapse is
-	// otherwise transient -- sysmon's own periodic recompute runs from
-	// whichever M happens to be widened at that moment and self-heals --
-	// but a caller observing GOMAXPROCS in between would see the wrong
-	// value. Gated on goexperiment.Numa, a compile-time constant, so
-	// this dead-code-eliminates out of an experiment-off binary; zero
-	// behavior change when the experiment is off.
-	if goexperiment.Numa {
-		if _, ok := getg().m.numa.softAffinityNode(); ok {
-			return numaAffinityPopcount(numaStartupAffinity[:])
-		}
-	}
-
 	// This buffer is huge (8 kB) but we are on the system stack
 	// and there should be plenty of space (64 kB).
 	// Also this is a leaf, so we're not holding up the memory for long.
@@ -207,16 +175,6 @@ func newosproc(mp *m) {
 	if false {
 		print("newosproc stk=", stk, " m=", mp, " g=", mp.g0, " clone=", abi.FuncPCABI0(clone), " id=", mp.id, " ostk=", &mp, "\n")
 	}
-
-	// Node-mask soft affinity:
-	// the widen-before-clone call that used to live here has moved up to
-	// newm1 (proc.go), its only caller -- newm1 also has a cgo path
-	// (asmcgocall(_cgo_thread_start, ...), which creates the OS thread
-	// via pthread_create rather than ever reaching this function) that
-	// needs the exact same widen and was missed here. See
-	// numaWidenBeforeClone's doc comment (numa_linux.go) for the full
-	// mechanism and the real-hardware evidence (both the original clone
-	// leak and the cgo-path gap) that found this.
 
 	// Disable signals during clone, so that the new thread starts
 	// with signals disabled. It will enable them in minit.

@@ -99,24 +99,6 @@ func numaHeapHomingActive() bool {
 func numaBindGrowth(addr unsafe.Pointer, size uintptr, node int32) {
 }
 
-// numaNoteSchedule is a no-op on non-Linux platforms: node-mask soft
-// affinity is Linux-only (see numa_linux.go). Its call
-// site in schedule() is also gated on goexperiment.Numa, so this body
-// never runs with the experiment off; it exists purely so proc.go, which
-// is not Linux-specific, has something to call on every GOOS.
-func numaNoteSchedule() {
-}
-
-// numaWidenBeforeClone is a no-op on non-Linux platforms, for the same
-// reason as numaNoteSchedule above: it exists purely so
-// syscall_runtime_BeforeFork (proc.go), which is not Linux-specific, has
-// something to call on every GOOS; its call site is gated on
-// goexperiment.Numa, so this body never runs with the experiment off.
-//
-//go:nosplit
-func numaWidenBeforeClone(mp *m) {
-}
-
 // numaPlacementInit is a no-op on non-Linux platforms: P-placement
 // eligibility depends on Linux-only topology and affinity machinery
 // (see numa_linux.go). Its call site in schedinit is gated on
@@ -135,15 +117,4 @@ func numaPlacementActive() bool {
 // numaPlacementActive always false, no P home is ever consumed. Its
 // call sites (schedinit, procresize) are gated on goexperiment.Numa.
 func numaAssignPHomes(nprocs int32) {
-}
-
-// numaEnforceEval is a no-op on non-Linux platforms: adaptive
-// enforcement stand-down acts on Linux-only thread affinity (see
-// numa_linux.go). Its caller (numaWakeSysmonTick) is goexperiment-gated.
-func numaEnforceEval(ratePerSec int64, elapsed int64) {
-}
-
-// numaEnforceParkBackstop is a no-op on non-Linux platforms, for the
-// same reason; see numa_linux.go.
-func numaEnforceParkBackstop(mp *m) {
 }

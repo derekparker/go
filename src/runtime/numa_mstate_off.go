@@ -19,13 +19,3 @@ type mNUMAState struct{}
 
 func (s *mNUMAState) placementDone() bool { return false }
 func (s *mNUMAState) setPlacementDone()   {}
-
-func (s *mNUMAState) softAffinityNode() (node int8, ok bool) { return 0, false }
-func (s *mNUMAState) setSoftAffinityNode(node int8)          {}
-func (s *mNUMAState) clearSoftAffinityNode()                 {}
-
-func (s *mNUMAState) softAffinityCheckDue(now int64) bool { return false }
-func (s *mNUMAState) armSoftAffinityCheck(deadline int64) {}
-
-func (s *mNUMAState) appliedEpoch() uint32     { return 0 }
-func (s *mNUMAState) setAppliedEpoch(e uint32) {}

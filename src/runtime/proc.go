@@ -1821,8 +1821,8 @@ func startTheWorldWithSema(now int64, w worldStop) int64 {
 
 	// NUMA stand-down: detection only here. mp.locks != 0 (acquirem
 	// above), and syscalls are banned under
-	// sched.lock or with mp.locks != 0 (the same rule
-	// numaNoteSchedule follows), so numaStandDownIfNeeded only flips atomic
+	// sched.lock or with mp.locks != 0, so numaStandDownIfNeeded only
+	// flips atomic
 	// state -- no syscalls. If it reports a fresh trigger, the
 	// syscall-bearing widening (eager allm walk + this M's own
 	// convergence) is deferred to numaStandDownWiden below, run only
@@ -1844,9 +1844,6 @@ func startTheWorldWithSema(now int64, w worldStop) int64 {
 				throw("startTheWorld: inconsistent mp->nextp")
 			}
 			mp.nextp.set(p)
-			if goexperiment.Numa {
-				numaCountMWake() // wake-rate count for enforcement stand-down
-			}
 			notewakeup(&mp.park)
 		} else {
 			// Start M to run P.  Do not start another M below.
@@ -2036,12 +2033,6 @@ func mPark() {
 	}
 	notesleep(&gp.m.park)
 	noteclear(&gp.m.park)
-	if goexperiment.Numa {
-		// While the enforcement stand-down latch is set,
-		// each parking M widens its own kernel mask and clears its own
-		// soft-affinity cache (see numaEnforceParkBackstop).
-		numaEnforceParkBackstop(gp.m)
-	}
 }
 
 // mexit tears down and exits the current thread.
@@ -2980,22 +2971,6 @@ func newm(fn func(), pp *p, id int64) {
 }
 
 func newm1(mp *m) {
-	// Node-mask soft affinity:
-	// both branches below create a brand new OS thread that inherits
-	// the CALLING M's (getg().m, not mp -- the new, not-yet-started M
-	// this function's own parameter names) current CPU affinity mask --
-	// the cgo branch via pthread_create (asmcgocall(_cgo_thread_start,
-	// ...)), the other via newosproc's clone(2). Both are POSIX thread-
-	// creation primitives with the same inherit-caller's-affinity
-	// semantics, so this must run before EITHER branch, not just before
-	// newosproc: an earlier version of this fix lived inside newosproc
-	// itself and never widened the cgo path at all, leaving the
-	// self-reinforcing single-node collapse fully intact on any cgo
-	// build. See numaWidenBeforeClone's doc comment
-	// (numa_linux.go) for the full mechanism.
-	if goexperiment.Numa {
-		numaWidenBeforeClone(getg().m)
-	}
 	if iscgo && _cgo_thread_start != nil {
 		var ts cgothreadstart
 		ts.g.set(mp.g0)
@@ -3218,9 +3193,6 @@ func startm(pp *p, spinning, lockheld bool) {
 	// The caller incremented nmspinning, so set m.spinning in the new M.
 	nmp.spinning = spinning
 	nmp.nextp.set(pp)
-	if goexperiment.Numa {
-		numaCountMWake() // wake-rate count for enforcement stand-down
-	}
 	notewakeup(&nmp.park)
 	// Ownership transfer of pp committed by wakeup. Preemption is now
 	// safe.
@@ -3390,9 +3362,6 @@ func startlockedm(gp *g) {
 	incidlelocked(-1)
 	pp := releasep()
 	mp.nextp.set(pp)
-	if goexperiment.Numa {
-		numaCountMWake() // wake-rate count for enforcement stand-down
-	}
 	notewakeup(&mp.park)
 	stopm()
 }
@@ -4331,21 +4300,6 @@ top:
 		// then blocks waiting for a new p.
 		startlockedm(gp)
 		goto top
-	}
-
-	// Node-mask soft affinity:
-	// this is the one point in the scheduler where the M is about to
-	// run user code with mp.locks == 0 and no locks held -- unlike
-	// acquirep, whose call paths (procresize under sched.lock, allocm
-	// under allocmLock+acquirem) make a syscall here a lock-ordering
-	// hazard. Gated on goexperiment.Numa, a
-	// compile-time constant, so the call dead-code-eliminates out of an
-	// experiment-off binary entirely; numaNoteSchedule itself gates
-	// every other precondition (multi-node, not confined, not stood
-	// down, started with full affinity) and fires the underlying
-	// sched_setaffinity syscall only on an actual NUMA node change.
-	if goexperiment.Numa {
-		numaNoteSchedule()
 	}
 
 	execute(gp, inheritTime)
@@ -5317,22 +5271,6 @@ func syscall_runtime_BeforeFork() {
 	sigsave(&gp.m.sigmask)
 	sigblock(false)
 
-	// Node-mask soft affinity narrows this M's own CPU
-	// affinity as a scheduling hint, not an operator placement choice --
-	// but sched_setaffinity's mask is inherited across fork(2)/clone(2),
-	// so without this, a child process forked from this M (about to
-	// exec, via os/exec) would start life with that narrowed mask as
-	// its own startup affinity, indistinguishable from real operator
-	// placement to its own numaShouldConfine/numaNoteSchedule checks.
-	// Widen back to full before the fork/clone syscall runs (below,
-	// still in the syscall package) so the child inherits the correct,
-	// wide mask; see numaWidenBeforeClone's doc comment (numa_linux.go).
-	// Gated on goexperiment.Numa, a compile-time constant, so this
-	// dead-code-eliminates out of an experiment-off binary.
-	if goexperiment.Numa {
-		numaWidenBeforeClone(gp.m)
-	}
-
 	// This function is called before fork in syscall package.
 	// Code between fork and exec must not allocate memory nor even try to grow stack.
 	// Here we spoil g.stackguard0 to reliably detect any attempts to grow stack.
@@ -5413,25 +5351,6 @@ var pendingPreemptSignals atomic.Int32
 func syscall_runtime_BeforeExec() {
 	// Prevent thread creation during exec.
 	execLock.lock()
-
-	// Node-mask soft affinity narrows this M's own CPU
-	// affinity as a scheduling hint, not an operator placement choice --
-	// but sched_setaffinity's mask survives execve(2) (unlike fork/clone,
-	// execve does not create a new thread; it replaces this thread's own
-	// image in place), so without this, a process image replaced via
-	// syscall.Exec from a soft-narrowed M would start life with that
-	// narrowed mask as its own startup affinity, indistinguishable from
-	// real operator placement to its own numaShouldConfine/
-	// numaNoteSchedule checks -- the same leak numaWidenBeforeClone's doc
-	// comment (numa_linux.go) describes for fork(2)/clone(2)/
-	// pthread_create, but via execve specifically: syscall.Exec bypasses
-	// fork entirely, so syscall_runtime_BeforeFork's own widen call above
-	// never runs for this path. Gated on goexperiment.Numa, a
-	// compile-time constant, so this dead-code-eliminates out of an
-	// experiment-off binary.
-	if goexperiment.Numa {
-		numaWidenBeforeClone(getg().m)
-	}
 
 	// On Darwin, wait for all pending preemption signals to
 	// be received. See issue #41702.
@@ -6722,11 +6641,6 @@ func sysmon() {
 		// from a timer to avoid adding system load to applications that spend
 		// most of their time sleeping.
 		now := nanotime()
-		if goexperiment.Numa {
-			// Wake-rate window evaluation for the adaptive
-			// enforcement stand-down (see numa_wake.go).
-			numaWakeSysmonTick(now)
-		}
 		if debug.schedtrace <= 0 && (sched.gcwaiting.Load() || sched.npidle.Load() == gomaxprocs) {
 			lock(&sched.lock)
 			if sched.gcwaiting.Load() || sched.npidle.Load() == gomaxprocs {
