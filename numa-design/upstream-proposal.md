@@ -10,15 +10,14 @@ I propose making the Go runtime aware of NUMA topology on Linux, behind
 a new, off-by-default `GOEXPERIMENT=numa`. With the experiment enabled,
 the runtime would discover the machine's node topology at startup,
 partition Ps across nodes, grow the heap into per-node address ranges,
-route span allocation and recycling by the allocating P's node, softly
-bind threads to their node's CPUs, and opt the heap out of the kernel's
-automatic NUMA balancing, which becomes redundant once the runtime
-places memory itself. A process sized to a single socket would confine
+route span allocation and recycling by the allocating P's node, and opt
+the heap out of the kernel's automatic NUMA balancing, which becomes
+redundant once the runtime places memory itself. A process sized to a single socket would confine
 itself to one node automatically, matching what operators achieve today
 with `numactl`.
 
 The design adds no public API. Configuration is limited to `GODEBUG`
-knobs for diagnostics and overrides. With the experiment disabled the
+knobs for diagnostics. With the experiment disabled the
 new code is compiled out entirely, and with it enabled, every feature
 disables itself on hardware or in configurations where it cannot help:
 single-node machines, processes already placed by an operator, and
@@ -90,9 +89,11 @@ This is a long-standing gap with a history:
   Ps on the same M after STW`, for [#65694](https://go.dev/issue/65694),
   Go 1.26) began giving the scheduler a stable M/P pairing across
   stop-the-world, explicitly anticipating "a more general affinity for
-  specific Ms" as future work. This proposal is a step in that
-  direction: it gives that affinity a reason (the P's node) and
-  extends it to the kernel's view of where the thread may run.
+  specific Ms" as future work. This proposal leans on that stability
+  rather than duplicating it in kernel CPU masks: measured directly,
+  the pairing plus the kernel's own wake-place locality keeps threads
+  on their memory's node with no `sched_setaffinity` at all (see
+  "Thread placement" in the design).
 
 This proposal follows the same shape as #73193: teach the runtime about
 the hardware it is on, do the obviously right thing by default (under
@@ -242,13 +243,14 @@ node should it come from?"
 
 Two consequences of that choice are worth stating plainly. First, the
 locality this design achieves does not depend on the scheduler keeping
-any particular M and P together: the home belongs to the P, and
-whichever M acquires a P applies that P's node affinity (below), so
-placement follows the P wherever it goes. The scheduler's recent move
-toward stable M/P pairing across stop-the-world (CL 714801) is
-complementary, making re-application rarer and keeping caches warm,
-but the numbers in the Evaluation section do not lean on it: it is
-equally present in the stock baseline they are measured against.
+any particular M and P together, nor on pinning threads: the home
+belongs to the P, allocation routing keys off it (falling back to the
+faulting thread's current node, read via `getcpu`, in contexts with no
+P at hand), and in practice the kernel's own wake-place locality plus
+the scheduler's stable M/P pairing across stop-the-world (CL 714801)
+keep the running thread on its memory's node. That last claim is
+measured, not assumed: refill locality is unchanged with thread
+affinity disabled entirely (see "Thread placement" below).
 Second, a G can still migrate across nodes, through the global run
 queue or by being stolen by a P homed elsewhere, exactly as today.
 When that happens, its existing working set becomes remote, and this
@@ -302,8 +304,10 @@ Note what this partitioning does and does not do. It does not bind any
 page to any node; there is no per-node `mbind`, and the OOM-on-one-node
 failure modes of hard binding are structurally impossible. Actual page
 placement still happens by first touch. The window's job is to make
-locality *composable*: because threads are softly affine to their
-node's CPUs (below), the first touch of a page in `window(n)` almost
+locality *composable*: because the thread running a P stays, in
+practice, on the node its recent memory lives on (kernel wake-place
+locality; measured in "Thread placement" below), the first touch of a
+page in `window(n)` almost
 always happens on node `n`, and because `node(addr)` is computable from
 the address alone in a few instructions, every later layer (span
 recycling, diagnostics) can tell where memory lives with no per-page
@@ -332,93 +336,74 @@ using them is gone, and refill locality decays back toward blind. With
 node-keyed recycling, memory that starts local tends to stay local
 through arbitrarily many recycle generations.
 
-### Soft thread affinity and adaptive stand-down
+### Thread placement: measured, and deliberately omitted
 
-First-touch placement only lands pages on the right node if the
-faulting thread is running there, so the last piece is thread
-placement: an M running a P homed to node `n` sets its affinity
-(`sched_setaffinity`) to node `n`'s CPUs. The affinity is *soft* in
-every sense that matters. It is node-wide, not per-CPU, so the kernel
-scheduler retains full freedom within the node; it is dropped when the
-M releases its P; and it never constrains which P an M may acquire or
-which G a P may run.
+First-touch placement lands a page on the node of the thread that
+faults it, so at first glance the design needs thread affinity: pin
+each M to its P's home node and first touch follows. The prototype
+implemented exactly that -- a soft, node-wide `sched_setaffinity`
+while an M ran a P, plus a calibrated wake-rate detector that stood
+the affinity down in the one regime it hurt -- and measuring the whole
+mechanism end to end is what removed it from this proposal:
 
-One workload shape is genuinely hurt by even this much: programs
-dominated by sustained high-frequency thread sleep/wake cycles (heavy
-timer or network wake storms at very high `GOMAXPROCS`), where
-narrowing the wake-target CPU set adds latency to every wakeup. This
-is not hypothetical; it is the one regression the prototype's gates
-caught with enforcement unconditionally on. Wake-latency-bound
-scheduler microbenchmarks (goroutine create/capture storms at 256
-procs) regressed 15-19% in wall time, and hardware counters show
-where it went: on-CPU work barely moved (about +7% user cycles per
-op) while wall time rose 23%, so the regression is almost entirely
-off-CPU time -- runnable work waiting, because a narrowed M cannot be
-woken onto the other node's idle CPUs. Execution traces confirm the
-mechanism directly: with enforcement pinned on, the scheduler-latency
-profile (time goroutines spend runnable before running, from `go tool
-trace`) shows 47-80 ns of scheduler delay per benchmark op against
-35-38 ns with enforcement off -- roughly +56% at the median with no
-overlap across runs -- while the same detector, left in automatic
-mode, trips once and stands enforcement down as designed.
+- On the flagship workload (the 4 GiB / 256-proc GC benchmark in the
+  Evaluation section), disabling thread affinity entirely cost only
+  +2.4% wall time (p=0.002, n=10 interleaved) and showed no
+  significant change on the user+sys metric (p=0.28).
+- Span-refill locality -- classified against the faulting thread's
+  *physical* node, read via `getcpu` at refill time -- was unchanged
+  without affinity: per-width medians 92.6-95.8%, against 92.6-96.3%
+  with it, every width above the 90% bar in both configurations.
+- The pathology that affinity forces the runtime to manage is real
+  and not confined to microbenchmarks. Narrowing wake-target CPU sets
+  regressed wake-heavy scheduler microbenchmarks 15-19% in wall time
+  (hardware counters and execution traces attribute it to off-CPU
+  wake latency: runnable work waiting while the other node idles),
+  and an ordinary short-request `net/http` server under keep-alive
+  load sustains a wake rate that tripped the prototype's storm
+  detector in 3 of 3 runs. On exactly the workloads most common in
+  deployment, the detector immediately stood affinity down anyway:
+  the machinery shipped only to disable itself.
 
-The runtime softens this pathology itself rather than shipping a
-tuning knob: it detects the regime and removes its own enforcement. A
-detector in sysmon watches the process-wide thread wake rate, and
-when the rate holds at or above a calibrated threshold, enforcement
-stands down: every thread's kernel affinity mask is widened back to
-the full allowed set, and Ms stop narrowing. From that point the
-program's threads schedule exactly as they do without the experiment,
-so the cost of the pathological interaction is limited to the
-detection window rather than paid for the life of the process.
+Locality survives without affinity because the kernel already provides
+the stability first touch needs: wake-place locality and the
+scheduler's stable M/P pairing across stop-the-world (CL 714801) keep
+a thread on the node where it last ran, the homed windows keep its
+allocations inside that node's address range, and node-keyed recycling
+keeps them there through reuse. Kernel affinity bought a small
+wall-time insurance premium on one workload, at the price of a real
+pathology plus a calibrated detector, a cooldown, and a trip cap to
+manage that pathology. This proposal ships none of it. Thread
+placement belongs to a future scheduler-level proposal, in the
+direction CL 714801 already names ("a more general affinity for
+specific Ms").
 
-The proposed trip is 2048 wakes per second held across 8 consecutive
-100 ms windows, and both numbers are calibrated rather than guessed,
-from the runtime's own wake counters recorded over full runs of both
-regimes on two-node hardware. The recordings settled the shape of the
-detector, not just its constants: GC-heavy workloads produce wake
-herds that *burst* higher than any storm (13.9k to 36k wakes/s at
-phase boundaries, against the storms' sustained 7.8k to 12.3k/s), so
-an instantaneous rate cannot separate the regimes. Sustainment can:
-in every recorded run the GC herds die within 4 consecutive windows,
-while a storm exceeds the threshold in every window indefinitely. The
-proposed threshold sits 3.8x below the storms' minimum sustained
-rate, and the required streak is twice the longest GC-herd run ever
-observed. On the measured system, a full run of the GC-heavy
-pathological workload takes zero trips, and a storm stands
-enforcement down within roughly 800 ms of onset.
-
-Stand-down is not necessarily permanent. After ten seconds of
-accumulated below-threshold time, the detector re-arms and enforcement
-resumes, with threads re-narrowing lazily as they schedule. Two limits
-keep this from oscillating: consecutive transitions are separated by
-at least the ten-second cooldown, and after eight stand-downs over the
-life of the process the latch becomes permanent. So enforcement can
-adapt to a program whose behavior changes phase, but the total number
-of flips is small and bounded. A `GODEBUG=numaenforce` setting pins
-the decision in either direction (always enforce, or never), for
-debugging.
+The one remaining use of thread affinity in this design is
+fill-one-socket confinement (above): a single narrowing at startup
+with a one-way stand-down, no detector, applied only when the process
+is sized to one node and unplaced.
 
 ### Observability
 
 `GODEBUG=numa=1` reports the discovered topology and each feature's
 enable-or-disable decision with its reason at startup; `numa=2` adds
-verbose detail (window layout, per-node hint streams, enforcement
-transitions). These are diagnostics, not configuration: the only
-behavioral knob is the `numaenforce` override above.
+verbose detail (window layout, per-node hint streams). These are
+diagnostics, not configuration: the design has no behavioral knobs.
 
 ### What is deliberately out of scope
 
 No public API of any kind. No non-Linux implementation (the design
 isolates OS specifics behind per-OS files so other platforms can follow
 later). No scheduler restructuring: run queues,
-steal order, and wake paths are untouched. No hard memory binding of
+steal order, and wake paths are untouched. No thread affinity beyond
+confinement's one-shot narrowing (implemented, measured, and dropped;
+see "Thread placement" above). No hard memory binding of
 any region to a single node. No page migration. No NUMA-aware channel
 or goroutine placement: co-locating a channel's memory with the
 goroutines communicating over it (#12298), or scheduling a goroutine
 near the data it uses, requires exactly the scheduler integration this
 proposal avoids (see the Rationale section); making allocation
-NUMA-aware and homing Ps and threads is the foundation such work would
+NUMA-aware and homing Ps is the foundation such work would
 build on, as a separate, later proposal. Default-on is explicitly a
 separate, future decision with its own bar.
 
@@ -434,7 +419,7 @@ continuously, in minor faults.
 binding turns one node's memory pressure into allocation failure or
 swap while the other node has free memory, fights operator and
 container placement, and is irreversible damage when the runtime
-guesses wrong. First touch plus affinity achieves nearly the same
+guesses wrong. First touch plus homed routing achieves nearly the same
 placement with none of the failure modes; the allocation fallback
 sequence means the worst case is remote memory, exactly what we have
 everywhere today.
@@ -477,26 +462,63 @@ the documented `GODEBUG` outputs. The proposal is Go 1 compatible.
 I have implemented this design in full as a prototype and measured it
 on a two-socket Sapphire Rapids system (2 nodes, 256 logical CPUs),
 with the kernel's NUMA balancing at its defaults, comparing against a
-stock toolchain built from the same source. Results that a decision
-should rest on, all from pre-registered gates with benchstat
-(Mann-Whitney) as the authority:
+stock toolchain built from the same source. Method, throughout: every
+gate pre-registered with a frozen bar before measurement; interleaved
+A/B arms on an otherwise idle machine, one warmup round then 10
+recorded rounds per arm unless noted; benchstat (Mann-Whitney) as the
+sole authority on significance; raw archives retained for every number
+below.
 
-- *Balancer exemption:* a GC-heavy benchmark run takes **2.78 million
-  NUMA hint faults on stock Go and exactly 0** with the exemption in
-  place, while running faster.
+The workloads: the `golang.org/x/benchmarks` suite (`garbage` with a
+4 GiB live set as the deliberately pathological full-width GC
+workload; `json` as the realistic single-threaded proxy), the runtime
+package's allocation and scheduler microbenchmarks, a span-refill
+locality probe reading the runtime's local/remote refill counters
+across widths, and a keep-alive `net/http` server under closed-loop
+load for the real-server checks. Kernel-side effects were read from
+`/proc/vmstat` NUMA counters and perf hardware counters around each
+run.
+
+- *Balancer exemption:* over the same benchmark work, the kernel takes
+  **2.78 million NUMA hint faults for stock Go and exactly 0** with
+  the exemption in place (`/proc/vmstat` deltas), while the exempted
+  run is also faster.
 - *Placement:* span-refill locality on unpinned runs rises from
-  **53-75% (varying with width) to 93-97% at every width**.
-- *Full-width wall time:* on a deliberately pathological GC workload
-  (4 GiB live set, `GOMAXPROCS=256`, the regime confinement cannot
-  help), **8-10% faster (p <= 0.005)**.
+  **53-75% (varying with width) to 93-97% at every measured width**
+  (GOMAXPROCS 2, 8, 32, 128, 256; 5 launches per width since the
+  randomized heap base makes layout a per-launch property). Locality
+  is classified against the faulting thread's *physical* node, read
+  via `getcpu` at refill time, so the number cannot be satisfied by
+  bookkeeping: it measures where memory actually is relative to the
+  CPU using it.
+- *Full width:* on the pathological GC workload (garbage, 4 GiB live
+  set, `GOMAXPROCS=256`, the regime confinement cannot help), **8-10%
+  faster (p <= 0.005, n=10)** across the recorded gates. Those gates
+  ran on the prototype with thread affinity still present; a
+  dedicated same-day interleaved ablation (n=10 per arm) bounds
+  affinity's contribution at **2.4 points of the wall-time win
+  (p=0.002) and none of the user+sys win (p=0.28)**, so the
+  configuration this proposal ships retains roughly 6-8% wall and the
+  full user+sys improvement. Re-running the headline gates on the
+  affinity-free tree is part of the planned series validation.
 - *Confined case:* a single-socket-sized process, unpinned, runs
   **30-33% faster** than stock, and within noise of the same binary
-  under `numactl`.
-- *Stand-down:* on a synthetic wake-storm workload the detector stands
-  enforcement down within roughly 800 ms as designed, a full run of
-  the GC-heavy pathological workload takes zero trips (verified with
-  `GODEBUG` accounting), and all four scheduler microbenchmarks are
-  statistically indistinguishable from stock.
+  under `numactl --cpunodebind --membind`.
+- *Thread-affinity ablation, in full* (the evidence behind "Thread
+  placement" above): disabling affinity changes refill locality by
+  less than measurement noise at every width (per-width medians
+  92.6-95.8% without vs 92.6-96.3% with); wake-heavy scheduler
+  microbenchmarks regress 15-19% wall with affinity pinned on
+  (attributed to off-CPU wake latency by perf counters, and confirmed
+  by execution traces showing +56% median scheduler delay per op with
+  no overlap across runs); and a plain `net/http` server at ~44k
+  requests/s pays only -0.5% throughput under pinned affinity while
+  tripping the prototype's storm detector in 3 of 3 runs.
+- *Scheduler neutrality:* with no thread affinity there is no
+  mechanism left by which this proposal changes scheduling; the four
+  scheduler microbenchmarks were statistically indistinguishable from
+  stock even in the prototype's affinity-plus-detector configuration,
+  and the shipped configuration removes that machinery outright.
 
 The costs, equally measured, because a proposal that hides them is not
 worth reviewing:
@@ -541,8 +563,8 @@ structure above:
    its own. This phase is a reasonable stopping point if phase 2
    stalls in review.
 2. *Placement.* P homes, per-node heap ranges, windowed page
-   allocation, node-keyed span recycling, soft affinity with the
-   adaptive stand-down. Carries the locality and full-width wins.
+   allocation, node-keyed span recycling. Carries the locality and
+   full-width wins.
 
 I have a complete implementation of the design and would send it as CL
 series matching these phases, each CL individually building and
@@ -557,22 +579,6 @@ passing tests. I would do this work.
   Machines with more CPU-bearing nodes than `N` disable the placement
   layer (phase 1 still applies). Whether 4 is the right number, and
   whether it should eventually become link-time configurable, is open.
-- *The enforcement detector.* This is the most experimental piece of
-  the design, and I expect it to draw the most review scrutiny: a
-  calibrated detector with a cooldown and a trip cap is real
-  machinery, and its constants, while measured, are measured on one
-  platform. Two simplifications are available if review prefers them.
-  The re-arm could be dropped entirely, making enforcement stand-down
-  one-way like confinement's, which deletes the cooldown and trip-cap
-  machinery at the cost of never recovering affinity in a program
-  whose storm phase ends. Or enforcement could ship default-off
-  behind `GODEBUG=numaenforce` until there is field experience. The
-  pathology itself is confirmed from three independent directions:
-  wall time (benchstat), hardware counters (the regression is off-CPU
-  time), and execution traces (scheduler latency per op grows by half
-  again with enforcement pinned on, with the detector observed
-  tripping live in the same setup). What remains open is the
-  machinery's complexity budget, not the mechanism's existence.
 - *Second-platform validation.* Before graduating beyond an
   experiment, the numbers should be reproduced on at least one
   additional topology (4-node x86 and/or multi-node arm64). The

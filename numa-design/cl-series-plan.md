@@ -1,5 +1,14 @@
 # CL series plan (upstream-readiness gap item 5)
 
+> **Amendment 2026-09-08:** the soft-affinity ablation and real-workload
+> storm probe (RESULTS.md 2026-09-04) removed soft NUMA thread affinity
+> and the adaptive enforcement stand-down from the upstream series. The
+> two CLs planned for them are dropped; tranche 2 ends at node-keyed
+> mcentral recycling (13 CLs total including the standalone fix). The
+> implementation-branch code removal, series rebuild, and gate re-runs
+> on the affinity-free tree are the follow-up. Everything below is the
+> original plan, retained as written.
+
 How the branch becomes a reviewable upstream series. The working branch's
 ~100-commit history is the *audit archive* (pre-registrations, gate
 verdicts, red/green pairs) and is not what gets mailed: the series is

@@ -71,17 +71,19 @@ scheduler microbenchmarks statistically indistinguishable from stock.
   deliberately avoids the scheduler rewrite: run queues, wake ordering and
   steal order are untouched (a node-filtered steal was prototyped and
   deleted when ablation showed it contributed nothing), and thread
-  affinity is soft, with a calibrated detector that stands it down in the
-  one regime it hurts.
+  affinity was prototyped, measured, and dropped the same way: the
+  2026-09-04 ablation showed the memory layers carry the win without it
+  (+2.4% wall, nil user+sys, locality unchanged; RESULTS.md).
 - **CL 714801, "runtime: prefer to restart Ps on the same M after
   STW" (Michael Pratt, for #65694, Go 1.26)**: the scheduler's first
   step toward stable M/P affinity, with "a more general affinity for
   specific Ms" explicitly named as future work. It is in this series'
   baseline (it predates the fork point), so every measured delta is on
-  top of it. The soft thread affinity in CLs 13-14 extends the same
-  direction outward to the kernel scheduler, with the P's home node as
-  the affinity's reason; the stable pairing it provides makes affinity
-  re-application rarer.
+  top of it. The series leans on exactly that stability instead of
+  shipping kernel thread affinity of its own: the 2026-09-04 ablation
+  showed the pairing plus kernel wake-place locality keeps threads on
+  their memory's node without any `sched_setaffinity` (see the
+  revision note under The Series).
 - **Linux automatic NUMA balancing**: the mechanism stock Go leans on
   today. The series treats it as the baseline to beat and to exempt: a
   `MPOL_BIND`-to-all-nodes VMA policy on every heap chunk changes no
@@ -101,6 +103,21 @@ scheduler microbenchmarks statistically indistinguishable from stock.
   of NUMA and worth landing first.
 
 ## The series
+
+**Revision 2026-09-08 -- enforcement dropped.** The soft-affinity
+ablation and real-workload storm probe (RESULTS.md 2026-09-04) showed
+kernel thread affinity contributes +2.4% wall and nothing on the
+user+sys primary on the flagship gate, with refill locality unchanged
+without it, while an ordinary net/http server trips the wake-storm
+detector immediately -- the machinery ships only to disable itself on
+the most common deployment shape. The upstream series therefore drops
+CLs 13 (soft NUMA thread affinity) and 14 (adaptive enforcement
+stand-down), ending at node-keyed mcentral: 13 commits total. The
+table below still lists all 15 as they exist on the current
+`numa-cl-series` branch; the branch rebuild that removes the
+enforcement code (and the matching implementation-branch change, gate
+re-runs on the affinity-free tree included) is the next mechanical
+step.
 
 Branch `numa-cl-series` (pushed to the lab Forgejo), 15 commits from base
 `8058a57773` (upstream master at the campaign fork point). Every commit
@@ -140,8 +157,8 @@ the −8..−10% full-width win):
 | 10 | `d89bd0d979` | runtime: NUMA P homes | 9 files, +483/−13 |
 | 11 | `e291adcb73` | runtime: route span allocation by P home | 5 files, +247/−9 |
 | 12 | `891fcf86a8` | runtime: node-keyed mcentral span recycling | 10 files, +1381/−116 |
-| 13 | `eec40813ac` | runtime: soft NUMA thread affinity | 15 files, +1610/−81 |
-| 14 | `e83443fe12` | runtime: adaptive NUMA enforcement stand-down | 10 files, +441/−7 |
+| 13 | `eec40813ac` | runtime: soft NUMA thread affinity *(dropped from the upstream series, 2026-09-08)* | 15 files, +1610/−81 |
+| 14 | `e83443fe12` | runtime: adaptive NUMA enforcement stand-down *(dropped from the upstream series, 2026-09-08)* | 10 files, +441/−7 |
 
 Ordering note vs the original plan: P homes moved ahead of span-routing
 and mcentral keying (they consume the P-home key), and the per-chunk VMA
