@@ -5064,3 +5064,101 @@ node-keyed mcentral); PR #3 review branch rebuilt as fix + phase 1 +
 phase 2 (CLs 8-12) with end tree byte-identical to implementation
 HEAD. Raws: `bench-data/regate-affinity-free/`; run dir
 `~/regate-20260908-184004` on numa-dell.
+
+# Proposal review follow-ups (2026-09-10)
+
+Measurements taken to answer the second review round on PR #4 (proposal
+doc). Raws: `bench-data/review-20260910/`. Tree: `358ec77372` (src
+identical to `a225a5261d`, the affinity-free tree) unless stated.
+
+## Physical page residency of the per-node windows (numa-dell, 256P, unpinned)
+
+`locality-probe -procs 256 -secs 25`, `/proc/PID/numa_maps` sampled ~18 s
+in, aggregated over every VMA carrying a memory policy:
+
+- `prefer:0` (node 0's window): 544,256 resident pages, **100% on N0**.
+- `prefer:1` (node 1's window): 647,548 resident pages, **100% on N1**.
+- `bind:0-1` (heap grown with no routing node: manual allocations such
+  as stacks, and pre-topology growth): 37,657 pages over 39 ranges, split
+  N0=16,325 / N1=21,332. That is 3% of resident heap pages.
+
+So the windows are physically where the address arithmetic says they
+are. The mechanism is the per-chunk `mbind(MPOL_PREFERRED, node)` in
+`numaBindArenaHome` -- which the proposal text had been describing as
+"no per-node mbind, first touch" (wrong; corrected in the doc).
+
+## Thread-to-memory locality, classified against getcpu (numa-dell)
+
+The runtime's `/numa/span-refills/{local,remote}` counter classifies
+`numaArenaNode(span) == node` where `node` is the *routing* node, i.e.
+the P's home when placement is active (`numaRefillNode` ->
+`numaGrowNode`). Probe A's note above ("classified against getcpu") was
+wrong: neither the ablation tree (`8e03a4ae49`) nor the current one
+classifies against the thread's physical node. Verified by reading both
+trees' `mcentral.go`.
+
+One-line diagnostic patch (never committed):
+
+    -	local := !goexperiment.Numa || numaArenaNode(s.base()) == node
+    +	local := !goexperiment.Numa || numaArenaNode(s.base()) == numaCurrentNode()
+
+`v4-g2-locality.sh` R=5, widths 2/8/32/128/256, `numa_balancing=1`:
+
+- **Affinity-free tree (`358ec77372`): per-width medians 55.39 / 55.87
+  / 58.09 / 54.99 / 46.76%**, minimum launch 4.47% (procs=2). Chance
+  level: with no affinity nothing correlates an M's node with its P's
+  home. Raw: `g2-locality-getcpu-classified-noaffinity.out`.
+- Pre-removal tree (`8e03a4ae49`, soft affinity + detector, auto):
+  **per-width medians 95.78 / 94.74 / 49.47 / 93.25 / 95.49%**. The 32P
+  width read 49.27/49.47/49.43/50.73% in four launches and 69.40% in
+  the fifth (ramp-inclusive 57-84%), consistent with the storm detector
+  standing enforcement down at that width; not chased, the mechanism is
+  dropped. Raw: `g2-locality-getcpu-classified-softaffinity-8e03a4ae49.out`.
+  So soft affinity was the thing that made thread-to-memory locality
+  real; without it the design's physical locality is at chance.
+
+Consequences recorded in the proposal: the 93-96% counter is a routing
+/recycling statement, not a thread-locality one; the -9.08% full-width
+wall win is attributable to thread-to-memory locality only up to the
+2.4 points the affinity ablation measured; the rest (6-7 points) is
+unattributed (candidates: exemption at full width, per-node sharding of
+central lists / page-allocator search state under 256-way contention).
+Added as an open issue with a decomposition plan.
+
+## cgo pre-runtime thread (numa-dell)
+
+`numa-design/cgo-prethread/`: a C constructor starts a pthread before
+runtime init; it later calls an exported Go function and allocates 64
+MiB. 3/3 runs: Go main thread `get_mempolicy` mode = 2 (MPOL_BIND);
+constructor thread mode = 0 (MPOL_DEFAULT) while running Go code and
+faulting heap pages. `/proc/self/numa_maps`: every heap range carries a
+VMA policy (`bind:0-1` or `prefer:N`), so the per-VMA layer covers the
+faults the task policy misses. Raw: `cgo-prethread.txt`.
+
+## Single-node host cost of the ON build (local workstation)
+
+Ryzen 9 3950X (16C/32T, 1 NUMA node, `numa_balancing=0`), tree
+`358ec77372`, runtime test binary with/without `GOEXPERIMENT=numa`,
+`GOMAXPROCS=1 taskset -c 5`, 20 interleaved rounds, `Malloc(8|16)$`:
+
+    Malloc8    8.327n ± 1%   8.342n ± 1%   ~ (p=0.441 n=20)
+    Malloc16   12.47n ± 2%   12.69n ± 1%   +1.85% (p=0.002 n=20)
+    geomean    10.19n        10.29n        +1.01%
+
+`GODEBUG=numa=1` on this host: `nodes 1 allowed 1`, `confinement
+declined: not multi-node`. So a single-node host with every feature
+declined pays ~+1% on the alloc micro; the +3.5% in the proposal is the
+numa-dell 1P reading where confinement and the windowed path are
+active. Raw: `singlenode-1p-alloc-micro-*`.
+
+## Balancer-exemption-alone throughput (from the archive, collated)
+
+The proposal had said the exempted run is "also faster"; that number
+(2,780,209 vs 0 hint faults, -8%) is the v4 G2 primary, i.e. the FULL
+tree. Exemption-only arms in the archive: garbage 128P 4 GiB C-vs-B
++8.58% (p=0.003, n=10, pathology candidate 1); three-arm sweep C-L1 vs
+B +5.24% (p=0.001, n=15); garbage 256P 8 GiB -0.7% (n=3, noise); gc-pause
+STW p99 -21% (median of 5, Stage 1a); Prometheus remote DRAM share
+34% -> 45% under numa and 44% under membind. Doc corrected accordingly
+and a phase-1 caveat + open issue added (exemption alone regresses
+unconfined processes; recommend gating it on confinement/placement).

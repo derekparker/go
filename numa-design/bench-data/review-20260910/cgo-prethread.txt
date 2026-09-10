@@ -1,0 +1,17 @@
+# numa-dell, GOEXPERIMENT=numa, cgo program: a C constructor starts a pthread before Go
+# runtime init; the thread later calls an exported Go function (goWork) and allocates.
+# Source: numa-design/cgo-prethread/. Three runs (run 1 with GODEBUG=numa=1):
+Go main thread:              tid=3892102  task mempolicy mode=2 (MPOL_BIND)
+C-constructor thread in Go:  tid=3892103  task mempolicy mode=0 (MPOL_DEFAULT)
+C-constructor thread in Go:  allocated and touched 64 MiB of Go heap
+Go main thread:              tid=3892174  task mempolicy mode=2 (MPOL_BIND)
+C-constructor thread in Go:  tid=3892175  task mempolicy mode=0 (MPOL_DEFAULT)
+Go main thread:              tid=3892245  task mempolicy mode=2 (MPOL_BIND)
+C-constructor thread in Go:  tid=3892246  task mempolicy mode=0 (MPOL_DEFAULT)
+# Rerun on the restored pristine toolchain (358ec77372) with the numa_maps readout fixed to
+# select heap ranges by their VMA policy (only the runtime installs policies in this process):
+Go main thread:              tid=53426    task mempolicy mode=2 (MPOL_BIND)
+C-constructor thread in Go:  tid=53427    task mempolicy mode=0 (MPOL_DEFAULT)
+C-constructor thread in Go:  allocated and touched 64 MiB of Go heap
+numa_maps:                   VMA policies on Go heap ranges (policy: count): map[bind:0-1:353 prefer:0:1 prefer:1:1]
+# runs 2 and 3 identical in kind (bind:0-1 340/343 ranges, prefer:0 1, prefer:1 1).

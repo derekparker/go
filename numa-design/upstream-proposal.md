@@ -89,11 +89,10 @@ This is a long-standing gap with a history:
   Ps on the same M after STW`, for [#65694](https://go.dev/issue/65694),
   Go 1.26) began giving the scheduler a stable M/P pairing across
   stop-the-world, explicitly anticipating "a more general affinity for
-  specific Ms" as future work. This proposal leans on that stability
-  rather than duplicating it in kernel CPU masks: measured directly,
-  the pairing plus the kernel's own wake-place locality keeps threads
-  on their memory's node with no `sched_setaffinity` at all (see
-  "Thread placement" in the design).
+  specific Ms" as future work. This proposal does not duplicate that
+  in kernel CPU masks; it treats thread placement as scheduler
+  territory and measures what its absence costs (see "Thread
+  placement" in the design).
 
 This proposal follows the same shape as #73193: teach the runtime about
 the hardware it is on, do the obviously right thing by default (under
@@ -112,13 +111,31 @@ it falls.
 ### Topology discovery
 
 At startup the runtime reads the NUMA topology from sysfs
-(`/sys/devices/system/node`): the set of online nodes, each node's CPU
-list, and whether each node has local memory. It intersects this with the
-process's CPU affinity mask from `sched_getaffinity`, so a process
-started under `numactl` or in a container with a restricted cpuset sees
-only the nodes it may actually use. Nodes with CPUs but no local memory
-and vice versa are handled by falling back to treating the machine as
-uniform.
+(`/sys/devices/system/node`): the set of online nodes and each node's
+CPU list. Two further facts come from the kernel directly rather than
+from sysfs. The set of nodes the process may allocate memory from is
+read back with `get_mempolicy(MPOL_F_MEMS_ALLOWED)`, which reflects a
+container's `cpuset.mems` without any parsing. The process's CPU
+affinity mask is read with `sched_getaffinity`; a mask narrower than
+the online CPUs, whether from `numactl` or a container cpuset, is
+treated as explicit operator placement, and confinement and placement
+(below) both decline, leaving only the balancer exemption in effect.
+
+Nodes with memory but no CPUs, and nodes with CPUs but no memory, both
+exist and both are handled without special cases. The first kind is
+common on current hardware: CXL memory expanders, high-bandwidth
+memory exposed in flat mode, and persistent memory in system-RAM mode
+all appear as CPU-less nodes. Such a node is in the allowed-memory
+mask, so the exemption policy covers it and the kernel may spill to it,
+but with no CPUs it is assigned no Ps and its heap window is never
+grown. The second kind, a memoryless node, arises when a socket has no
+DIMMs populated or a virtual machine exposes a vCPU-only node. Its
+CPUs get Ps and a heap window like any other, but the kernel excludes
+it from the allowed-memory mask, so its window carries the uniform
+exemption policy rather than a preference for that node, and pages its
+threads fault land on the nearest node with memory, as the kernel does
+for any memoryless node. The window capacity `N` (below) counts only
+CPU-bearing node ids, so sparse ids on CPU-less nodes do not exhaust it.
 
 Discovery is best-effort by design. If sysfs is unreadable, the
 topology is malformed, or only one usable node remains after the
@@ -145,6 +162,24 @@ policy of `MPOL_BIND` with a nodemask containing *all* allowed nodes
 changes no placement decision whatsoever, since every node the process
 could use is in the mask, but marks the memory as deliberately placed
 and therefore off-limits to balancing.
+
+This is a documented contract, not an accident of the current
+scheduler. The balancer's scan (`task_numa_work` in
+`kernel/sched/fair.c`) skips every VMA whose governing policy lacks
+the migrate-on-fault flag `MPOL_F_MOF`; `vma_policy_mof` in
+`mm/mempolicy.c` resolves that policy as the VMA's own if it has one
+and the faulting task's otherwise. The kernel sets that flag only on
+its built-in default per-task policy, never on a policy a program
+installs with `mbind` or `set_mempolicy`, unless the program passes
+`MPOL_F_NUMA_BALANCING` to opt back in. That flag (Linux 5.12,
+documented in `set_mempolicy(2)`: "when mode is `MPOL_BIND`, enable
+the kernel NUMA balancing for the task") exists precisely because
+explicitly placed memory is exempt by default, and the exemption has
+held since automatic balancing was introduced in Linux 3.8. Should a
+future kernel change the default, the sampling faults would return;
+nothing here depends on the exemption for correctness, and the
+Evaluation section observes it through `/proc/vmstat` rather than
+assuming it.
 
 The runtime applies this in two layers:
 
@@ -173,7 +208,14 @@ The runtime applies this in two layers:
    c-shared library) or that have since installed their own policy. And
    such threads do fault Go heap pages: a C-created thread that calls
    into Go runs Go code, allocates, and touches the heap like any
-   other. Binding the heap VMA itself closes that gap: the policy
+   other. This is demonstrated, not assumed: a small cgo program on the
+   evaluation machine starts a pthread from a C constructor (which runs
+   before the Go runtime initializes) and later calls an exported Go
+   function from it. Queried with `get_mempolicy` from inside Go, the
+   runtime's own threads report `MPOL_BIND` and the constructor thread
+   reports `MPOL_DEFAULT`, the balancer-eligible policy, while running
+   Go code and touching tens of megabytes of fresh heap (see
+   Evaluation). Binding the heap VMA itself closes that gap: the policy
    travels with the memory range and governs the fault no matter which
    thread takes it.
 
@@ -183,37 +225,53 @@ here covers or constrains C code's own memory. Balancing continues to
 apply to everything else in the process (cgo allocations, mapped
 files), where the kernel's heuristics remain the right tool.
 
-This layer is independent of everything below it and is worth having
-even without the placement machinery. The elimination is preventive,
-not reactive: the balancer works by periodically write-protecting
-sampled ranges so the next touch faults, and it skips
-policy-covered memory when choosing what to sample, so over the exempt
-heap those protections are never installed and the faults simply never
-occur. There is nothing to absorb or handle more cheaply; the work
-disappears. On the system measured in the Evaluation section, the same
-GC-heavy benchmark run takes 2.78 million NUMA hint faults on stock Go
-and exactly 0 with the exemption in place, while also running faster.
+The elimination is preventive, not reactive: the balancer works by
+periodically write-protecting sampled ranges so the next touch faults,
+and it skips policy-covered memory when choosing what to sample, so
+over the exempt heap those protections are never installed and the
+faults simply never occur. There is nothing to absorb or handle more
+cheaply; the work disappears. On the system measured in the Evaluation
+section, the full-width GC-heavy benchmark takes 2.78 million NUMA
+hint faults per run on stock Go and exactly 0 with the exemption in
+place.
+
+What the exemption does *not* do, measured on its own with neither
+confinement nor placement, is make programs faster. It removes the
+fault tax, but it also removes the balancer's page migrations, and on
+workloads where those migrations were converging usefully they were
+worth more than the faults cost: an unpinned process using half the
+machine measured 5 to 9% slower with the exemption alone (Evaluation).
+Where the balancer never converges, the exemption alone is neutral on
+throughput and improves GC pause tails. Its value in this design is as
+the substrate the placement layers need: they decide where memory
+goes, and the balancer would otherwise fight that decision page by
+page. The Implementation section draws the phasing consequence.
 
 ### Fill-one-socket confinement
 
 One deployment shape deserves specific handling: a Go process sized to
-a fraction of the machine, with `GOMAXPROCS` set (or container-limited)
-to at most one node's worth of CPUs, on a box shared with other
-processes. Today such
+a fraction of the machine, with `GOMAXPROCS` set explicitly (in the
+environment or by `runtime.GOMAXPROCS`) to at most one node's worth of
+CPUs, on a box shared with other processes. Today such
 a process schedules across all sockets and takes remote-access
 penalties for no benefit unless the operator remembers to pin it.
 
 Under this proposal, when the runtime observes at startup that
 
-- `GOMAXPROCS` is no larger than the CPU count of a single node, and
+- `GOMAXPROCS` was set explicitly and is no larger than the CPU count
+  of a single node, and
 - the process's affinity mask is unrestricted (the operator has not
   placed it),
 
 it confines itself to its boot node (the node the initial thread was
-running on): thread affinity is set to that node's CPUs, and since all
-faulting threads now run there, first-touch places the heap there too.
-The effect is equivalent to `numactl --cpunodebind=B --membind=B`
-without the operator having to know about it.
+running on): the thread affinity mask is narrowed to that node's CPUs
+and the task memory policy is set to prefer that node, so the heap
+lands there (spilling gracefully if the node fills) and the threads
+stay there. The effect is equivalent to `numactl --cpunodebind=B
+--membind=B` without the operator having to know about it. A
+`GOMAXPROCS` derived by the runtime itself from a container CPU limit
+does not count as explicit today; whether it should is listed under
+Open issues.
 
 Confinement is conservative in both directions. If the operator *has*
 restricted the affinity mask, the runtime treats that as explicit
@@ -242,15 +300,17 @@ wherever the runtime needs it: "when this P asks for memory, which
 node should it come from?"
 
 Two consequences of that choice are worth stating plainly. First, the
-locality this design achieves does not depend on the scheduler keeping
-any particular M and P together, nor on pinning threads: the home
-belongs to the P, allocation routing keys off it (falling back to the
-faulting thread's current node, read via `getcpu`, in contexts with no
-P at hand), and in practice the kernel's own wake-place locality plus
-the scheduler's stable M/P pairing across stop-the-world (CL 714801)
-keep the running thread on its memory's node. That last claim is
-measured, not assumed: refill locality is unchanged with thread
-affinity disabled entirely (see "Thread placement" below).
+home says where a P's memory comes from, not where its thread runs:
+allocation routing keys off the home (falling back to the faulting
+thread's current node, read via `getcpu`, in contexts with no P at
+hand), while the M holding the P is placed by the kernel. With no
+thread affinity those two are uncorrelated. Measured on the shipped
+tree, the thread holding a P is on the P's home node 47 to 58% of the
+time, which is chance (see "Thread placement" below). The memory
+layers do not need that correlation to function (the windows and
+node-keyed recycling hold regardless), but the locality benefit a
+thread actually sees does, and the Evaluation section is explicit
+about which measured wins can be attributed to it.
 Second, a G can still migrate across nodes, through the global run
 queue or by being stolen by a P homed elsewhere, exactly as today.
 When that happens, its existing working set becomes remote, and this
@@ -293,25 +353,40 @@ Two mechanisms cooperate to keep allocations inside their window:
   the same as searching each window in turn: it ignores window
   boundaries entirely, so it can be satisfied by free memory in any
   window, by ranges that straddle a window edge, and by address space
-  no window covers. One ordering choice is deliberate: on a window
+  no window covers. None of this duplicates allocator state per node:
+  the page allocator's bitmap and summaries remain one global
+  structure, a window is two addresses plus a search cursor, and node
+  membership is arithmetic on the address, so a free run that crosses
+  a window edge is simply a run in the global bitmap that the windowed
+  search declines and the unconstrained search may take. One ordering
+  choice is deliberate: on a window
   miss the allocator prefers growing the home window over reusing free
   memory in other nodes' windows, because reuse-anywhere-first is
   precisely the cross-node consumption that defeats placement.
   Placement can degrade under address-space pressure; allocation can
   never fail because of it.
 
-Note what this partitioning does and does not do. It does not bind any
-page to any node; there is no per-node `mbind`, and the OOM-on-one-node
-failure modes of hard binding are structurally impossible. Actual page
-placement still happens by first touch. The window's job is to make
-locality *composable*: because the thread running a P stays, in
-practice, on the node its recent memory lives on (kernel wake-place
-locality; measured in "Thread placement" below), the first touch of a
-page in `window(n)` almost
-always happens on node `n`, and because `node(addr)` is computable from
+Note what this partitioning does and does not do. Each chunk grown
+into `window(n)` is given a *soft* per-node policy,
+`mbind(MPOL_PREFERRED, n)`: the kernel places its pages on node `n`
+while node `n` has free memory and spills to any other allowed node
+otherwise. Nothing is hard-bound, so the OOM-on-one-node failure modes
+of `MPOL_BIND` to a single node are structurally impossible, and the
+policy is still an explicit one, so the balancer exemption holds over
+the window. This is what makes the address arithmetic trustworthy: a
+page in `window(n)` is physically on node `n` regardless of which
+thread happened to fault it, so a thread running on the wrong node
+does not drag pages there, and the runtime never depends on first
+touch landing where it hoped. Measured at full width on the evaluation
+machine, unpinned, every resident page of each node's window was on
+that node (Evaluation). And because `node(addr)` is computable from
 the address alone in a few instructions, every later layer (span
 recycling, diagnostics) can tell where memory lives with no per-page
-metadata and no syscalls.
+metadata and no syscalls. Heap grown with no routing node at hand
+(runtime-internal manual allocations such as goroutine stacks, and
+anything mapped before topology discovery) carries the uniform
+exemption policy alone; it was 3% of resident heap pages in that
+measurement.
 
 ### Span routing and node-keyed span recycling
 
@@ -327,6 +402,19 @@ node-aware at its two ends:
   node's list, falling back to other nodes' lists before growing the
   heap.
 
+Two fallback orders appear in this design and they differ on purpose.
+The central lists hold *spans already carved for a size class*, many
+of them partially full. A refill that finds nothing on its home node's
+list takes a span from another node's list before growing the heap,
+which preserves the stock allocator's space economics (a partially
+used span is reused before new memory is mapped) and its bounded sweep
+budget. The page allocator, one level down, deals in *free pages*;
+there, a miss in the home window grows the home window before reusing
+free pages in another node's window, because free pages consumed
+across nodes become remote spans for their whole lifetime. Reusing a
+remote span is a bounded, self-correcting cost: when that span is
+freed it returns to its own node's list, not the borrower's.
+
 The second half is what makes the first durable. Without node-keyed
 recycling, spans drift across nodes through the shared central lists
 in steady state: a span freed by a P on node 0 sits in a global list
@@ -338,9 +426,10 @@ through arbitrarily many recycle generations.
 
 ### Thread placement: measured, and deliberately omitted
 
-First-touch placement lands a page on the node of the thread that
-faults it, so at first glance the design needs thread affinity: pin
-each M to its P's home node and first touch follows. The prototype
+Memory placement above is keyed by the P; the thread running that P is
+placed by the kernel. At first glance the design needs thread affinity
+to close that gap: pin each M to its P's home node, so the CPU touching
+the memory is on the memory's node. The prototype
 implemented exactly that -- a soft, node-wide `sched_setaffinity`
 while an M ran a P, plus a calibrated wake-rate detector that stood
 the affinity down in the one regime it hurt -- and measuring the whole
@@ -350,10 +439,14 @@ mechanism end to end is what removed it from this proposal:
   Evaluation section), disabling thread affinity entirely cost only
   +2.4% wall time (p=0.002, n=10 interleaved) and showed no
   significant change on the user+sys metric (p=0.28).
-- Span-refill locality -- classified against the faulting thread's
-  *physical* node, read via `getcpu` at refill time -- was unchanged
-  without affinity: per-width medians 92.6-95.8%, against 92.6-96.3%
-  with it, every width above the 90% bar in both configurations.
+- Span-refill locality as the runtime counts it (the span's window
+  against the P's home) was unchanged without affinity: per-width
+  medians 92.6-95.8%, against 92.6-96.3% with it, every width above
+  the 90% bar in both configurations. That counter is bookkeeping, so
+  the thread-to-memory question was measured directly on the shipped
+  tree: refills classified against the node the thread was actually
+  running on, read via `getcpu` at refill time, are local only 47 to
+  58% of the time (per-width medians, Evaluation), which is chance.
 - The pathology that affinity forces the runtime to manage is real
   and not confined to microbenchmarks. Narrowing wake-target CPU sets
   regressed wake-heavy scheduler microbenchmarks 15-19% in wall time
@@ -365,18 +458,34 @@ mechanism end to end is what removed it from this proposal:
   deployment, the detector immediately stood affinity down anyway:
   the machinery shipped only to disable itself.
 
-Locality survives without affinity because the kernel already provides
-the stability first touch needs: wake-place locality and the
-scheduler's stable M/P pairing across stop-the-world (CL 714801) keep
-a thread on the node where it last ran, the homed windows keep its
-allocations inside that node's address range, and node-keyed recycling
-keeps them there through reuse. Kernel affinity bought a small
-wall-time insurance premium on one workload, at the price of a real
-pathology plus a calibrated detector, a cooldown, and a trip cap to
-manage that pathology. This proposal ships none of it. Thread
-placement belongs to a future scheduler-level proposal, in the
-direction CL 714801 already names ("a more general affinity for
-specific Ms").
+What the ablation did not show is that locality survives without
+affinity; measured directly, it does not. With no affinity, nothing
+ties an M to its P's home node: the kernel places threads by its own
+load balancing, and a thread holding a P homed to node `n` is on node
+`n` about half the time. The memory side of the design still holds
+without affinity (windows are resident on their nodes; routing and
+recycling keep a P's spans in its window), but the thread side is
+unmet, so the full-width win cannot be credited to thread-to-memory
+locality. The ablation bounds that credit: thread affinity, which does
+put the thread on its memory's node (the same measurement on the
+prototype tree with affinity active reads 93 to 96% at four of the
+five widths; Evaluation), was worth
+2.4 points of wall time on the flagship workload and nothing
+significant on user+sys. The remaining 6 to 7 points come from
+elsewhere, most plausibly the exemption's removal of balancer work at
+full width and the per-node sharding of the central lists and
+page-allocator search state under 256-way contention; separating
+those is listed under Open issues.
+
+The decision stands on cost and benefit, not on locality being free.
+Kernel affinity bought 2.4 points on one workload at the price of a
+real pathology plus a calibrated detector, a cooldown, and a trip cap
+to manage it, and this proposal ships none of it. Thread placement is
+therefore the open half of NUMA locality. It belongs to a future
+scheduler-level proposal in the direction CL 714801 already names ("a
+more general affinity for specific Ms"): an M that prefers to run on
+its P's home node, without a kernel mask, would give the memory layers
+here the thread stability they were built to exploit.
 
 The one remaining use of thread affinity in this design is
 fill-one-socket confinement (above): a single narrowing at startup
@@ -419,8 +528,8 @@ continuously, in minor faults.
 binding turns one node's memory pressure into allocation failure or
 swap while the other node has free memory, fights operator and
 container placement, and is irreversible damage when the runtime
-guesses wrong. First touch plus homed routing achieves nearly the same
-placement with none of the failure modes; the allocation fallback
+guesses wrong. A soft per-node preference plus homed routing achieves
+the same placement with none of the failure modes; the allocation fallback
 sequence means the worst case is remote memory, exactly what we have
 everywhere today.
 
@@ -479,20 +588,53 @@ load for the real-server checks. Kernel-side effects were read from
 `/proc/vmstat` NUMA counters and perf hardware counters around each
 run.
 
-- *Balancer exemption:* over the same benchmark work, the kernel takes
-  **2.78 million NUMA hint faults for stock Go and exactly 0** with
-  the exemption in place (`/proc/vmstat` deltas), while the exempted
-  run is also faster.
+- *Balancer exemption:* over the full-width GC workload, the kernel
+  takes **2.78 million NUMA hint faults per run for stock Go and
+  exactly 0** with the exemption in place (`/proc/vmstat` deltas over
+  three sampled rounds of the full-width gate below; exemption-only
+  arms of earlier sweeps read 0 against 57 thousand to 4.2 million).
+  The exemption *alone*, with neither confinement nor placement, is
+  not a throughput win: on `garbage` at half width (128 Ps, unpinned)
+  it measured **+5.2% slower (p=0.001, n=15)** and, on a 4 GiB live
+  set, **+8.6% slower (p=0.003, n=10)** against stock, because the
+  balancer's migrations were doing useful work there; at full width
+  on an 8 GiB live set it was within noise (-0.7%, n=3), and on a GC
+  pause benchmark it cut STW p99 by 21% (median of 5). Remote-DRAM
+  share does not fall under the exemption alone and on one real
+  server (Prometheus) rose from 34% to 45%. Every speedup claimed in
+  this document comes from the layers below, with the exemption as
+  their precondition.
 - *Placement:* span-refill locality on unpinned runs rises from
   **53-75% (varying with width) to 93-96% at every measured width**
   on the affinity-free tree (GOMAXPROCS 2, 8, 32, 128, 256; 5
   launches per width since the randomized heap base makes layout a
   per-launch property; per-width medians 92.7-96.3%, minimum launch
-  92.4%). Locality
-  is classified against the faulting thread's *physical* node, read
-  via `getcpu` at refill time, so the number cannot be satisfied by
-  bookkeeping: it measures where memory actually is relative to the
-  CPU using it.
+  92.4%). This counter classifies the span's window against the P's
+  home, so it is bookkeeping by itself; the two physical facts it
+  rests on were measured separately. First, *residency*: sampling
+  `/proc/self/numa_maps` of a 256-P unpinned run, **100% of the
+  resident pages of node 0's window were on node 0 (544,256 pages) and
+  100% of node 1's on node 1 (647,548 pages)**; the 3% of heap pages
+  carrying only the uniform policy were split between nodes. Second,
+  *thread-to-memory locality*: with the counter re-classified against
+  the node the thread was actually running on (`getcpu` at refill
+  time, a one-line diagnostic patch), per-width medians read **55.4 /
+  55.9 / 58.1 / 55.0 / 46.8% at GOMAXPROCS 2 / 8 / 32 / 128 / 256** (5
+  launches per width, minimum launch 4.5%): chance level. Without
+  thread affinity the thread holding a P is on the P's home node about
+  half the time. The same measurement on the prototype tree with soft
+  affinity active reads **95.8 / 94.7 / 49.5 / 93.3 / 95.5%**; the
+  32-P reading is 49% in four launches of five and 69% in the fifth,
+  consistent with the prototype's storm detector standing affinity
+  down at that width, and was not chased since that mechanism is
+  dropped. The 93-96% figure is
+  therefore a statement about routing and recycling, not about where
+  threads run, and the full-width win below is not attributed to
+  thread-to-memory locality (see "Thread placement").
+- *Pre-runtime threads:* the cgo program described under the balancer
+  exemption reports `MPOL_BIND` from the runtime's threads and
+  `MPOL_DEFAULT` from a thread started by a C constructor, in 3 of 3
+  runs, while that thread allocates and touches 64 MiB of Go heap.
 - *Full width:* on the pathological GC workload (garbage, 4 GiB live
   set, `GOMAXPROCS=256`, the regime confinement cannot help), the
   exact configuration this proposal describes, with no thread
@@ -502,7 +644,10 @@ run.
   read 8-10% wall across recorded runs; the dedicated interleaved
   ablation (n=10 per arm) bounds affinity's contribution at 2.4
   points of wall (p=0.002) and none of user+sys (p=0.28), consistent
-  with the affinity-free result.
+  with the affinity-free result. Since affinity is what puts a thread
+  on its memory's node, 2.4 points is also the most of this win that
+  thread-to-memory locality can explain; the rest is unattributed
+  (Open issues).
 - *Confined case:* a single-socket-sized process, unpinned, runs
   **30-33% faster** than stock, and within noise of the same binary
   under `numactl --cpunodebind --membind`.
@@ -530,13 +675,25 @@ worth reviewing:
   structural cost, approximately linear in the capacity constant
   (+1.9% at `N = 1`, +5.5% at `N = 8`), not attributable to any single
   hot path; a realistic single-threaded workload proxy reads +1.35%.
-  This is the price of the experiment being *on*, paid even on
-  single-node machines, and is the strongest argument for keeping `N`
-  small.
-- The balancer exemption alone costs about **5%** on workloads that the
+  Those numbers are from the two-node machine at `GOMAXPROCS=1`, where
+  the runtime confines and the windowed allocator is active. On a
+  literal single-node host, where every feature declines itself, the
+  same microbenchmarks read **+1.0% geomean (Malloc8 unchanged,
+  p=0.44; Malloc16 +1.85%, p=0.002; n=20 interleaved, spreads of 1-2%)**
+  on a 16-core desktop part. That residual is the compile-time
+  footprint of the `N`-sized structures, and it is the strongest
+  argument for keeping `N` small.
+- The balancer exemption alone costs **5 to 9%** on workloads that the
   kernel balancer happens to serve well (stable working sets, unpinned,
-  no confinement). This is the deliberate trade of the whole design;
-  the placement layers are what win it back.
+  spread across nodes with neither confinement nor placement engaged;
+  the numbers and conditions are in the exemption bullet above). On
+  the shipped tree both configurations in which that cost was measured
+  now engage a placement layer and come out ahead: the same half-width
+  process confines and runs 30% faster, and at full width placement
+  reads 9% faster. On single-node hosts the exemption is never applied
+  and the cost is zero. The residual exposure is a workload the
+  balancer served well and placement does not; the full-width `json`
+  gate, the one such workload measured, is statistically flat.
 - Memory: resident set size is statistically flat against stock across
   the measured workloads. The design adds a fixed amount of runtime
   metadata, independent of heap size: the central free lists, arena
@@ -561,9 +718,14 @@ The work lands as two independently valuable phases, matching the
 structure above:
 
 1. *Topology, balancer exemption, confinement.* Small, no allocator
-   changes, and carries the exemption and the 30% confined-case win on
-   its own. This phase is a reasonable stopping point if phase 2
-   stalls in review.
+   changes, and carries the 30% confined-case win on its own. One
+   caveat, drawn from the exemption-only measurements above: in a
+   process that does not confine, phase 1 as currently implemented
+   applies the exemption with nothing to win back its cost, a 5 to 9%
+   loss on balancer-friendly workloads. Confinement does not need the
+   exemption layer (its own task policy is already an explicit one),
+   so the exemption's real customer is phase 2. How to resolve that
+   is listed under Open issues.
 2. *Placement.* P homes, per-node heap ranges, windowed page
    allocation, node-keyed span recycling. Carries the locality and
    full-width wins.
@@ -586,6 +748,32 @@ passing tests. I would do this work.
   additional topology (4-node x86 and/or multi-node arm64). The
   benchmark harness makes this mechanical; the hardware is the
   constraint.
+- *Where the balancer exemption lands.* Measured alone it is a 5 to 9%
+  loss on balancer-friendly unpinned workloads and it is only needed by
+  placement. Two clean resolutions: move it from phase 1 to phase 2, or
+  keep it in phase 1 but apply it only when confinement or placement
+  is active. My recommendation is the second, which keeps phase 1 free
+  of any measured regression without changing its scope; it is a small
+  change to the prototype and I would make it before sending the CLs.
+- *Container-derived `GOMAXPROCS`.* Confinement requires an explicit
+  `GOMAXPROCS`. A process whose `GOMAXPROCS` the runtime derived from a
+  container CPU limit (#73193) is not treated as explicit, so an
+  8-CPU-limited container on a two-socket host gets placement across
+  both nodes rather than confinement to one. Treating the
+  container-derived value as explicit for this purpose is probably
+  right and is a one-line change, but it widens the population
+  confinement affects and deserves its own measurement.
+- *Attribution of the full-width win.* The 9% wall improvement on the
+  flagship workload is reproducible, but only 2.4 points of it are
+  attributable to thread-to-memory locality (the affinity ablation),
+  and the shipped tree's thread locality is at chance. The remainder
+  needs a decomposition before this proposal is filed upstream: an
+  exemption-only arm at full width on the same 4 GiB live set, and a
+  placement arm with routing on but the per-node windows disabled,
+  would separate balancer relief from sharding from placement. If the
+  sharding explains most of it, part of this design's value is a
+  contention fix that does not need NUMA at all, and the proposal
+  should say so.
 - *Phasing of review.* Whether phase 2 should wait for a release of
   experience with phase 1, or land in the same cycle, is a judgment
   call I leave to the review.

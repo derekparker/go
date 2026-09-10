@@ -1,0 +1,13 @@
+# numa-dell (2 nodes, 256 CPUs), kernel.numa_balancing=1, toolchain go1.28-devel_a225a5261d
+# (src identical to 358ec77372), GOEXPERIMENT=numa, unpinned, GOMAXPROCS unset (placement active).
+# locality-probe -procs 256 -secs 25 -warmup 5; /proc/PID/numa_maps sampled ~18 s in.
+# Aggregated over every VMA carrying a memory policy (only the runtime installs them):
+policy=bind:0-1 node=N0 pages=16325
+policy=bind:0-1 node=N1 pages=21332
+policy=bind:0-1 ranges=39 pages=37657
+policy=prefer:0 node=N0 pages=544256
+policy=prefer:0 ranges=1 pages=544256
+policy=prefer:1 node=N1 pages=647548
+policy=prefer:1 ranges=1 pages=647548
+# probe's own counter for the same run:
+locality procs=256 local=4768774 remote=191301 share=96.14% (steady-state, warmup=5s) ramp-inclusive=96.53%

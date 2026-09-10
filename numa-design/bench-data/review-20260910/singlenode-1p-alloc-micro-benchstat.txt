@@ -1,0 +1,5 @@
+         │ singlenode-1p-alloc-micro-off.out │  singlenode-1p-alloc-micro-on.out  │
+         │              sec/op               │   sec/op     vs base               │
+Malloc8                          8.327n ± 1%   8.342n ± 1%       ~ (p=0.441 n=20)
+Malloc16                         12.47n ± 2%   12.69n ± 1%  +1.85% (p=0.002 n=20)
+geomean                          10.19n        10.29n       +1.01%

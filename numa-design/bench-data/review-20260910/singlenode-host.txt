@@ -1,0 +1,5 @@
+Host: local workstation, AMD Ryzen 9 3950X 16-Core Processor, 32 CPUs, NUMA nodes online: 0, kernel 7.1.9-200.fc44.x86_64, kernel.numa_balancing=0
+Toolchain: go version go1.28-devel_358ec77372 Tue Sep 8 16:08:41 2026 -0700 linux/amd64
+Arms: runtime package test binary built with (on) and without (off) GOEXPERIMENT=numa from the same tree.
+Protocol: 20 interleaved rounds off/on, GOMAXPROCS=1, taskset -c 5, -test.bench 'Malloc(8|16)$' -test.benchtime 1s. benchstat verdict in singlenode-1p-alloc-micro-benchstat.txt.
+GODEBUG=numa=1 on this host: "numa: nodes 1 allowed 1", "numa: confinement declined: not multi-node" (placement silently ineligible on a single node).
