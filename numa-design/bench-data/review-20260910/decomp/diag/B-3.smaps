@@ -1,0 +1,55 @@
+t=1789145821
+Rss:              423696 kB
+AnonHugePages:    360448 kB
+vmas=41
+cpu MHz		: 1900.000
+t=1789145826
+Rss:             1471760 kB
+AnonHugePages:   1380352 kB
+vmas=48
+cpu MHz		: 800.000
+t=1789145831
+Rss:             2477948 kB
+AnonHugePages:   2353152 kB
+vmas=50
+cpu MHz		: 800.389
+t=1789145836
+Rss:             3288344 kB
+AnonHugePages:   3145728 kB
+vmas=51
+cpu MHz		: 765.591
+t=1789145841
+Rss:             3528540 kB
+AnonHugePages:   3264512 kB
+vmas=49
+cpu MHz		: 799.642
+t=1789145846
+Rss:             7804852 kB
+AnonHugePages:   5371904 kB
+vmas=70
+cpu MHz		: 796.022
+t=1789145851
+Rss:             9552616 kB
+AnonHugePages:   7057408 kB
+vmas=70
+cpu MHz		: 1900.094
+t=1789145857
+Rss:             9556472 kB
+AnonHugePages:   7057408 kB
+vmas=70
+cpu MHz		: 799.919
+t=1789145862
+Rss:             9555936 kB
+AnonHugePages:   7057408 kB
+vmas=136
+cpu MHz		: 1900.000
+t=1789145867
+Rss:             9557520 kB
+AnonHugePages:   7057408 kB
+vmas=125
+cpu MHz		: 1300.000
+t=1789145872
+Rss:             9558880 kB
+AnonHugePages:   7065600 kB
+vmas=111
+cpu MHz		: 1899.979

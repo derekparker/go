@@ -5227,3 +5227,43 @@ Per-round wall (ms): B 3.09-3.37, E 3.14-3.27, N 2.87-3.22, F 2.97-3.22.
 Not done (stopped per instruction): a replicate session of B vs F to
 confirm the null, and a "sharding-only" arm (per-P-home span tagging
 without address windows), which needs a code change.
+
+### Why the sessions disagree: clock, not code (2026-09-11 diagnostic)
+
+Raws: `bench-data/review-20260910/decomp/diag/` (perf stat + 5 s
+smaps_rollup/maps samples, 3 alternating B/F pairs, same binaries).
+
+    run  wall/op   user cycles  user instr   eff. clock  CPUs busy  THP  VMAs
+    B-1  3.007ms   3.589e12     1.685e12     1.344 GHz   49         83%  133
+    F-1  2.634ms   3.927e12     1.717e12     1.413 GHz   53         80%  140
+    B-2  3.219ms   3.763e12     1.710e12     1.318 GHz   49         82%  111
+    F-2  3.097ms   3.753e12     1.689e12     1.323 GHz   49         80%  120
+    B-3  3.138ms   3.610e12     1.699e12     1.331 GHz   47         82%  136
+    F-3  3.148ms   3.898e12     1.703e12     1.326 GHz   50         80%  170
+
+- Instructions retired per run are constant to 2% across all six runs
+  (the work is identical); cycles vary 9% and the effective clock
+  (user cycles / user task-clock) varies 1.32-1.41 GHz run to run.
+  numa-dell exposes no cpufreq interface (firmware-managed HWP; RAPL
+  package limit 350 W), so the OS cannot pin it and the harness cannot
+  see it except through counters. The one F run that ran at 1.41 GHz
+  is the one that "won" by 12%; at matched clock (pair 3) F and B are
+  identical.
+- The "256P" flagship workload keeps only ~49 CPUs busy on average
+  (task-clock / elapsed): garbage's parse loop serializes on a mutex
+  and on GC, so 80% of the machine idles, which is exactly the regime
+  in which turbo headroom, wake placement, and package power state
+  swing per-run clock the most.
+- THP share (AnonHugePages/Rss, 80-83%) and VMA counts (111-170) do
+  not differ between arms; huge-page availability is not the
+  differentiator.
+- Position-in-round and drift in the 10-round sweep were checked: no
+  position effect (means 3.140/3.155/3.165/3.143 ms by slot) and no
+  monotone drift over the 40 minutes.
+
+Conclusion: garbage wall at "256P" on this box carries ~5% per-run and
+~10% per-session clock variance that no ordering discipline removes,
+because it is not under OS control. A wall-time verdict on this
+workload needs cycles-at-matched-clock or instructions as the
+primary, or a workload that actually saturates the machine. The
+2026-09-08 -9.08% and today's null are both inside that envelope.

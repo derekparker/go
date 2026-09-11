@@ -1,0 +1,15 @@
+# started on Fri Sep 11 12:53:06 2026
+
+
+ Performance counter stats for '/home/deparker/decomp-20260910-213940/bins/B/garbage -benchmem=4096 -benchnum=1':
+
+ 3,588,550,073,131      cycles:u                         #    1.344 GHz                       
+ 1,685,290,655,422      instructions:u                   #    0.47  insn per cycle            
+ 2,669,809,007,138      task-clock:u                     #   48.964 CPUs utilized             
+
+      54.526388492 seconds time elapsed
+
+    2403.312067000 seconds user
+     160.264308000 seconds sys
+
+
