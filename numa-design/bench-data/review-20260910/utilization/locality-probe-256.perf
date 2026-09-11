@@ -1,0 +1,15 @@
+# started on Fri Sep 11 14:10:54 2026
+
+
+ Performance counter stats for '/home/deparker/util-140739/locality-probe -procs 256 -secs 5 -warmup 2':
+
+   137,191,482,376      task-clock:u                     #   18.977 CPUs utilized             
+    90,593,203,561      cycles:u                         #    0.660 GHz                       
+    12,947,233,086      instructions:u                   #    0.14  insn per cycle            
+
+       7.229377510 seconds time elapsed
+
+     101.881609000 seconds user
+      36.373533000 seconds sys
+
+

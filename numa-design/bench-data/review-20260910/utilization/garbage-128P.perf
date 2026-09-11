@@ -1,0 +1,15 @@
+# started on Fri Sep 11 14:10:12 2026
+
+
+ Performance counter stats for '/home/deparker/util-140739/garbage -benchmem=4096 -benchnum=1':
+
+ 1,012,859,624,229      task-clock:u                     #   24.538 CPUs utilized             
+ 1,350,409,882,725      cycles:u                         #    1.333 GHz                       
+   936,422,507,055      instructions:u                   #    0.69  insn per cycle            
+
+      41.277959475 seconds time elapsed
+
+     938.660286000 seconds user
+      48.242795000 seconds sys
+
+

@@ -1,0 +1,11 @@
+== Fri Sep 11 02:07:52 PM EDT 2026 runs
+sched-CreateGoroutines       elapsed=   2.0s cpu-s=     4.8 CPUs-busy=   2.3 (of 256) eff-clock=0.69GHz instr=7.06e+09
+sched-CreateGoroutinesCapture elapsed=   2.5s cpu-s=     7.1 CPUs-busy=   2.8 (of 256) eff-clock=0.83GHz instr=9.98e+09
+sched-PingPongHog            elapsed=   2.9s cpu-s=     3.4 CPUs-busy=   1.1 (of 256) eff-clock=1.66GHz instr=1.56e+10
+sched-CreateGoroutinesParallel elapsed=   1.8s cpu-s=    93.0 CPUs-busy=  52.4 (of 256) eff-clock=1.18GHz instr=1.69e+10
+gc-pause-bench-heavy         elapsed=  66.2s cpu-s= 10023.5 CPUs-busy= 151.3 (of 256) eff-clock=2.59GHz instr=9.85e+10
+json-256P                    elapsed=  11.5s cpu-s=   955.0 CPUs-busy=  83.2 (of 256) eff-clock=1.60GHz instr=2.11e+12
+garbage-256P                 elapsed=  53.0s cpu-s=  2765.9 CPUs-busy=  52.2 (of 256) eff-clock=1.35GHz instr=1.71e+12
+garbage-128P                 elapsed=  41.3s cpu-s=  1012.9 CPUs-busy=  24.5 (of 256) eff-clock=1.33GHz instr=9.36e+11
+locality-probe-256           elapsed=   7.2s cpu-s=   137.2 CPUs-busy=  19.0 (of 256) eff-clock=0.66GHz instr=1.29e+10
+D=/home/deparker/util-140739

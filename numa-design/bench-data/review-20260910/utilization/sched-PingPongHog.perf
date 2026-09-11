@@ -1,0 +1,15 @@
+# started on Fri Sep 11 14:07:57 2026
+
+
+ Performance counter stats for '/home/deparker/util-140739/runtime.test -test.run ^$ -test.bench ^BenchmarkPingPongHog$ -test.benchtime 1s':
+
+     3,351,172,786      task-clock:u                     #    1.144 CPUs utilized             
+     5,548,422,330      cycles:u                         #    1.656 GHz                       
+    15,630,698,374      instructions:u                   #    2.82  insn per cycle            
+
+       2.930449908 seconds time elapsed
+
+       3.150694000 seconds user
+       0.206265000 seconds sys
+
+

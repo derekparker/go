@@ -1,0 +1,6 @@
+goos: linux
+goarch: amd64
+pkg: runtime
+cpu: INTEL(R) XEON(R) PLATINUM 8592+
+BenchmarkPingPongHog-256     	 1011633	      1202 ns/op
+PASS

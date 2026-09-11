@@ -1,0 +1,15 @@
+# started on Fri Sep 11 14:08:02 2026
+
+
+ Performance counter stats for '/home/deparker/util-140739/gc-pause-bench -ptrheap=true -toucher=false -heap=4096 -idle=1000000 -stacks=200 -warm=10 -gcgap=1s -discard=1 -n=6':
+
+10,023,469,007,980      task-clock:u                     #  151.332 CPUs utilized             
+25,960,123,991,927      cycles:u                         #    2.590 GHz                       
+    98,524,196,902      instructions:u                   #    0.00  insn per cycle            
+
+      66.234957051 seconds time elapsed
+
+    9737.687925000 seconds user
+     207.866020000 seconds sys
+
+

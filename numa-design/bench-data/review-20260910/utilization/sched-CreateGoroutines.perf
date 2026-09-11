@@ -1,0 +1,15 @@
+# started on Fri Sep 11 14:07:52 2026
+
+
+ Performance counter stats for '/home/deparker/util-140739/runtime.test -test.run ^$ -test.bench ^BenchmarkCreateGoroutines$ -test.benchtime 1s':
+
+     4,752,181,558      task-clock:u                     #    2.341 CPUs utilized             
+     3,297,426,956      cycles:u                         #    0.694 GHz                       
+     7,061,826,565      instructions:u                   #    2.14  insn per cycle            
+
+       2.029971858 seconds time elapsed
+
+       4.114914000 seconds user
+       0.639385000 seconds sys
+
+

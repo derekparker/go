@@ -5267,3 +5267,30 @@ because it is not under OS control. A wall-time verdict on this
 workload needs cycles-at-matched-clock or instructions as the
 primary, or a workload that actually saturates the machine. The
 2026-09-08 -9.08% and today's null are both inside that envelope.
+
+### How much of the machine each evaluation workload actually uses (2026-09-11)
+
+`perf stat -e task-clock,cycles,instructions`, stock (experiment-off)
+builds of the branch tree, `GOMAXPROCS=256` unless noted, one run each.
+CPUs-busy = task-clock / elapsed. Raws: `bench-data/review-20260910/utilization/`.
+
+    workload                        elapsed  CPUs busy (of 256)  eff. clock
+    sched CreateGoroutines            2.0 s      2.3              0.69 GHz
+    sched CreateGoroutinesCapture     2.5 s      2.8              0.83 GHz
+    sched PingPongHog                 2.9 s      1.1  (hardcodes GOMAXPROCS=1)
+    sched CreateGoroutinesParallel    1.8 s     52.4              1.18 GHz
+    gc-pause-bench heavy profile     66.2 s    151.3              2.59 GHz
+    x/benchmarks json 256P           11.5 s     83.2              1.60 GHz
+    x/benchmarks garbage 256P        53.0 s     52.2              1.35 GHz
+    x/benchmarks garbage 128P        41.3 s     24.5              1.33 GHz
+    locality-probe -procs 256         7.2 s     19.0              0.66 GHz
+    net/http server (Probe B, archive)          ~6-7% CPU, loadgen-bound
+
+Nothing in the evaluation saturates the box. The only workload that
+comes close is gc-pause-bench during mark (151 CPUs, and it also runs
+at the highest clock). The flagship garbage "256P" keeps ~52 CPUs
+busy; the wake-latency scheduler micros keep 1-3; the locality probe,
+256 goroutines allocating flat out, keeps 19 -- it is serialized on
+allocator locks, which is worth knowing when reading its counters.
+"GOMAXPROCS=256" in this archive means 256 Ps exist, not that 256 CPUs
+work.

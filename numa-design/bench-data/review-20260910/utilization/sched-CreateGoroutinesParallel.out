@@ -1,0 +1,6 @@
+goos: linux
+goarch: amd64
+pkg: runtime
+cpu: INTEL(R) XEON(R) PLATINUM 8592+
+BenchmarkCreateGoroutinesParallel-256     	 6186296	       238.6 ns/op
+PASS

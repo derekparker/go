@@ -1,0 +1,15 @@
+# started on Fri Sep 11 14:09:08 2026
+
+
+ Performance counter stats for '/home/deparker/util-140739/json -benchmem=512 -benchnum=1 -benchtime=3s':
+
+   955,041,693,143      task-clock:u                     #   83.204 CPUs utilized             
+ 1,532,290,314,503      cycles:u                         #    1.604 GHz                       
+ 2,110,075,211,622      instructions:u                   #    1.38  insn per cycle            
+
+      11.478248884 seconds time elapsed
+
+     822.259856000 seconds user
+     108.607493000 seconds sys
+
+
