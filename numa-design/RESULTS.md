@@ -5162,3 +5162,68 @@ STW p99 -21% (median of 5, Stage 1a); Prometheus remote DRAM share
 34% -> 45% under numa and 44% under membind. Doc corrected accordingly
 and a phase-1 caveat + open issue added (exemption alone regresses
 unconfined processes; recommend gating it on confinement/placement).
+
+## Decomposition of the full-width win (2026-09-10, numa-dell)
+
+Question: what is the -9.08% wall on garbage 4 GiB / 256P (2026-09-08
+re-gate) made of, given thread-to-memory locality is at chance?
+Raws: `bench-data/review-20260910/decomp/` (per-arm .out, warmups,
+vmstat-deltas.txt, meta.txt, sanity.txt, analysis.txt, pairwise.txt).
+
+Arms, all `garbage -benchmem=4096 -benchnum=1`, `GOMAXPROCS=256`,
+unpinned, `numa_balancing=1`, one session, 1 warmup + 10 recorded
+rounds, arm order rotated per round:
+
+- **B** stock: branch tree `358ec77372` built with the experiment OFF.
+- **E** exemption only: one-line patch `numaHeapStreamsEnabled = false`
+  (no windows, no P-home routing, single central set, BIND-all task +
+  VMA policy). Sanity: `placement declined: heap streams disabled`.
+- **N** full tree minus per-node memory policy: `numaBindGrowth` always
+  BIND-all (windows, P homes, routing, node-keyed recycling all on;
+  pages by first touch). Sanity: `placement eligible`.
+- **F** full tree, unpatched. Sanity: `placement eligible`.
+
+Mechanism validity (recorded rounds): B mean 637k hint faults / 2.31M
+pages migrated per run, 10/10 runs > 0; E/F/N means <= 7 faults, <= 3
+migrations per run.
+
+benchstat, wall sec/op (n=10):
+
+    B 3.154m ± 3%   E 3.198m ± 1%   N 3.119m ± 3%   F 3.146m ± 2%
+    B->F  ~ (p=0.353)    B->E ~ (p=0.143)    B->N ~ (p=0.165)
+    E->N -2.47% (p=0.011)   E->F -1.61% (p=0.015)   N->F ~ (p=0.684)
+
+user+sys sec/op: B 243.9m, E 256.5m (~ p=0.063), N 259.5m (+6.4%
+p=0.029 vs B), F 248.0m (~ p=0.280 vs B); N->F -4.4% (p=0.029).
+STW-sec/GC: B 28.73m, E 30.05m (~), N 32.10m (+11.7% p=0.002),
+F 32.26m (+12.3% p=0.000). RSS: F +3.0% bytes-from-system (p=0.035),
+peak-RSS ~ (p=0.052).
+
+Per-round wall (ms): B 3.09-3.37, E 3.14-3.27, N 2.87-3.22, F 2.97-3.22.
+2026-09-08 re-gate per-round for comparison: off 3.22-3.51, numa
+2.57-3.06.
+
+**Findings.**
+
+1. **The -9.08% did not reproduce.** Same source, same binary build
+   recipe, same machine, same flags, tighter spreads than 09-08 (±1-3%
+   vs ±5-8%): F vs B is ~ (p=0.353), point estimate -0.3%. Between the
+   two sessions the stock arm moved -5% and the numa arm +4%. The
+   full-width win is session-dependent, and the 09-08 reading is
+   within the 8-17% between-session variance the archive already
+   documents for garbage's stock arm.
+2. Within the session, the layers separate as: exemption alone is
+   neutral-to-slightly-negative (E vs B +1.4%, ~); adding windows +
+   P-home routing + node-keyed recycling with no per-node memory policy
+   recovers -2.5% (E->N, p=0.011) but costs +6.4% CPU and +11.7% STW;
+   adding the per-node MPOL_PREFERRED on top changes wall by nothing
+   (N->F ~) and gives back the CPU (N->F -4.4%). Net F vs B: nothing
+   significant on wall, nothing on CPU, +12% STW per cycle, +3% memory
+   from system.
+3. The only robust, sign-stable effects of the placement layer on this
+   workload are the costs: STW-sec/GC +11-12% (N and F, p<=0.002) and
+   GC-bytes-from-system +8% (per-node metadata).
+
+Not done (stopped per instruction): a replicate session of B vs F to
+confirm the null, and a "sharding-only" arm (per-P-home span tagging
+without address windows), which needs a code change.

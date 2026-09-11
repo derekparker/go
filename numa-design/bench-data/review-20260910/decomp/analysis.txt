@@ -1,0 +1,53 @@
+### all arms vs stock (B), sec/op and user+sys, n=10
+                             │   sec/op    │   sec/op     vs base          │   sec/op     vs base          │   sec/op     vs base          │
+Garbage/benchmem-MB=4096-256   3.154m ± 3%   3.198m ± 1%  ~ (p=0.143 n=10)   3.119m ± 3%  ~ (p=0.165 n=10)   3.146m ± 2%  ~ (p=0.353 n=10)
+Garbage/benchmem-MB=4096-256           129.6Mi ± 3%           131.5Mi ± 3%  ~ (p=0.631 n=10)           139.7Mi ± 2%  +7.75% (p=0.000 n=10)           140.5Mi ± 2%  +8.40% (p=0.000 n=10)
+                             │ STW-sec/GC  │ STW-sec/GC   vs base          │ STW-sec/GC   vs base                │ STW-sec/GC   vs base                │
+Garbage/benchmem-MB=4096-256   28.73m ± 6%   30.05m ± 7%  ~ (p=0.105 n=10)   32.10m ± 4%  +11.73% (p=0.002 n=10)   32.26m ± 8%  +12.30% (p=0.000 n=10)
+                             │ STW-sec/op  │ STW-sec/op   vs base          │ STW-sec/op   vs base                │ STW-sec/op   vs base                │
+Garbage/benchmem-MB=4096-256   44.92µ ± 8%   47.93µ ± 7%  ~ (p=0.052 n=10)   51.36µ ± 4%  +14.34% (p=0.001 n=10)   51.62µ ± 8%  +14.91% (p=0.002 n=10)
+Garbage/benchmem-MB=4096-256         5.934Mi ± 0%         5.934Mi ± 0%  ~ (p=0.593 n=10)         5.934Mi ± 0%  ~ (p=0.393 n=10)         5.934Mi ± 0%  ~ (p=0.579 n=10)
+Garbage/benchmem-MB=4096-256   145.2k ± 0%   145.2k ± 0%  ~ (p=0.434 n=10)   145.2k ± 0%  ~ (p=0.764 n=10)   145.2k ± 0%  ~ (p=0.264 n=10)
+Garbage/benchmem-MB=4096-256        9.076Gi ± 1%        9.087Gi ± 3%  ~ (p=0.912 n=10)        9.060Gi ± 1%  ~ (p=0.684 n=10)        9.346Gi ± 4%  +2.97% (p=0.035 n=10)
+Garbage/benchmem-MB=4096-256             8.746Gi ± 1%             8.753Gi ± 3%  ~ (p=0.912 n=10)             8.720Gi ± 1%  ~ (p=0.529 n=10)             9.003Gi ± 4%  ~ (p=0.052 n=10)
+Garbage/benchmem-MB=4096-256              194.4Mi ± 1%              194.3Mi ± 3%  ~ (p=0.796 n=10)              191.9Mi ± 1%  -1.30% (p=0.015 n=10)              195.4Mi ± 2%  ~ (p=0.853 n=10)
+                             │ peak-RSS-bytes │ peak-RSS-bytes  vs base          │ peak-RSS-bytes  vs base          │ peak-RSS-bytes  vs base          │
+Garbage/benchmem-MB=4096-256     9.009Gi ± 1%     9.016Gi ± 3%  ~ (p=0.912 n=10)     8.989Gi ± 1%  ~ (p=0.684 n=10)     9.256Gi ± 4%  ~ (p=0.052 n=10)
+Garbage/benchmem-MB=4096-256    10.23Gi ± 1%    10.27Gi ± 3%  ~ (p=0.912 n=10)    10.26Gi ± 1%  ~ (p=0.912 n=10)    10.52Gi ± 3%  ~ (p=0.063 n=10)
+Garbage/benchmem-MB=4096-256              15.05Mi ± 1%              15.31Mi ± 2%  +1.77% (p=0.030 n=10)              15.34Mi ± 2%  +1.97% (p=0.000 n=10)              15.20Mi ± 1%  +1.04% (p=0.003 n=10)
+                             │ user+sys-sec/op │ user+sys-sec/op  vs base          │ user+sys-sec/op  vs base               │ user+sys-sec/op  vs base          │
+Garbage/benchmem-MB=4096-256       243.9m ± 6%       256.5m ± 5%  ~ (p=0.063 n=10)       259.5m ± 5%  +6.40% (p=0.029 n=10)       248.0m ± 5%  ~ (p=0.280 n=10)
+
+### pairwise: F vs N (does the per-node memory policy matter given windows+routing?)
+                             │   sec/op    │   sec/op     vs base          │
+                             │ STW-sec/GC  │ STW-sec/GC   vs base          │
+                             │ STW-sec/op  │ STW-sec/op   vs base          │
+                             │ peak-RSS-bytes │ peak-RSS-bytes  vs base               │
+                             │ user+sys-sec/op │ user+sys-sec/op  vs base               │
+
+### pairwise: N vs E (windows + P-home routing + node-keyed lists, no per-node policy, vs exemption only)
+                             │   sec/op    │   sec/op     vs base               │
+                             │ STW-sec/GC  │ STW-sec/GC   vs base               │
+                             │ STW-sec/op  │ STW-sec/op   vs base               │
+                             │ peak-RSS-bytes │ peak-RSS-bytes  vs base          │
+                             │ user+sys-sec/op │ user+sys-sec/op  vs base          │
+
+### pairwise: E vs B (exemption only vs stock)
+                             │   sec/op    │   sec/op     vs base          │
+                             │ STW-sec/GC  │ STW-sec/GC   vs base          │
+                             │ STW-sec/op  │ STW-sec/op   vs base          │
+                             │ peak-RSS-bytes │ peak-RSS-bytes  vs base          │
+                             │ user+sys-sec/op │ user+sys-sec/op  vs base          │
+
+### pairwise: F vs B (full tree vs stock; should reproduce -9%)
+                             │   sec/op    │   sec/op     vs base          │
+                             │ STW-sec/GC  │ STW-sec/GC   vs base                │
+                             │ STW-sec/op  │ STW-sec/op   vs base                │
+                             │ peak-RSS-bytes │ peak-RSS-bytes  vs base          │
+                             │ user+sys-sec/op │ user+sys-sec/op  vs base          │
+
+### vmstat deltas per arm (recorded rounds only)
+B n=10 mean hint_faults=637311 mean pages_migrated=2311126 runs_with_faults=10
+E n=10 mean hint_faults=2 mean pages_migrated=1 runs_with_faults=5
+F n=10 mean hint_faults=7 mean pages_migrated=3 runs_with_faults=6
+N n=10 mean hint_faults=1 mean pages_migrated=0 runs_with_faults=7

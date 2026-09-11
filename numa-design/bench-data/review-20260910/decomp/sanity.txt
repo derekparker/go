@@ -1,0 +1,12 @@
+-- E
+numa: confinement declined: GOMAXPROCS exceeds node
+numa: nodes 2 allowed 2
+numa: placement declined: heap streams disabled
+-- N
+numa: confinement declined: GOMAXPROCS exceeds node
+numa: nodes 2 allowed 2
+numa: placement eligible
+-- F
+numa: confinement declined: GOMAXPROCS exceeds node
+numa: nodes 2 allowed 2
+numa: placement eligible

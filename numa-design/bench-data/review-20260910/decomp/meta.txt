@@ -1,0 +1,9 @@
+-- B: /home/deparker/decomp-20260910-213940/bins/B/garbage: go1.28-devel_358ec77372 Tue Sep 8 16:08:41 2026 -0700 
+-- E: /home/deparker/decomp-20260910-213940/bins/E/garbage: go1.28-devel_070d007aac Thu Sep 10 14:43:21 2026 -0700 X:numa 	build	GOEXPERIMENT=numa 
+-- N: /home/deparker/decomp-20260910-213940/bins/N/garbage: go1.28-devel_070d007aac Thu Sep 10 14:43:21 2026 -0700 X:numa 	build	GOEXPERIMENT=numa 
+-- F: /home/deparker/decomp-20260910-213940/bins/F/garbage: go1.28-devel_358ec77372 Tue Sep 8 16:08:41 2026 -0700 X:numa 	build	GOEXPERIMENT=numa 
+6.12.0-211.7.1.el10_2.x86_64
+1
+               total        used        free      shared  buff/cache   available
+Mem:              30           3          21           0           6          26
+Thu Sep 10 09:42:43 PM EDT 2026
