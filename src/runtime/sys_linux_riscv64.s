@@ -22,6 +22,7 @@
 #define SYS_exit_group		94
 #define SYS_faccessat		48
 #define SYS_futex		98
+#define SYS_getcpu		168
 #define SYS_getpid		172
 #define SYS_gettid		178
 #define SYS_gettimeofday	169
@@ -639,6 +640,13 @@ TEXT runtime·osyield<ABIInternal>(SB),NOSPLIT,$0
 // func sched_getaffinity(pid, len uintptr, buf *uintptr) int32
 TEXT runtime·sched_getaffinity<ABIInternal>(SB),NOSPLIT,$0
 	MOV	$SYS_sched_getaffinity, A7
+	ECALL
+	RET
+
+// func getcpu(cpu, node *uint32) int32
+TEXT runtime·getcpu<ABIInternal>(SB),NOSPLIT,$0
+	MOV	ZERO, A2	// tcache, must be NULL
+	MOV	$SYS_getcpu, A7
 	ECALL
 	RET
 

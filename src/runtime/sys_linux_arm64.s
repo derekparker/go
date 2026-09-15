@@ -49,6 +49,7 @@
 #define SYS_timer_create	107
 #define SYS_timer_settime	110
 #define SYS_timer_delete	111
+#define SYS_getcpu		168
 
 TEXT runtime·exit(SB),NOSPLIT|NOFRAME,$0-4
 	MOVW	code+0(FP), R0
@@ -759,6 +760,15 @@ TEXT runtime·sched_getaffinity(SB),NOSPLIT|NOFRAME,$0
 	MOVD	$SYS_sched_getaffinity, R8
 	SVC
 	MOVW	R0, ret+24(FP)
+	RET
+
+TEXT runtime·getcpu(SB),NOSPLIT|NOFRAME,$0
+	MOVD	cpu+0(FP), R0
+	MOVD	node+8(FP), R1
+	MOVD	$0, R2
+	MOVD	$SYS_getcpu, R8
+	SVC
+	MOVW	R0, ret+16(FP)
 	RET
 
 // int access(const char *name, int mode)

@@ -59,6 +59,7 @@
 #define SYS_clock_gettime	265
 #define SYS_tgkill		270
 #define SYS_pipe2		331
+#define SYS_getcpu		318
 
 TEXT runtime·exit(SB),NOSPLIT,$0
 	MOVL	$SYS_exit_group, AX
@@ -777,6 +778,15 @@ TEXT runtime·sched_getaffinity(SB),NOSPLIT,$0
 	MOVL	buf+8(FP), DX
 	INVOKE_SYSCALL
 	MOVL	AX, ret+12(FP)
+	RET
+
+TEXT runtime·getcpu(SB),NOSPLIT,$0-12
+	MOVL	$SYS_getcpu, AX
+	MOVL	cpu+0(FP), BX
+	MOVL	node+4(FP), CX
+	MOVL	$0, DX
+	INVOKE_SYSCALL
+	MOVL	AX, ret+8(FP)
 	RET
 
 // int access(const char *name, int mode)

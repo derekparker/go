@@ -47,6 +47,7 @@
 #define SYS_openat		257
 #define SYS_faccessat		269
 #define SYS_pipe2		293
+#define SYS_getcpu		309
 
 TEXT runtime·exit(SB),NOSPLIT,$0-4
 	MOVL	code+0(FP), DI
@@ -694,6 +695,15 @@ TEXT runtime·sched_getaffinity(SB),NOSPLIT,$0
 	MOVL	$SYS_sched_getaffinity, AX
 	SYSCALL
 	MOVL	AX, ret+24(FP)
+	RET
+
+TEXT runtime·getcpu(SB),NOSPLIT,$0-20
+	MOVQ	cpu+0(FP), DI
+	MOVQ	node+8(FP), SI
+	MOVQ	$0, DX
+	MOVL	$SYS_getcpu, AX
+	SYSCALL
+	MOVL	AX, ret+16(FP)
 	RET
 
 // int access(const char *name, int mode)
