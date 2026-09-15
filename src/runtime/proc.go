@@ -909,6 +909,7 @@ func schedinit() {
 		parseRuntimeDebugVars(gogetenv("GODEBUG"))
 	}
 	finishDebugVarsSetup()
+	numaSchedinit()
 	gcinit()
 
 	// Allocate stack space that can be used when crashing due to bad stack
@@ -950,6 +951,13 @@ func schedinit() {
 		throw("unknown runnable goroutine during bootstrap")
 	}
 	unlock(&sched.lock)
+
+	if goexperiment.Numa {
+		// Single-node confinement needs the startup GOMAXPROCS value; no
+		// other runtime thread exists yet, so affinity/mempolicy set
+		// here is inherited by every future M.
+		numaConfineIfSmall(procs)
+	}
 
 	// World is effectively started now, as P's can run.
 	worldStarted()
@@ -1786,6 +1794,13 @@ func startTheWorldWithSema(now int64, w worldStop) int64 {
 		procs = newprocs
 		newprocs = 0
 	}
+	// Captured under the same sched.lock critical section as procs: the
+	// NUMA stand-down trigger below must see the customGOMAXPROCS value
+	// that produced this procs (or newprocs), not a value read after
+	// unlock that could race a subsequent GOMAXPROCS/SetDefaultGOMAXPROCS
+	// call. See numaStandDownIfNeeded's doc comment for why this flag
+	// alone (independent of the procs comparison) must trigger stand-down.
+	customGOMAXPROCS := sched.customGOMAXPROCS
 	p1 := procresize(procs)
 	sched.gcwaiting.Store(false)
 	if sched.sysmonwait.Load() {
@@ -1793,6 +1808,18 @@ func startTheWorldWithSema(now int64, w worldStop) int64 {
 		notewakeup(&sched.sysmonnote)
 	}
 	unlock(&sched.lock)
+
+	// NUMA stand-down: detection only here. mp.locks != 0 (acquirem
+	// above), and syscalls are banned under
+	// sched.lock or with mp.locks != 0, so numaStandDownIfNeeded only
+	// flips atomic
+	// state -- no syscalls. If it reports a fresh trigger, the
+	// syscall-bearing restoration is deferred to numaStandDownWiden
+	// below, run only after releasem once the world has fully restarted.
+	standingDown := false
+	if goexperiment.Numa {
+		standingDown = numaStandDownIfNeeded(procs, customGOMAXPROCS)
+	}
 
 	worldStarted()
 
@@ -1835,6 +1862,16 @@ func startTheWorldWithSema(now int64, w worldStop) int64 {
 	wakep()
 
 	releasem(mp)
+
+	if goexperiment.Numa && standingDown {
+		// mp.locks == 0 here (releasem above) and sched.lock is free:
+		// safe to make syscalls. See numaStandDownWiden's doc comment.
+		// The goexperiment.Numa check is structural, matching the
+		// detection call site above, rather than relying on standingDown
+		// alone being provably false (by optimizer constant propagation)
+		// to eliminate this call in off builds.
+		numaStandDownWiden()
+	}
 
 	return now
 }
@@ -3006,6 +3043,17 @@ func templateThread() {
 // Stops execution of the current m until new work is available.
 // Returns with acquired P.
 func stopm() {
+	// M is parking: never a malloc or steal path. The numaStoodDown
+	// check is inlined here (rather than left as numaFixThreadPlacement's
+	// own first statement) so the steady-state cost at every park --
+	// experiment on, but never confined or not yet stood down -- is one
+	// inlined atomic load with a not-taken branch, not a full call into
+	// numa_linux.go. See numaStoodDown's doc comment (numa_standdown.go)
+	// and numaFixThreadPlacement's (numa_linux.go).
+	if goexperiment.Numa && numaStoodDown.Load() {
+		numaFixThreadPlacement()
+	}
+
 	gp := getg()
 
 	if gp.m.locks != 0 {

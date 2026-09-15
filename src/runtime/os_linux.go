@@ -455,6 +455,9 @@ func raiseproc(sig uint32)
 func sched_getaffinity(pid, len uintptr, buf *byte) int32
 func osyield()
 
+//go:noescape
+func getcpu(cpu, node *uint32) int32
+
 //go:nosplit
 func osyield_no_g() {
 	osyield()
