@@ -130,4 +130,8 @@ type Flags struct {
 
 	// GoListExportNewFormat enables the new format for go list -export.
 	GoListExportNewFormat bool
+
+	// Numa enables NUMA topology discovery and single-node
+	// confinement. Linux-only; other platforms no-op. Off by default.
+	Numa bool
 }
