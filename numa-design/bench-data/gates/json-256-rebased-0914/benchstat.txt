@@ -1,0 +1,81 @@
+             │ stock.derived.out │           numa.derived.out            │
+             │      sec/op       │    sec/op      vs base                │
+JSON-256            3.099m ± 29%   2.068m ±  26%  -33.25% (p=0.004 n=10)
+Run/json-256         5.219 ± 86%    5.898 ± 167%        ~ (p=0.912 n=10)
+geomean             127.2m         110.5m         -13.14%
+
+         │  stock.derived.out   │               numa.derived.out               │
+         │ GC-bytes-from-system │ GC-bytes-from-system  vs base                │
+JSON-256          23.40Mi ± 69%          45.39Mi ± 41%  +93.99% (p=0.003 n=10)
+
+         │ stock.derived.out │        numa.derived.out        │
+         │    STW-sec/GC     │  STW-sec/GC   vs base          │
+JSON-256        35.52m ± 18%   40.67m ± 18%  ~ (p=0.063 n=10)
+
+         │ stock.derived.out │           numa.derived.out            │
+         │    STW-sec/op     │  STW-sec/op    vs base                │
+JSON-256        273.6µ ± 79%   103.3µ ± 110%  -62.24% (p=0.007 n=10)
+
+         │ stock.derived.out  │              numa.derived.out              │
+         │ allocated-bytes/op │ allocated-bytes/op  vs base                │
+JSON-256        9.105Mi ± 33%        5.974Mi ± 33%  -34.39% (p=0.011 n=10)
+
+         │ stock.derived.out │          numa.derived.out          │
+         │     allocs/op     │  allocs/op   vs base               │
+JSON-256         26.84k ± 0%   26.81k ± 0%  -0.10% (p=0.003 n=10)
+
+         │ stock.derived.out │              numa.derived.out              │
+         │ bytes-from-system │ bytes-from-system  vs base                 │
+JSON-256       4.220Gi ± 90%       9.640Gi ± 52%  +128.44% (p=0.003 n=10)
+
+         │   stock.derived.out    │                numa.derived.out                 │
+         │ heap-bytes-from-system │ heap-bytes-from-system  vs base                 │
+JSON-256            4.113Gi ± 92%            9.484Gi ± 52%  +130.57% (p=0.003 n=10)
+
+         │    stock.derived.out    │                numa.derived.out                 │
+         │ other-bytes-from-system │ other-bytes-from-system  vs base                │
+JSON-256             67.63Mi ± 21%             98.63Mi ± 29%  +45.83% (p=0.001 n=10)
+
+         │ stock.derived.out │            numa.derived.out             │
+         │  peak-RSS-bytes   │ peak-RSS-bytes  vs base                 │
+JSON-256       4.169Gi ± 91%    9.575Gi ± 52%  +129.65% (p=0.003 n=10)
+
+         │ stock.derived.out │            numa.derived.out             │
+         │   peak-VM-bytes   │ peak-VM-bytes   vs base                 │
+JSON-256       5.383Gi ± 71%   10.778Gi ± 46%  +100.22% (p=0.004 n=10)
+
+         │    stock.derived.out    │             numa.derived.out              │
+         │ stack-bytes-from-system │ stack-bytes-from-system  vs base          │
+JSON-256             17.84Mi ± 10%             16.48Mi ± 12%  ~ (p=0.325 n=10)
+
+         │ stock.derived.out │            numa.derived.out             │
+         │  user+sys-sec/op  │ user+sys-sec/op  vs base                │
+JSON-256         188.3m ± 9%      123.5m ± 36%  -34.44% (p=0.002 n=10)
+
+             │ stock.derived.out │           numa.derived.out           │
+             │     cycles/op     │   cycles/op    vs base               │
+JSON-256           179.3M ±  52%   132.8M ± 101%       ~ (p=0.190 n=10)
+Run/json-256       224.2G ± 163%   265.6G ± 294%       ~ (p=0.315 n=10)
+geomean            6.340G          5.938G         -6.34%
+
+             │ stock.derived.out │            numa.derived.out             │
+             │  instructions/op  │ instructions/op  vs base                │
+JSON-256            327.5M ± 43%     314.7M ±  46%        ~ (p=0.190 n=10)
+Run/json-256        482.3G ± 94%     629.4G ± 226%        ~ (p=0.218 n=10)
+geomean             12.57G           14.07G         +11.99%
+
+             │ stock.derived.out │       numa.derived.out        │
+             │        GHz        │     GHz      vs base          │
+Run/json-256        873.0m ± 12%   969.5m ± 5%  ~ (p=0.052 n=10)
+
+             │ stock.derived.out │       numa.derived.out        │
+             │     CPUs-busy     │  CPUs-busy   vs base          │
+Run/json-256         45.60 ± 39%   49.10 ± 39%  ~ (p=0.755 n=10)
+
+             │ stock.derived.out │       numa.derived.out        │
+             │    hint-faults    │ hint-faults  vs base          │
+Run/json-256      10385.0 ± 358%     606.5 ± ?  ~ (p=0.086 n=10)
+
+             │ stock.derived.out │         numa.derived.out         │
+             │  pages-migrated   │ pages-migrated  vs base          │
+Run/json-256       69.91k ± 818%       79.99k ± ?  ~ (p=0.723 n=10)

@@ -1,0 +1,42 @@
+run=1
+policy=prefer:0 node=N0 pages=496985
+policy=prefer:0 node=N1 pages=850
+policy=prefer:0 pages=497835
+vmas=56
+run=2
+policy=prefer:1 node=N1 pages=562539
+policy=prefer:1 pages=562539
+vmas=74
+run=3
+policy=prefer:1 node=N1 pages=517608
+policy=prefer:1 pages=517608
+vmas=71
+run=4
+policy=prefer:1 node=N1 pages=540960
+policy=prefer:1 pages=540960
+vmas=76
+run=5
+policy=prefer:0 node=N0 pages=519543
+policy=prefer:0 node=N1 pages=834
+policy=prefer:0 pages=520377
+vmas=60
+run=6
+policy=prefer:1 node=N1 pages=533804
+policy=prefer:1 pages=533804
+vmas=66
+run=7
+policy=prefer:1 node=N1 pages=533050
+policy=prefer:1 pages=533050
+vmas=71
+run=8
+policy=prefer:1 node=N1 pages=537731
+policy=prefer:1 pages=537731
+vmas=68
+run=9
+policy=prefer:1 node=N1 pages=562527
+policy=prefer:1 pages=562527
+vmas=65
+run=10
+policy=prefer:1 node=N1 pages=498126
+policy=prefer:1 pages=498126
+vmas=74

@@ -1,0 +1,9 @@
+Building Go cmd/dist using /home/deparker/go-bootstrap. (go1.28-devel_68cbbd30f2 Thu Aug 27 13:57:29 2026 -0700 linux/amd64)
+Building Go toolchain1 and bootstrap cmd/go (go_bootstrap) using /home/deparker/go-bootstrap.
+Building Go toolchain2 using go_bootstrap and Go toolchain1.
+Building Go toolchain3 and commands using go_bootstrap and Go toolchain2.
+Checking command staleness for linux/amd64.
+---
+Installed Go for linux/amd64 in /home/deparker/numa-gate-out/json-256-rebased-0914/stock.wt
+Installed commands in /home/deparker/numa-gate-out/json-256-rebased-0914/stock.wt/bin
+*** You need to add /home/deparker/numa-gate-out/json-256-rebased-0914/stock.wt/bin to your PATH.

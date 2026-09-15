@@ -1,0 +1,19 @@
+== 2026-09-14T14:28:12-04:00 gate gc-pause-rebased-0912 workload=gc-pause n=10 procs=256 mem=4096 host=dell-per660-01.khw.eng.rdu2.dc.redhat.com
+== 2026-09-14T14:28:13-04:00 arm stock: worktree ba2d41763e36a9f30af6813920791a5dae76daaa exp='' patch=''
+== 2026-09-14T14:29:21-04:00 arm numa: worktree ba2d41763e36a9f30af6813920791a5dae76daaa exp='numa' patch=''
+-- sanity numa:
+numa: confinement declined: GOMAXPROCS exceeds node
+numa: nodes 2
+== 2026-09-14T14:30:36-04:00 warmup round
+== round 1 2026-09-14T14:33:25-04:00
+== round 2 2026-09-14T14:36:09-04:00
+== round 3 2026-09-14T14:38:53-04:00
+== round 4 2026-09-14T14:41:32-04:00
+== round 5 2026-09-14T14:44:18-04:00
+== round 6 2026-09-14T14:46:58-04:00
+== round 7 2026-09-14T14:49:38-04:00
+== round 8 2026-09-14T14:52:20-04:00
+== round 9 2026-09-14T14:55:01-04:00
+== round 10 2026-09-14T14:57:42-04:00
+== 2026-09-14T15:00:24-04:00 cleanup
+== DONE 2026-09-14T15:00:25-04:00

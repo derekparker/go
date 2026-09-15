@@ -1,0 +1,15 @@
+# started on Mon Sep 14 15:21:28 2026
+
+
+ Performance counter stats for '/home/deparker/numa-gate-out/confined-rebased-0914/bins/stock/w -benchmem=4096 -benchnum=1':
+
+ 2,017,566,193,285      task-clock:u                     #   35.029 CPUs utilized             
+ 2,689,645,142,785      cycles:u                         #    1.333 GHz                       
+ 1,688,708,096,017      instructions:u                   #    0.63  insn per cycle            
+
+      57.597505846 seconds time elapsed
+
+    1895.813391000 seconds user
+      69.520290000 seconds sys
+
+

@@ -1,0 +1,15 @@
+# started on Mon Sep 14 15:50:15 2026
+
+
+ Performance counter stats for '/home/deparker/numa-gate-out/json-256-rebased-0914/bins/numa/w -benchmem=512 -benchnum=1 -benchtime=3s':
+
+   375,317,884,976      task-clock:u                     #   59.429 CPUs utilized             
+   275,025,462,677      cycles:u                         #    0.733 GHz                       
+   334,781,374,280      instructions:u                   #    1.22  insn per cycle            
+
+       6.315388914 seconds time elapsed
+
+     233.072684000 seconds user
+     135.141295000 seconds sys
+
+

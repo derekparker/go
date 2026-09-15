@@ -1,0 +1,81 @@
+                             │ stock.derived.out │          numa.derived.out          │
+                             │      sec/op       │   sec/op     vs base               │
+Garbage/benchmem-MB=4096-256         3.304m ± 5%   3.200m ± 8%  -3.15% (p=0.003 n=10)
+Run/garbage-256                       59.69 ± 2%    58.14 ± 4%  -2.59% (p=0.001 n=10)
+geomean                              444.1m        431.3m       -2.87%
+
+                             │  stock.derived.out   │            numa.derived.out            │
+                             │ GC-bytes-from-system │ GC-bytes-from-system  vs base          │
+Garbage/benchmem-MB=4096-256           130.1Mi ± 5%           130.2Mi ± 3%  ~ (p=0.912 n=10)
+
+                             │ stock.derived.out │        numa.derived.out        │
+                             │    STW-sec/GC     │  STW-sec/GC   vs base          │
+Garbage/benchmem-MB=4096-256         30.85m ± 7%   29.39m ± 16%  ~ (p=0.631 n=10)
+
+                             │ stock.derived.out │        numa.derived.out        │
+                             │    STW-sec/op     │  STW-sec/op   vs base          │
+Garbage/benchmem-MB=4096-256        47.80µ ± 10%   47.03µ ± 11%  ~ (p=0.436 n=10)
+
+                             │ stock.derived.out  │             numa.derived.out              │
+                             │ allocated-bytes/op │ allocated-bytes/op  vs base               │
+Garbage/benchmem-MB=4096-256         5.934Mi ± 0%         5.934Mi ± 0%  -0.01% (p=0.019 n=10)
+
+                             │ stock.derived.out │          numa.derived.out          │
+                             │     allocs/op     │  allocs/op   vs base               │
+Garbage/benchmem-MB=4096-256         145.2k ± 0%   145.2k ± 0%  -0.00% (p=0.025 n=10)
+
+                             │ stock.derived.out │          numa.derived.out           │
+                             │ bytes-from-system │ bytes-from-system  vs base          │
+Garbage/benchmem-MB=4096-256        8.982Gi ± 2%        9.087Gi ± 3%  ~ (p=0.165 n=10)
+
+                             │   stock.derived.out    │             numa.derived.out             │
+                             │ heap-bytes-from-system │ heap-bytes-from-system  vs base          │
+Garbage/benchmem-MB=4096-256             8.652Gi ± 2%             8.756Gi ± 3%  ~ (p=0.190 n=10)
+
+                             │    stock.derived.out    │             numa.derived.out              │
+                             │ other-bytes-from-system │ other-bytes-from-system  vs base          │
+Garbage/benchmem-MB=4096-256              193.4Mi ± 1%              194.4Mi ± 2%  ~ (p=0.353 n=10)
+
+                             │ stock.derived.out │         numa.derived.out         │
+                             │  peak-RSS-bytes   │ peak-RSS-bytes  vs base          │
+Garbage/benchmem-MB=4096-256        8.914Gi ± 2%     8.940Gi ± 3%  ~ (p=0.218 n=10)
+
+                             │ stock.derived.out │        numa.derived.out         │
+                             │   peak-VM-bytes   │ peak-VM-bytes  vs base          │
+Garbage/benchmem-MB=4096-256        10.14Gi ± 2%    10.30Gi ± 2%  ~ (p=0.165 n=10)
+
+                             │    stock.derived.out    │             numa.derived.out              │
+                             │ stack-bytes-from-system │ stack-bytes-from-system  vs base          │
+Garbage/benchmem-MB=4096-256              15.02Mi ± 4%              15.05Mi ± 2%  ~ (p=0.927 n=10)
+
+                             │ stock.derived.out │            numa.derived.out            │
+                             │  user+sys-sec/op  │ user+sys-sec/op  vs base               │
+Garbage/benchmem-MB=4096-256         250.4m ± 5%       239.5m ± 6%  -4.35% (p=0.035 n=10)
+
+                             │ stock.derived.out │          numa.derived.out          │
+                             │     cycles/op     │  cycles/op   vs base               │
+Garbage/benchmem-MB=4096-256         382.2M ± 5%   364.1M ± 5%  -4.74% (p=0.019 n=10)
+Run/garbage-256                      3.822T ± 5%   3.641T ± 5%  -4.74% (p=0.019 n=10)
+geomean                              38.22G        36.41G       -4.74%
+
+                             │ stock.derived.out │            numa.derived.out            │
+                             │  instructions/op  │ instructions/op  vs base               │
+Garbage/benchmem-MB=4096-256         170.0M ± 0%       169.4M ± 1%  -0.40% (p=0.035 n=10)
+Run/garbage-256                      1.700T ± 0%       1.694T ± 1%  -0.41% (p=0.036 n=10)
+geomean                              17.00G            16.94G       -0.41%
+
+                │ stock.derived.out │       numa.derived.out       │
+                │        GHz        │    GHz      vs base          │
+Run/garbage-256          1.306 ± 1%   1.311 ± 2%  ~ (p=0.630 n=10)
+
+                │ stock.derived.out │       numa.derived.out       │
+                │     CPUs-busy     │ CPUs-busy   vs base          │
+Run/garbage-256          48.80 ± 5%   48.75 ± 4%  ~ (p=0.578 n=10)
+
+                │ stock.derived.out │           numa.derived.out           │
+                │    hint-faults    │ hint-faults   vs base                │
+Run/garbage-256        789.0k ± 50%   597.2k ± 30%  -24.31% (p=0.001 n=10)
+
+                │ stock.derived.out │           numa.derived.out            │
+                │  pages-migrated   │ pages-migrated  vs base               │
+Run/garbage-256         2.498M ± 5%     2.286M ± 18%  -8.50% (p=0.029 n=10)

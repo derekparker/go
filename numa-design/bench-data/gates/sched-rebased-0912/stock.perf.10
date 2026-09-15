@@ -1,0 +1,15 @@
+# started on Mon Sep 14 14:27:20 2026
+
+
+ Performance counter stats for '/home/deparker/numa-gate-out/sched-rebased-0912/bins/stock/w -test.run ^$ -test.bench ^Benchmark(CreateGoroutines|CreateGoroutinesCapture|CreateGoroutinesParallel|PingPongHog)$ -test.benchtime 1s':
+
+    98,124,519,386      task-clock:u                     #   15.195 CPUs utilized             
+   119,443,968,569      cycles:u                         #    1.217 GHz                       
+    36,997,204,327      instructions:u                   #    0.31  insn per cycle            
+
+       6.457878949 seconds time elapsed
+
+      89.619160000 seconds user
+       7.967857000 seconds sys
+
+

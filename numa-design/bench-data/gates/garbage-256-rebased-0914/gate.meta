@@ -1,0 +1,12 @@
+name=garbage-256-rebased-0914 workload=garbage n=10 procs=256 mem=4096 pin=0 host=numa-dell
+arms:
+stock ba2d41763e36a9f30af6813920791a5dae76daaa  
+numa ba2d41763e36a9f30af6813920791a5dae76daaa numa 
+started=
+6.12.0-211.7.1.el10_2.x86_64
+numa_balancing=1
+Mem:              30           2          19           0           8          27
+[always] madvise never
+/home/deparker/numa-gate-out/garbage-256-rebased-0914/bins/stock/w: go1.28-devel_ba2d41763e Mon Sep 14 11:20:54 2026 -0700 
+/home/deparker/numa-gate-out/garbage-256-rebased-0914/bins/numa/w: go1.28-devel_ba2d41763e Mon Sep 14 11:20:54 2026 -0700 X:numa 	build	GOEXPERIMENT=numa 
+finished=2026-09-14T15:47:18-04:00

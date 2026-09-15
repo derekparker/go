@@ -1,0 +1,2 @@
+numa: confinement declined: GOMAXPROCS exceeds node
+numa: nodes 2

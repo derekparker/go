@@ -1,0 +1,22 @@
+Single-node feature-declined experiment-on cost (commit ba2d41763e36a9f30af6813920791a5dae76daaa)
+Host: darwin/arm64 (NUMA runtime unavailable on non-Linux; NUMA runtime will decline/no-op)
+Samples per arm: 20 (one warmup discarded each arm), interleaved order
+
+BenchmarkMalloc8:
+  stock ns/op: median=6.0 mean=6.0 min=5.9 max=6.0 stdev=0.02
+  numa  ns/op: median=6.0 mean=6.0 min=5.9 max=6.0 stdev=0.02
+  ratio (numa/stock) median/median = 1.0029 (0.29%)
+
+BenchmarkMalloc16:
+  stock ns/op: median=8.5 mean=8.5 min=8.4 max=8.6 stdev=0.04
+  numa  ns/op: median=8.5 mean=8.6 min=8.5 max=8.6 stdev=0.02
+  ratio (numa/stock) median/median = 1.0094 (0.94%)
+
+Geomean of per-benchmark ratios (numa/stock) = 1.0062 (0.62%)
+Threshold: <= +2% (factor <= 1.0200) => PASS
+
+Raw sample counts:
+  BenchmarkMalloc8: stock=20 numa=20
+  BenchmarkMalloc16: stock=20 numa=20
+
+Notes: Host clock resolution and background activity can affect ns/op. This host is macOS (Darwin) on arm64; NUMA runtime is a no-op here (non-Linux), so any observed difference is due to build overhead or measurement noise.

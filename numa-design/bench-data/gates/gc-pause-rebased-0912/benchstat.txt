@@ -1,0 +1,29 @@
+                 │ stock.derived.out │         numa.derived.out          │
+                 │      sec/op       │   sec/op    vs base               │
+GCCycleWall               5.595 ± 5%   5.693 ± 3%       ~ (p=0.813 n=80)
+Run/gc-pause-256          81.45 ± 4%   81.35 ± 4%       ~ (p=1.000 n=10)
+geomean                   21.35        21.52       +0.81%
+
+                 │ stock.derived.out │       numa.derived.out        │
+                 │     cycles/op     │  cycles/op   vs base          │
+Run/gc-pause-256         38.37T ± 7%   38.41T ± 6%  ~ (p=0.912 n=10)
+
+                 │ stock.derived.out │         numa.derived.out          │
+                 │  instructions/op  │ instructions/op  vs base          │
+Run/gc-pause-256         125.8G ± 5%       126.2G ± 3%  ~ (p=0.591 n=10)
+
+                 │ stock.derived.out │       numa.derived.out       │
+                 │        GHz        │    GHz      vs base          │
+Run/gc-pause-256          2.822 ± 1%   2.817 ± 0%  ~ (p=0.304 n=10)
+
+                 │ stock.derived.out │       numa.derived.out       │
+                 │     CPUs-busy     │ CPUs-busy   vs base          │
+Run/gc-pause-256          166.8 ± 2%   167.2 ± 2%  ~ (p=0.617 n=10)
+
+                 │ stock.derived.out │        numa.derived.out        │
+                 │    hint-faults    │ hint-faults   vs base          │
+Run/gc-pause-256        130.6k ± 20%   118.0k ± 42%  ~ (p=0.280 n=10)
+
+                 │ stock.derived.out │         numa.derived.out         │
+                 │  pages-migrated   │ pages-migrated  vs base          │
+Run/gc-pause-256        1.215M ± 51%     1.474M ± 45%  ~ (p=0.143 n=10)

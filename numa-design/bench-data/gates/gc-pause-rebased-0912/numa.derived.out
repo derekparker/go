@@ -1,0 +1,90 @@
+BenchmarkGCCycleWall 1 5420728526 ns/op
+BenchmarkGCCycleWall 1 5548742676 ns/op
+BenchmarkGCCycleWall 1 5828719645 ns/op
+BenchmarkGCCycleWall 1 5137054774 ns/op
+BenchmarkGCCycleWall 1 6021176325 ns/op
+BenchmarkGCCycleWall 1 5215994571 ns/op
+BenchmarkGCCycleWall 1 5946213059 ns/op
+BenchmarkGCCycleWall 1 6316609033 ns/op
+BenchmarkGCCycleWall 1 6113827448 ns/op
+BenchmarkGCCycleWall 1 5720601012 ns/op
+BenchmarkGCCycleWall 1 5516556384 ns/op
+BenchmarkGCCycleWall 1 6244339176 ns/op
+BenchmarkGCCycleWall 1 6313140483 ns/op
+BenchmarkGCCycleWall 1 5544969684 ns/op
+BenchmarkGCCycleWall 1 6050001002 ns/op
+BenchmarkGCCycleWall 1 6270352366 ns/op
+BenchmarkGCCycleWall 1 5884601942 ns/op
+BenchmarkGCCycleWall 1 5647834337 ns/op
+BenchmarkGCCycleWall 1 5375146831 ns/op
+BenchmarkGCCycleWall 1 5929986429 ns/op
+BenchmarkGCCycleWall 1 5956562788 ns/op
+BenchmarkGCCycleWall 1 5497535779 ns/op
+BenchmarkGCCycleWall 1 5950563974 ns/op
+BenchmarkGCCycleWall 1 5900655906 ns/op
+BenchmarkGCCycleWall 1 6145824855 ns/op
+BenchmarkGCCycleWall 1 5385563626 ns/op
+BenchmarkGCCycleWall 1 6088591653 ns/op
+BenchmarkGCCycleWall 1 6045041889 ns/op
+BenchmarkGCCycleWall 1 6146127623 ns/op
+BenchmarkGCCycleWall 1 5990186342 ns/op
+BenchmarkGCCycleWall 1 5731819997 ns/op
+BenchmarkGCCycleWall 1 6172464133 ns/op
+BenchmarkGCCycleWall 1 5796988455 ns/op
+BenchmarkGCCycleWall 1 6007820948 ns/op
+BenchmarkGCCycleWall 1 5675459680 ns/op
+BenchmarkGCCycleWall 1 6063230992 ns/op
+BenchmarkGCCycleWall 1 5986959678 ns/op
+BenchmarkGCCycleWall 1 5981861342 ns/op
+BenchmarkGCCycleWall 1 6001587039 ns/op
+BenchmarkGCCycleWall 1 6037430849 ns/op
+BenchmarkGCCycleWall 1 6074637665 ns/op
+BenchmarkGCCycleWall 1 5250879265 ns/op
+BenchmarkGCCycleWall 1 5671919663 ns/op
+BenchmarkGCCycleWall 1 5630248620 ns/op
+BenchmarkGCCycleWall 1 5030470401 ns/op
+BenchmarkGCCycleWall 1 6162645876 ns/op
+BenchmarkGCCycleWall 1 6060125482 ns/op
+BenchmarkGCCycleWall 1 6151006823 ns/op
+BenchmarkGCCycleWall 1 5319493387 ns/op
+BenchmarkGCCycleWall 1 4902962603 ns/op
+BenchmarkGCCycleWall 1 5299003316 ns/op
+BenchmarkGCCycleWall 1 5249115636 ns/op
+BenchmarkGCCycleWall 1 5395738503 ns/op
+BenchmarkGCCycleWall 1 5412172064 ns/op
+BenchmarkGCCycleWall 1 5595330994 ns/op
+BenchmarkGCCycleWall 1 5588142430 ns/op
+BenchmarkGCCycleWall 1 5551664061 ns/op
+BenchmarkGCCycleWall 1 5079831678 ns/op
+BenchmarkGCCycleWall 1 5454777318 ns/op
+BenchmarkGCCycleWall 1 5463550486 ns/op
+BenchmarkGCCycleWall 1 5506325427 ns/op
+BenchmarkGCCycleWall 1 5191901479 ns/op
+BenchmarkGCCycleWall 1 5600634957 ns/op
+BenchmarkGCCycleWall 1 5559771930 ns/op
+BenchmarkGCCycleWall 1 5957197691 ns/op
+BenchmarkGCCycleWall 1 5711444696 ns/op
+BenchmarkGCCycleWall 1 5325788610 ns/op
+BenchmarkGCCycleWall 1 5903825734 ns/op
+BenchmarkGCCycleWall 1 5854206097 ns/op
+BenchmarkGCCycleWall 1 5966878329 ns/op
+BenchmarkGCCycleWall 1 5481938642 ns/op
+BenchmarkGCCycleWall 1 5809394965 ns/op
+BenchmarkGCCycleWall 1 5444362948 ns/op
+BenchmarkGCCycleWall 1 5198178482 ns/op
+BenchmarkGCCycleWall 1 5424158297 ns/op
+BenchmarkGCCycleWall 1 4767306509 ns/op
+BenchmarkGCCycleWall 1 4797159095 ns/op
+BenchmarkGCCycleWall 1 5462169734 ns/op
+BenchmarkGCCycleWall 1 5249342469 ns/op
+BenchmarkGCCycleWall 1 5832355240 ns/op
+BenchmarkRun/gc-pause-256 1 79310454948 ns/op 3.677e+13 cycles/op 1.244e+11 instructions/op 2.812 GHz 164.9 CPUs-busy 120158 hint-faults 798519 pages-migrated
+BenchmarkRun/gc-pause-256 1 83323221401 ns/op 3.936e+13 cycles/op 1.258e+11 instructions/op 2.813 GHz 167.9 CPUs-busy 135099 hint-faults 1872852 pages-migrated
+BenchmarkRun/gc-pause-256 1 80848623488 ns/op 3.835e+13 cycles/op 1.281e+11 instructions/op 2.812 GHz 168.7 CPUs-busy 111584 hint-faults 812991 pages-migrated
+BenchmarkRun/gc-pause-256 1 83573282807 ns/op 3.981e+13 cycles/op 1.274e+11 instructions/op 2.820 GHz 168.9 CPUs-busy 68751 hint-faults 1655554 pages-migrated
+BenchmarkRun/gc-pause-256 1 82644563278 ns/op 3.945e+13 cycles/op 1.249e+11 instructions/op 2.817 GHz 169.4 CPUs-busy 106811 hint-faults 1132279 pages-migrated
+BenchmarkRun/gc-pause-256 1 82356092021 ns/op 3.848e+13 cycles/op 1.266e+11 instructions/op 2.808 GHz 166.4 CPUs-busy 161188 hint-faults 1459763 pages-migrated
+BenchmarkRun/gc-pause-256 1 78267553025 ns/op 3.626e+13 cycles/op 1.220e+11 instructions/op 2.816 GHz 164.5 CPUs-busy 115898 hint-faults 1481640 pages-migrated
+BenchmarkRun/gc-pause-256 1 78689120850 ns/op 3.639e+13 cycles/op 1.215e+11 instructions/op 2.823 GHz 163.8 CPUs-busy 63687 hint-faults 1476370 pages-migrated
+BenchmarkRun/gc-pause-256 1 81858127597 ns/op 3.905e+13 cycles/op 1.291e+11 instructions/op 2.822 GHz 169.0 CPUs-busy 136859 hint-faults 1472079 pages-migrated
+BenchmarkRun/gc-pause-256 1 77722723804 ns/op 3.431e+13 cycles/op 1.277e+11 instructions/op 2.819 GHz 156.6 CPUs-busy 130378 hint-faults 1706393 pages-migrated

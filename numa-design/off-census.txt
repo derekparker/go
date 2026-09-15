@@ -1,0 +1,23 @@
+Experiment-off function census
+
+Baseline: 116291c88aac1d92d86787a51af5d263a7eeb9d4
+Final reviewed tree: created with git stash create after CPU-id truncation fix
+Host/build: darwin/arm64, minimal non-test canary, GOEXPERIMENT empty
+
+baseline TEXT symbols: 1432
+reviewed TEXT symbols: 1432
+symbols only in baseline: 0
+symbols only in reviewed: 0
+functions with instruction-count differences: 0
+reviewed symbols containing "numa" (case-insensitive): 0
+
+A stricter normalized-disassembly comparison reported textual differences
+in 858 functions. The comparison removed instruction addresses and hex
+addresses but retained other operand displacements. The NUMA experiment
+adds unconditional runtime global state, which shifts data references in
+the linked image even when experiment code is unreachable. The census
+therefore establishes identical function presence and instruction-line
+counts, not byte-identical machine code or identical normalized operands.
+
+This is the same function-level criterion used by the project gate. Raw
+binary equality is not claimed.

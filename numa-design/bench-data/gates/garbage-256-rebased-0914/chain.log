@@ -1,0 +1,19 @@
+== 2026-09-14T15:23:19-04:00 gate garbage-256-rebased-0914 workload=garbage n=10 procs=256 mem=4096 host=dell-per660-01.khw.eng.rdu2.dc.redhat.com
+== 2026-09-14T15:23:19-04:00 arm stock: worktree ba2d41763e36a9f30af6813920791a5dae76daaa exp='' patch=''
+== 2026-09-14T15:24:27-04:00 arm numa: worktree ba2d41763e36a9f30af6813920791a5dae76daaa exp='numa' patch=''
+-- sanity numa:
+numa: confinement declined: GOMAXPROCS exceeds node
+numa: nodes 2
+== 2026-09-14T15:25:43-04:00 warmup round
+== round 1 2026-09-14T15:27:40-04:00
+== round 2 2026-09-14T15:29:39-04:00
+== round 3 2026-09-14T15:31:37-04:00
+== round 4 2026-09-14T15:33:36-04:00
+== round 5 2026-09-14T15:35:29-04:00
+== round 6 2026-09-14T15:37:27-04:00
+== round 7 2026-09-14T15:39:27-04:00
+== round 8 2026-09-14T15:41:25-04:00
+== round 9 2026-09-14T15:43:21-04:00
+== round 10 2026-09-14T15:45:19-04:00
+== 2026-09-14T15:47:17-04:00 cleanup
+== DONE 2026-09-14T15:47:18-04:00

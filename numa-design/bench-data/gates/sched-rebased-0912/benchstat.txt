@@ -1,0 +1,41 @@
+                             │ stock.derived.out │          numa.derived.out           │
+                             │      sec/op       │    sec/op     vs base               │
+PingPongHog-256                     1.190µ ±  5%   1.167µ ± 18%       ~ (p=0.210 n=10)
+CreateGoroutines-256                718.8n ±  2%   708.2n ±  3%       ~ (p=0.190 n=10)
+CreateGoroutinesParallel-256        230.7n ± 10%   215.8n ±  7%  -6.46% (p=0.009 n=10)
+CreateGoroutinesCapture-256         7.745µ ±  5%   7.703µ ± 11%       ~ (p=0.796 n=10)
+Run/sched-256                        6.729 ±  4%    6.950 ± 13%       ~ (p=0.075 n=10)
+geomean                             25.26µ         24.89µ        -1.47%
+
+                            │ stock.derived.out │       numa.derived.out       │
+                            │       B/op        │    B/op     vs base          │
+CreateGoroutinesCapture-256          145.0 ± 1%   144.0 ± 1%  ~ (p=0.170 n=10)
+
+                            │ stock.derived.out │        numa.derived.out        │
+                            │     allocs/op     │ allocs/op   vs base            │
+CreateGoroutinesCapture-256          5.000 ± 0%   5.000 ± 0%  ~ (p=1.000 n=10) ¹
+¹ all samples are equal
+
+              │ stock.derived.out │        numa.derived.out        │
+              │     cycles/op     │  cycles/op    vs base          │
+Run/sched-256        114.8G ± 11%   121.7G ± 11%  ~ (p=0.079 n=10)
+
+              │ stock.derived.out │            numa.derived.out            │
+              │  instructions/op  │ instructions/op  vs base               │
+Run/sched-256         37.97G ± 5%       41.44G ± 7%  +9.14% (p=0.019 n=10)
+
+              │ stock.derived.out │       numa.derived.out       │
+              │        GHz        │    GHz      vs base          │
+Run/sched-256          1.161 ± 4%   1.192 ± 5%  ~ (p=0.138 n=10)
+
+              │ stock.derived.out │       numa.derived.out        │
+              │     CPUs-busy     │  CPUs-busy   vs base          │
+Run/sched-256          14.45 ± 5%   14.65 ± 12%  ~ (p=0.927 n=10)
+
+              │ stock.derived.out │        numa.derived.out        │
+              │    hint-faults    │ hint-faults   vs base          │
+Run/sched-256         605.0 ± 83%   296.0 ± 110%  ~ (p=0.240 n=10)
+
+              │ stock.derived.out │         numa.derived.out         │
+              │  pages-migrated   │ pages-migrated  vs base          │
+Run/sched-256        2.585k ± 73%     2.689k ± 92%  ~ (p=0.424 n=10)

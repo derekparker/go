@@ -1,0 +1,15 @@
+# started on Mon Sep 14 14:59:00 2026
+
+
+ Performance counter stats for '/home/deparker/numa-gate-out/gc-pause-rebased-0912/bins/stock/w -ptrheap=true -toucher=false -heap=4096 -idle=1000000 -stacks=200 -warm=10 -gcgap=1s -discard=2 -n=8':
+
+14,122,552,612,165      task-clock:u                     #  168.882 CPUs utilized             
+40,031,243,481,883      cycles:u                         #    2.835 GHz                       
+   131,694,841,131      instructions:u                   #    0.00  insn per cycle            
+
+      83.623685297 seconds time elapsed
+
+   13877.189348000 seconds user
+     134.395002000 seconds sys
+
+

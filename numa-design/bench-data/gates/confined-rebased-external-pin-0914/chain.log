@@ -1,0 +1,19 @@
+== 2026-09-15T14:14:28-04:00 gate confined-rebased-external-pin-0914 workload=garbage n=10 procs=128 mem=4096 host=dell-per660-01.khw.eng.rdu2.dc.redhat.com
+== 2026-09-15T14:14:28-04:00 arm stock: worktree ba2d41763e36a9f30af6813920791a5dae76daaa exp='' patch=''
+== 2026-09-15T14:15:20-04:00 arm numa: worktree ba2d41763e36a9f30af6813920791a5dae76daaa exp='numa' patch=''
+-- sanity numa:
+numa: confined to node 1 cpus 128
+numa: nodes 2
+== 2026-09-15T14:16:19-04:00 warmup round
+== round 1 2026-09-15T14:17:34-04:00
+== round 2 2026-09-15T14:18:49-04:00
+== round 3 2026-09-15T14:20:04-04:00
+== round 4 2026-09-15T14:21:19-04:00
+== round 5 2026-09-15T14:22:35-04:00
+== round 6 2026-09-15T14:23:51-04:00
+== round 7 2026-09-15T14:25:06-04:00
+== round 8 2026-09-15T14:26:21-04:00
+== round 9 2026-09-15T14:27:36-04:00
+== round 10 2026-09-15T14:28:51-04:00
+== 2026-09-15T14:30:06-04:00 cleanup
+== DONE 2026-09-15T14:30:07-04:00

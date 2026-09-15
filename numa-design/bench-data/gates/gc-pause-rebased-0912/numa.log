@@ -1,0 +1,290 @@
+gc-pause-bench GOMAXPROCS=256 heap=4096MiB warm=10s n=8 idle=1000000 stacks=200 ptrheap=true toucher=false gcgap=1s discard=2
+Allocating pointer-dense heap...
+Spawning 1000000 idle + 200 stack-growing goroutines...
+Warming up (10s) — letting NUMA balancer mark pages...
+  2s elapsed, 0 touch passes
+  4s elapsed, 0 touch passes
+  6s elapsed, 0 touch passes
+  8s elapsed, 0 touch passes
+  10s elapsed, 0 touch passes
+Warm-up done (0 touch passes).
+Measuring 10 GC cycles (2 discarded, 8 measured, gcgap=1s)...
+  [discard 1/2] wall=6.057486781s stw=470.653µs
+  [discard 2/2] wall=4.786058903s stw=492.874µs
+
+=== GC Pause Results ===
+heap=4096  MiB  n=8     GOMAXPROCS=256   idle-goroutines=1000000  stack-goroutines=200  ptrheap=true  toucher=false  gcgap=1s  discard=2
+
+Wall-clock time per runtime.GC() call (includes concurrent phases):
+  p50=5.548742676s  p75=5.946213059s  p90=6.316609033s  p95=6.316609033s  p99=6.316609033s  max=6.316609033s
+  mean=5.679404826s  total=45.435238609s  pauses>5ms: 8/8 (100.0%)
+
+Runtime STW-only time (from MemStats.PauseNs, excludes concurrent GC):
+  p50=410.211µs   p95=1.042272ms  p99=1.042272ms  max=1.042272ms  mean=571.328µs 
+
+Notes:
+  - Build with GOEXPERIMENT=numa to enable mbind(MPOL_PREFERRED) on arenas.
+  - Ensure kernel.numa_balancing=1 (check: cat /proc/sys/kernel/numa_balancing).
+  - Run on a machine with 2+ NUMA nodes for meaningful results.
+  - Larger -heap and longer -warm show more pronounced differences.
+gc-pause-bench GOMAXPROCS=256 heap=4096MiB warm=10s n=8 idle=1000000 stacks=200 ptrheap=true toucher=false gcgap=1s discard=2
+Allocating pointer-dense heap...
+Spawning 1000000 idle + 200 stack-growing goroutines...
+Warming up (10s) — letting NUMA balancer mark pages...
+  2s elapsed, 0 touch passes
+  4s elapsed, 0 touch passes
+  6s elapsed, 0 touch passes
+  8s elapsed, 0 touch passes
+  10s elapsed, 0 touch passes
+Warm-up done (0 touch passes).
+Measuring 10 GC cycles (2 discarded, 8 measured, gcgap=1s)...
+  [discard 1/2] wall=7.143383847s stw=446.792µs
+  [discard 2/2] wall=5.331714188s stw=855.44µs
+
+=== GC Pause Results ===
+heap=4096  MiB  n=8     GOMAXPROCS=256   idle-goroutines=1000000  stack-goroutines=200  ptrheap=true  toucher=false  gcgap=1s  discard=2
+
+Wall-clock time per runtime.GC() call (includes concurrent phases):
+  p50=6.050001002s  p75=6.244339176s  p90=6.313140483s  p95=6.313140483s  p99=6.313140483s  max=6.313140483s
+  mean=5.971723444s  total=47.773787555s  pauses>5ms: 8/8 (100.0%)
+
+Runtime STW-only time (from MemStats.PauseNs, excludes concurrent GC):
+  p50=474.711µs   p95=742.248µs   p99=742.248µs   max=742.248µs   mean=525.121µs 
+
+Notes:
+  - Build with GOEXPERIMENT=numa to enable mbind(MPOL_PREFERRED) on arenas.
+  - Ensure kernel.numa_balancing=1 (check: cat /proc/sys/kernel/numa_balancing).
+  - Run on a machine with 2+ NUMA nodes for meaningful results.
+  - Larger -heap and longer -warm show more pronounced differences.
+gc-pause-bench GOMAXPROCS=256 heap=4096MiB warm=10s n=8 idle=1000000 stacks=200 ptrheap=true toucher=false gcgap=1s discard=2
+Allocating pointer-dense heap...
+Spawning 1000000 idle + 200 stack-growing goroutines...
+Warming up (10s) — letting NUMA balancer mark pages...
+  2s elapsed, 0 touch passes
+  4s elapsed, 0 touch passes
+  6s elapsed, 0 touch passes
+  8s elapsed, 0 touch passes
+  10s elapsed, 0 touch passes
+Warm-up done (0 touch passes).
+Measuring 10 GC cycles (2 discarded, 8 measured, gcgap=1s)...
+  [discard 1/2] wall=6.426505892s stw=437.385µs
+  [discard 2/2] wall=5.272770494s stw=430.85µs
+
+=== GC Pause Results ===
+heap=4096  MiB  n=8     GOMAXPROCS=256   idle-goroutines=1000000  stack-goroutines=200  ptrheap=true  toucher=false  gcgap=1s  discard=2
+
+Wall-clock time per runtime.GC() call (includes concurrent phases):
+  p50=5.884601942s  p75=5.929986429s  p90=5.956562788s  p95=5.956562788s  p99=5.956562788s  max=5.956562788s
+  mean=5.767860998s  total=46.142887986s  pauses>5ms: 8/8 (100.0%)
+
+Runtime STW-only time (from MemStats.PauseNs, excludes concurrent GC):
+  p50=403.525µs   p95=722.848µs   p99=722.848µs   max=722.848µs   mean=484.375µs 
+
+Notes:
+  - Build with GOEXPERIMENT=numa to enable mbind(MPOL_PREFERRED) on arenas.
+  - Ensure kernel.numa_balancing=1 (check: cat /proc/sys/kernel/numa_balancing).
+  - Run on a machine with 2+ NUMA nodes for meaningful results.
+  - Larger -heap and longer -warm show more pronounced differences.
+gc-pause-bench GOMAXPROCS=256 heap=4096MiB warm=10s n=8 idle=1000000 stacks=200 ptrheap=true toucher=false gcgap=1s discard=2
+Allocating pointer-dense heap...
+Spawning 1000000 idle + 200 stack-growing goroutines...
+Warming up (10s) — letting NUMA balancer mark pages...
+  2s elapsed, 0 touch passes
+  4s elapsed, 0 touch passes
+  6s elapsed, 0 touch passes
+  8s elapsed, 0 touch passes
+  10s elapsed, 0 touch passes
+Warm-up done (0 touch passes).
+Measuring 10 GC cycles (2 discarded, 8 measured, gcgap=1s)...
+  [discard 1/2] wall=7.483054656s stw=466.674µs
+  [discard 2/2] wall=5.289517483s stw=550.181µs
+
+=== GC Pause Results ===
+heap=4096  MiB  n=8     GOMAXPROCS=256   idle-goroutines=1000000  stack-goroutines=200  ptrheap=true  toucher=false  gcgap=1s  discard=2
+
+Wall-clock time per runtime.GC() call (includes concurrent phases):
+  p50=6.045041889s  p75=6.145824855s  p90=6.172464133s  p95=6.172464133s  p99=6.172464133s  max=6.172464133s
+  mean=5.963202514s  total=47.705620118s  pauses>5ms: 8/8 (100.0%)
+
+Runtime STW-only time (from MemStats.PauseNs, excludes concurrent GC):
+  p50=444.279µs   p95=3.897299ms  p99=3.897299ms  max=3.897299ms  mean=961.682µs 
+
+Notes:
+  - Build with GOEXPERIMENT=numa to enable mbind(MPOL_PREFERRED) on arenas.
+  - Ensure kernel.numa_balancing=1 (check: cat /proc/sys/kernel/numa_balancing).
+  - Run on a machine with 2+ NUMA nodes for meaningful results.
+  - Larger -heap and longer -warm show more pronounced differences.
+gc-pause-bench GOMAXPROCS=256 heap=4096MiB warm=10s n=8 idle=1000000 stacks=200 ptrheap=true toucher=false gcgap=1s discard=2
+Allocating pointer-dense heap...
+Spawning 1000000 idle + 200 stack-growing goroutines...
+Warming up (10s) — letting NUMA balancer mark pages...
+  2s elapsed, 0 touch passes
+  4s elapsed, 0 touch passes
+  6s elapsed, 0 touch passes
+  8s elapsed, 0 touch passes
+  10s elapsed, 0 touch passes
+Warm-up done (0 touch passes).
+Measuring 10 GC cycles (2 discarded, 8 measured, gcgap=1s)...
+  [discard 1/2] wall=7.193417291s stw=496.68µs
+  [discard 2/2] wall=4.977420523s stw=579.118µs
+
+=== GC Pause Results ===
+heap=4096  MiB  n=8     GOMAXPROCS=256   idle-goroutines=1000000  stack-goroutines=200  ptrheap=true  toucher=false  gcgap=1s  discard=2
+
+Wall-clock time per runtime.GC() call (includes concurrent phases):
+  p50=5.986959678s  p75=6.007820948s  p90=6.063230992s  p95=6.063230992s  p99=6.063230992s  max=6.063230992s
+  mean=5.943917372s  total=47.551338983s  pauses>5ms: 8/8 (100.0%)
+
+Runtime STW-only time (from MemStats.PauseNs, excludes concurrent GC):
+  p50=403.979µs   p95=720.169µs   p99=720.169µs   max=720.169µs   mean=504.057µs 
+
+Notes:
+  - Build with GOEXPERIMENT=numa to enable mbind(MPOL_PREFERRED) on arenas.
+  - Ensure kernel.numa_balancing=1 (check: cat /proc/sys/kernel/numa_balancing).
+  - Run on a machine with 2+ NUMA nodes for meaningful results.
+  - Larger -heap and longer -warm show more pronounced differences.
+gc-pause-bench GOMAXPROCS=256 heap=4096MiB warm=10s n=8 idle=1000000 stacks=200 ptrheap=true toucher=false gcgap=1s discard=2
+Allocating pointer-dense heap...
+Spawning 1000000 idle + 200 stack-growing goroutines...
+Warming up (10s) — letting NUMA balancer mark pages...
+  2s elapsed, 0 touch passes
+  4s elapsed, 0 touch passes
+  6s elapsed, 0 touch passes
+  8s elapsed, 0 touch passes
+  10s elapsed, 0 touch passes
+Warm-up done (0 touch passes).
+Measuring 10 GC cycles (2 discarded, 8 measured, gcgap=1s)...
+  [discard 1/2] wall=7.455684857s stw=480.896µs
+  [discard 2/2] wall=5.753546438s stw=409.015µs
+
+=== GC Pause Results ===
+heap=4096  MiB  n=8     GOMAXPROCS=256   idle-goroutines=1000000  stack-goroutines=200  ptrheap=true  toucher=false  gcgap=1s  discard=2
+
+Wall-clock time per runtime.GC() call (includes concurrent phases):
+  p50=5.671919663s  p75=6.074637665s  p90=6.162645876s  p95=6.162645876s  p99=6.162645876s  max=6.162645876s
+  mean=5.753991724s  total=46.031933795s  pauses>5ms: 8/8 (100.0%)
+
+Runtime STW-only time (from MemStats.PauseNs, excludes concurrent GC):
+  p50=439.09µs    p95=1.609734ms  p99=1.609734ms  max=1.609734ms  mean=614.02µs  
+
+Notes:
+  - Build with GOEXPERIMENT=numa to enable mbind(MPOL_PREFERRED) on arenas.
+  - Ensure kernel.numa_balancing=1 (check: cat /proc/sys/kernel/numa_balancing).
+  - Run on a machine with 2+ NUMA nodes for meaningful results.
+  - Larger -heap and longer -warm show more pronounced differences.
+gc-pause-bench GOMAXPROCS=256 heap=4096MiB warm=10s n=8 idle=1000000 stacks=200 ptrheap=true toucher=false gcgap=1s discard=2
+Allocating pointer-dense heap...
+Spawning 1000000 idle + 200 stack-growing goroutines...
+Warming up (10s) — letting NUMA balancer mark pages...
+  2s elapsed, 0 touch passes
+  4s elapsed, 0 touch passes
+  6s elapsed, 0 touch passes
+  8s elapsed, 0 touch passes
+  10s elapsed, 0 touch passes
+Warm-up done (0 touch passes).
+Measuring 10 GC cycles (2 discarded, 8 measured, gcgap=1s)...
+  [discard 1/2] wall=7.093706334s stw=461.94µs
+  [discard 2/2] wall=5.500910163s stw=700.968µs
+
+=== GC Pause Results ===
+heap=4096  MiB  n=8     GOMAXPROCS=256   idle-goroutines=1000000  stack-goroutines=200  ptrheap=true  toucher=false  gcgap=1s  discard=2
+
+Wall-clock time per runtime.GC() call (includes concurrent phases):
+  p50=5.319493387s  p75=5.412172064s  p90=5.595330994s  p95=5.595330994s  p99=5.595330994s  max=5.595330994s
+  mean=5.345244866s  total=42.761958933s  pauses>5ms: 8/8 (100.0%)
+
+Runtime STW-only time (from MemStats.PauseNs, excludes concurrent GC):
+  p50=439.758µs   p95=774.985µs   p99=774.985µs   max=774.985µs   mean=476.276µs 
+
+Notes:
+  - Build with GOEXPERIMENT=numa to enable mbind(MPOL_PREFERRED) on arenas.
+  - Ensure kernel.numa_balancing=1 (check: cat /proc/sys/kernel/numa_balancing).
+  - Run on a machine with 2+ NUMA nodes for meaningful results.
+  - Larger -heap and longer -warm show more pronounced differences.
+gc-pause-bench GOMAXPROCS=256 heap=4096MiB warm=10s n=8 idle=1000000 stacks=200 ptrheap=true toucher=false gcgap=1s discard=2
+Allocating pointer-dense heap...
+Spawning 1000000 idle + 200 stack-growing goroutines...
+Warming up (10s) — letting NUMA balancer mark pages...
+  2s elapsed, 0 touch passes
+  4s elapsed, 0 touch passes
+  6s elapsed, 0 touch passes
+  8s elapsed, 0 touch passes
+  10s elapsed, 0 touch passes
+Warm-up done (0 touch passes).
+Measuring 10 GC cycles (2 discarded, 8 measured, gcgap=1s)...
+  [discard 1/2] wall=6.961767655s stw=524.528µs
+  [discard 2/2] wall=5.039240505s stw=420.239µs
+
+=== GC Pause Results ===
+heap=4096  MiB  n=8     GOMAXPROCS=256   idle-goroutines=1000000  stack-goroutines=200  ptrheap=true  toucher=false  gcgap=1s  discard=2
+
+Wall-clock time per runtime.GC() call (includes concurrent phases):
+  p50=5.463550486s  p75=5.551664061s  p90=5.600634957s  p95=5.600634957s  p99=5.600634957s  max=5.600634957s
+  mean=5.426057167s  total=43.408457336s  pauses>5ms: 8/8 (100.0%)
+
+Runtime STW-only time (from MemStats.PauseNs, excludes concurrent GC):
+  p50=464.132µs   p95=783.595µs   p99=783.595µs   max=783.595µs   mean=540.246µs 
+
+Notes:
+  - Build with GOEXPERIMENT=numa to enable mbind(MPOL_PREFERRED) on arenas.
+  - Ensure kernel.numa_balancing=1 (check: cat /proc/sys/kernel/numa_balancing).
+  - Run on a machine with 2+ NUMA nodes for meaningful results.
+  - Larger -heap and longer -warm show more pronounced differences.
+gc-pause-bench GOMAXPROCS=256 heap=4096MiB warm=10s n=8 idle=1000000 stacks=200 ptrheap=true toucher=false gcgap=1s discard=2
+Allocating pointer-dense heap...
+Spawning 1000000 idle + 200 stack-growing goroutines...
+Warming up (10s) — letting NUMA balancer mark pages...
+  2s elapsed, 0 touch passes
+  4s elapsed, 0 touch passes
+  6s elapsed, 0 touch passes
+  8s elapsed, 0 touch passes
+  10s elapsed, 0 touch passes
+Warm-up done (0 touch passes).
+Measuring 10 GC cycles (2 discarded, 8 measured, gcgap=1s)...
+  [discard 1/2] wall=7.31215374s stw=515.438µs
+  [discard 2/2] wall=5.601446622s stw=433.548µs
+
+=== GC Pause Results ===
+heap=4096  MiB  n=8     GOMAXPROCS=256   idle-goroutines=1000000  stack-goroutines=200  ptrheap=true  toucher=false  gcgap=1s  discard=2
+
+Wall-clock time per runtime.GC() call (includes concurrent phases):
+  p50=5.809394965s  p75=5.903825734s  p90=5.966878329s  p95=5.966878329s  p99=5.966878329s  max=5.966878329s
+  mean=5.751334345s  total=46.010674764s  pauses>5ms: 8/8 (100.0%)
+
+Runtime STW-only time (from MemStats.PauseNs, excludes concurrent GC):
+  p50=496.458µs   p95=1.085798ms  p99=1.085798ms  max=1.085798ms  mean=600.452µs 
+
+Notes:
+  - Build with GOEXPERIMENT=numa to enable mbind(MPOL_PREFERRED) on arenas.
+  - Ensure kernel.numa_balancing=1 (check: cat /proc/sys/kernel/numa_balancing).
+  - Run on a machine with 2+ NUMA nodes for meaningful results.
+  - Larger -heap and longer -warm show more pronounced differences.
+gc-pause-bench GOMAXPROCS=256 heap=4096MiB warm=10s n=8 idle=1000000 stacks=200 ptrheap=true toucher=false gcgap=1s discard=2
+Allocating pointer-dense heap...
+Spawning 1000000 idle + 200 stack-growing goroutines...
+Warming up (10s) — letting NUMA balancer mark pages...
+  2s elapsed, 0 touch passes
+  4s elapsed, 0 touch passes
+  6s elapsed, 0 touch passes
+  8s elapsed, 0 touch passes
+  10s elapsed, 0 touch passes
+Warm-up done (0 touch passes).
+Measuring 10 GC cycles (2 discarded, 8 measured, gcgap=1s)...
+  [discard 1/2] wall=6.948432869s stw=375.227µs
+  [discard 2/2] wall=5.589187147s stw=418.952µs
+
+=== GC Pause Results ===
+heap=4096  MiB  n=8     GOMAXPROCS=256   idle-goroutines=1000000  stack-goroutines=200  ptrheap=true  toucher=false  gcgap=1s  discard=2
+
+Wall-clock time per runtime.GC() call (includes concurrent phases):
+  p50=5.249342469s  p75=5.444362948s  p90=5.83235524s  p95=5.83235524s  p99=5.83235524s  max=5.83235524s
+  mean=5.271879096s  total=42.175032774s  pauses>5ms: 8/8 (100.0%)
+
+Runtime STW-only time (from MemStats.PauseNs, excludes concurrent GC):
+  p50=433.635µs   p95=853.528µs   p99=853.528µs   max=853.528µs   mean=537.908µs 
+
+Notes:
+  - Build with GOEXPERIMENT=numa to enable mbind(MPOL_PREFERRED) on arenas.
+  - Ensure kernel.numa_balancing=1 (check: cat /proc/sys/kernel/numa_balancing).
+  - Run on a machine with 2+ NUMA nodes for meaningful results.
+  - Larger -heap and longer -warm show more pronounced differences.

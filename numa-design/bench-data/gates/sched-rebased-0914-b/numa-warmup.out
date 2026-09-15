@@ -1,0 +1,9 @@
+goos: linux
+goarch: amd64
+pkg: runtime
+cpu: INTEL(R) XEON(R) PLATINUM 8592+
+BenchmarkPingPongHog-256                  	  977910	      1223 ns/op
+BenchmarkCreateGoroutines-256             	 1823601	       712.6 ns/op
+BenchmarkCreateGoroutinesParallel-256     	 6875554	       199.2 ns/op
+BenchmarkCreateGoroutinesCapture-256      	  150876	      7285 ns/op	     145 B/op	       5 allocs/op
+PASS

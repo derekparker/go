@@ -1,0 +1,2 @@
+numa: confined to node 1 cpus 128
+numa: nodes 2

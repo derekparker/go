@@ -1,0 +1,12 @@
+name=sched-rebased-0914-b workload=sched n=10 procs=256 mem=4096 pin=0 host=numa-dell
+arms:
+stock ba2d41763e36a9f30af6813920791a5dae76daaa  
+numa ba2d41763e36a9f30af6813920791a5dae76daaa numa 
+started=
+6.12.0-211.7.1.el10_2.x86_64
+numa_balancing=1
+Mem:              30           2          17           0          10          27
+[always] madvise never
+/home/deparker/numa-gate-out/sched-rebased-0914-b/bins/stock/w: go1.28-devel_ba2d41763e Mon Sep 14 11:20:54 2026 -0700 
+/home/deparker/numa-gate-out/sched-rebased-0914-b/bins/numa/w: go1.28-devel_ba2d41763e Mon Sep 14 11:20:54 2026 -0700 X:numa 	build	GOEXPERIMENT=numa 
+finished=2026-09-14T16:35:46-04:00

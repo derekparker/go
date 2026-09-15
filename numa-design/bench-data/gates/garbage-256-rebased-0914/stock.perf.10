@@ -1,0 +1,15 @@
+# started on Mon Sep 14 15:46:17 2026
+
+
+ Performance counter stats for '/home/deparker/numa-gate-out/garbage-256-rebased-0914/bins/stock/w -benchmem=4096 -benchnum=1':
+
+ 3,014,503,868,894      task-clock:u                     #   50.835 CPUs utilized             
+ 3,937,682,801,347      cycles:u                         #    1.306 GHz                       
+ 1,699,124,887,174      instructions:u                   #    0.43  insn per cycle            
+
+      59.299938136 seconds time elapsed
+
+    2699.280784000 seconds user
+     192.175438000 seconds sys
+
+

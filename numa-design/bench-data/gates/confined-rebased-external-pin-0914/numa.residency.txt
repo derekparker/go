@@ -1,0 +1,49 @@
+run=1
+policy=prefer:1 node=N0 pages=851
+policy=prefer:1 node=N1 pages=538504
+policy=prefer:1 pages=539355
+vmas=69
+run=2
+policy=prefer:1 node=N0 pages=851
+policy=prefer:1 node=N1 pages=537199
+policy=prefer:1 pages=538050
+vmas=72
+run=3
+policy=prefer:1 node=N0 pages=851
+policy=prefer:1 node=N1 pages=539668
+policy=prefer:1 pages=540519
+vmas=67
+run=4
+policy=prefer:1 node=N0 pages=835
+policy=prefer:1 node=N1 pages=537009
+policy=prefer:1 pages=537844
+vmas=69
+run=5
+policy=prefer:1 node=N0 pages=835
+policy=prefer:1 node=N1 pages=540650
+policy=prefer:1 pages=541485
+vmas=70
+run=6
+policy=prefer:1 node=N0 pages=851
+policy=prefer:1 node=N1 pages=539142
+policy=prefer:1 pages=539993
+vmas=71
+run=7
+policy=prefer:1 node=N0 pages=851
+policy=prefer:1 node=N1 pages=536442
+policy=prefer:1 pages=537293
+vmas=69
+run=8
+policy=prefer:1 node=N0 pages=851
+policy=prefer:1 node=N1 pages=543218
+policy=prefer:1 pages=544069
+vmas=69
+run=9
+policy=prefer:1 node=N0 pages=835
+policy=prefer:1 node=N1 pages=543194
+policy=prefer:1 pages=544029
+vmas=65
+run=10
+policy=prefer:0 node=N0 pages=534245
+policy=prefer:0 pages=534245
+vmas=70

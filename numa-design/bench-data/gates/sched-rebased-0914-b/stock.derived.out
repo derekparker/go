@@ -1,0 +1,50 @@
+BenchmarkPingPongHog-256                  	 1088036	      1083 ns/op
+BenchmarkCreateGoroutines-256             	 1632548	       720.7 ns/op
+BenchmarkCreateGoroutinesParallel-256     	 6374064	       208.5 ns/op
+BenchmarkCreateGoroutinesCapture-256      	  148880	      8461 ns/op	     145 B/op	       5 allocs/op
+BenchmarkPingPongHog-256                  	  985326	      1126 ns/op
+BenchmarkCreateGoroutines-256             	 1642508	       709.2 ns/op
+BenchmarkCreateGoroutinesParallel-256     	 6202048	       210.5 ns/op
+BenchmarkCreateGoroutinesCapture-256      	  190783	      7511 ns/op	     145 B/op	       5 allocs/op
+BenchmarkPingPongHog-256                  	 1353302	       978.8 ns/op
+BenchmarkCreateGoroutines-256             	 1658600	       713.4 ns/op
+BenchmarkCreateGoroutinesParallel-256     	 5492131	       232.4 ns/op
+BenchmarkCreateGoroutinesCapture-256      	  198102	      7525 ns/op	     145 B/op	       5 allocs/op
+BenchmarkPingPongHog-256                  	  885256	      1175 ns/op
+BenchmarkCreateGoroutines-256             	 1664485	       706.2 ns/op
+BenchmarkCreateGoroutinesParallel-256     	 5966973	       248.6 ns/op
+BenchmarkCreateGoroutinesCapture-256      	  149602	      7157 ns/op	     144 B/op	       5 allocs/op
+BenchmarkPingPongHog-256                  	 1052910	      1218 ns/op
+BenchmarkCreateGoroutines-256             	 1723285	       705.5 ns/op
+BenchmarkCreateGoroutinesParallel-256     	 5716659	       229.8 ns/op
+BenchmarkCreateGoroutinesCapture-256      	  145609	      7488 ns/op	     145 B/op	       5 allocs/op
+BenchmarkPingPongHog-256                  	  948223	      1175 ns/op
+BenchmarkCreateGoroutines-256             	 1708302	       712.3 ns/op
+BenchmarkCreateGoroutinesParallel-256     	 5422134	       250.8 ns/op
+BenchmarkCreateGoroutinesCapture-256      	  160870	      7434 ns/op	     145 B/op	       5 allocs/op
+BenchmarkPingPongHog-256                  	  971864	      1221 ns/op
+BenchmarkCreateGoroutines-256             	 1632066	       701.5 ns/op
+BenchmarkCreateGoroutinesParallel-256     	 6085262	       214.1 ns/op
+BenchmarkCreateGoroutinesCapture-256      	  167295	      7430 ns/op	     144 B/op	       5 allocs/op
+BenchmarkPingPongHog-256                  	 1046091	      1098 ns/op
+BenchmarkCreateGoroutines-256             	 1729527	       719.7 ns/op
+BenchmarkCreateGoroutinesParallel-256     	 5950737	       179.9 ns/op
+BenchmarkCreateGoroutinesCapture-256      	  184023	      7802 ns/op	     145 B/op	       5 allocs/op
+BenchmarkPingPongHog-256                  	  965818	      1222 ns/op
+BenchmarkCreateGoroutines-256             	 1684996	       712.9 ns/op
+BenchmarkCreateGoroutinesParallel-256     	 5172849	       208.0 ns/op
+BenchmarkCreateGoroutinesCapture-256      	  208702	      8026 ns/op	     145 B/op	       5 allocs/op
+BenchmarkPingPongHog-256                  	 1010010	      1162 ns/op
+BenchmarkCreateGoroutines-256             	 1661263	       713.4 ns/op
+BenchmarkCreateGoroutinesParallel-256     	 6402181	       182.5 ns/op
+BenchmarkCreateGoroutinesCapture-256      	  221494	      7277 ns/op	     145 B/op	       5 allocs/op
+BenchmarkRun/sched-256 1 6547020668 ns/op 1.301e+11 cycles/op 3.777e+10 instructions/op 1.228 GHz 16.2 CPUs-busy 229 hint-faults 3110 pages-migrated
+BenchmarkRun/sched-256 1 6774095471 ns/op 1.295e+11 cycles/op 3.980e+10 instructions/op 1.198 GHz 16.0 CPUs-busy 225 hint-faults 5176 pages-migrated
+BenchmarkRun/sched-256 1 6930483932 ns/op 1.069e+11 cycles/op 3.751e+10 instructions/op 1.124 GHz 13.7 CPUs-busy 231 hint-faults 2065 pages-migrated
+BenchmarkRun/sched-256 1 6627168434 ns/op 1.193e+11 cycles/op 3.771e+10 instructions/op 1.163 GHz 15.5 CPUs-busy 724 hint-faults 2211 pages-migrated
+BenchmarkRun/sched-256 1 6738594794 ns/op 1.129e+11 cycles/op 3.857e+10 instructions/op 1.136 GHz 14.7 CPUs-busy 520 hint-faults 1664 pages-migrated
+BenchmarkRun/sched-256 1 6797798837 ns/op 1.028e+11 cycles/op 3.770e+10 instructions/op 1.114 GHz 13.6 CPUs-busy 624 hint-faults 4794 pages-migrated
+BenchmarkRun/sched-256 1 7796098622 ns/op 1.267e+11 cycles/op 4.359e+10 instructions/op 1.201 GHz 13.5 CPUs-busy 726 hint-faults 3752 pages-migrated
+BenchmarkRun/sched-256 1 6600102245 ns/op 1.329e+11 cycles/op 3.899e+10 instructions/op 1.282 GHz 15.7 CPUs-busy 273 hint-faults 1550 pages-migrated
+BenchmarkRun/sched-256 1 6903906433 ns/op 1.114e+11 cycles/op 3.822e+10 instructions/op 1.213 GHz 13.3 CPUs-busy 107 hint-faults 1568 pages-migrated
+BenchmarkRun/sched-256 1 7090769935 ns/op 1.450e+11 cycles/op 4.202e+10 instructions/op 1.309 GHz 15.6 CPUs-busy 778 hint-faults 1177 pages-migrated
